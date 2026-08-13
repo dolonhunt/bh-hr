@@ -4,6 +4,7 @@ import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { LucideIcon } from "lucide-react";
 import { ReactNode } from "react";
+import { Sparklines, SparklinesLine, SparklinesSpots } from "react-sparklines";
 
 interface KpiCardProps {
   label: string;
@@ -13,6 +14,8 @@ interface KpiCardProps {
   iconClass?: string;
   footer?: ReactNode;
   onClick?: () => void;
+  sparkline?: number[];
+  sparklineColor?: string;
 }
 
 export function KpiCard({
@@ -23,7 +26,23 @@ export function KpiCard({
   iconClass,
   footer,
   onClick,
+  sparkline,
+  sparklineColor,
 }: KpiCardProps) {
+  const accentColor = iconClass?.includes("emerald")
+    ? "#10b981"
+    : iconClass?.includes("amber")
+      ? "#f59e0b"
+      : iconClass?.includes("rose")
+        ? "#ef4444"
+        : iconClass?.includes("violet")
+          ? "#a855f7"
+          : iconClass?.includes("teal")
+            ? "#14b8a6"
+            : iconClass?.includes("primary")
+              ? "#10b981"
+              : "#10b981";
+
   return (
     <Card
       className={cn(
@@ -82,6 +101,27 @@ export function KpiCard({
           <Icon className="size-4 sm:size-5" />
         </div>
       </div>
+      {/* Sparkline */}
+      {sparkline && sparkline.length > 1 && (
+        <div className="mt-2 sm:mt-3 -mb-1 h-6 sm:h-8 pointer-events-none">
+          <Sparklines
+            data={sparkline}
+            limit={sparkline.length}
+            width={120}
+            height={32}
+            margin={2}
+          >
+            <SparklinesLine
+              color={sparklineColor ?? accentColor}
+              style={{ strokeWidth: 1.5, fill: "none" }}
+            />
+            <SparklinesSpots
+              size={2}
+              style={{ fill: sparklineColor ?? accentColor }}
+            />
+          </Sparklines>
+        </div>
+      )}
     </Card>
   );
 }

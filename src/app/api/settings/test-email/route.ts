@@ -8,12 +8,25 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Recipient 'to' is required" }, { status: 400 });
   }
 
+  // Callers may supply a custom subject/body (e.g. the Email Template Editor
+  // passes the rendered subject/body of the template being tested). Fall back
+  // to a generic test message when they are not provided so existing callers
+  // keep working.
+  const subject: string =
+    typeof body.subject === "string" && body.subject.trim()
+      ? body.subject
+      : "Test Email from TeamHub HR";
+  const emailBody: string =
+    typeof body.body === "string" && body.body.trim()
+      ? body.body
+      : "This is a test email from TeamHub HR system. SMTP is configured correctly.";
+
   // Simulate sending a test email by creating an EmailLog entry
   const log = await db.emailLog.create({
     data: {
       recipientTo: to,
-      subject: "Test Email from TeamHub HR",
-      body: "This is a test email from TeamHub HR system. SMTP is configured correctly.",
+      subject,
+      body: emailBody,
       status: "SENT",
       errorMessage: null,
       sentAt: new Date(),
@@ -27,7 +40,12 @@ export async function POST(req: NextRequest) {
       entityType: "EmailLog",
       entityId: log.id,
       description: `Test email simulated to ${to}`,
-      metadata: JSON.stringify({ note: "Test email simulated", to }),
+      metadata: JSON.stringify({
+        note: "Test email simulated",
+        to,
+        subjectLength: subject.length,
+        bodyLength: emailBody.length,
+      }),
     },
   });
 

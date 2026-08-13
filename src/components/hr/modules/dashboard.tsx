@@ -75,6 +75,7 @@ export function DashboardModule() {
   const setModule = useApp((s) => s.setModule);
   const openEmployee = useApp((s) => s.openEmployee);
   const setQuickAction = useApp((s) => s.setQuickAction);
+  const authUser = useApp((s) => s.authUser);
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -117,6 +118,11 @@ export function DashboardModule() {
   }
 
   const { kpis } = data;
+  const hour = new Date().getHours();
+  const greeting = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
+  const attendanceRate = kpis.totalEmployees > 0
+    ? Math.round((kpis.presentToday / kpis.totalEmployees) * 100)
+    : 0;
 
   return (
     <div className="space-y-6">
@@ -142,6 +148,80 @@ export function DashboardModule() {
         }
       />
 
+      {/* Welcome hero banner */}
+      <Card className="relative overflow-hidden border-border/60 shadow-soft bg-gradient-to-br from-primary/5 via-primary/3 to-transparent">
+        <div className="absolute top-0 right-0 w-64 h-64 rounded-full bg-primary/8 blur-3xl -mr-20 -mt-20" />
+        <CardContent className="relative p-5 sm:p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div className="min-w-0">
+            <div className="text-sm text-muted-foreground">
+              {new Date().toLocaleDateString("en-US", {
+                weekday: "long",
+                year: "numeric",
+                month: "long",
+                day: "numeric",
+              })}
+            </div>
+            <h2 className="text-xl sm:text-2xl font-bold tracking-tight mt-1">
+              {greeting}, {authUser?.name?.split(" ")[0] ?? "HR"} 👋
+            </h2>
+            <p className="text-sm text-muted-foreground mt-1">
+              You have{" "}
+              <span className="font-semibold text-foreground">
+                {kpis.pendingLeave} pending leave request{kpis.pendingLeave !== 1 ? "s" : ""}
+              </span>{" "}
+              and{" "}
+              <span className="font-semibold text-foreground">
+                {kpis.docsGenerated} document{kpis.docsGenerated !== 1 ? "s" : ""} generated
+              </span>
+              .
+            </p>
+          </div>
+          {/* Attendance ring */}
+          <div className="flex items-center gap-4 flex-shrink-0">
+            <div className="relative size-20 flex items-center justify-center">
+              <svg className="size-20 -rotate-90" viewBox="0 0 80 80">
+                <circle
+                  cx="40" cy="40" r="34"
+                  fill="none"
+                  stroke="oklch(0.92 0 0)"
+                  strokeWidth="6"
+                />
+                <circle
+                  cx="40" cy="40" r="34"
+                  fill="none"
+                  stroke="#10b981"
+                  strokeWidth="6"
+                  strokeLinecap="round"
+                  strokeDasharray={`${2 * Math.PI * 34 * attendanceRate / 100} ${2 * Math.PI * 34}`}
+                  className="transition-all duration-1000"
+                />
+              </svg>
+              <div className="absolute text-center">
+                <div className="text-lg font-bold tabular-nums">{attendanceRate}%</div>
+                <div className="text-[9px] text-muted-foreground uppercase">Present</div>
+              </div>
+            </div>
+            <div className="hidden sm:block text-sm space-y-0.5">
+              <div className="flex items-center gap-2">
+                <span className="size-2 rounded-full bg-emerald-500" />
+                <span className="text-muted-foreground">Present</span>
+                <span className="font-semibold tabular-nums">{kpis.presentToday}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="size-2 rounded-full bg-amber-500" />
+                <span className="text-muted-foreground">On Leave</span>
+                <span className="font-semibold tabular-nums">{kpis.onLeaveToday}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="size-2 rounded-full bg-rose-500" />
+                <span className="text-muted-foreground">Late</span>
+                <span className="font-semibold tabular-nums">{kpis.lateToday}</span>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* KPI row */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
         <KpiCard
@@ -151,6 +231,7 @@ export function DashboardModule() {
           iconClass="bg-primary/10 text-primary"
           delta={{ value: "+3", trend: "up" }}
           onClick={() => setModule("employees")}
+          sparkline={[17, 17, 18, 18, 19, 19, 20]}
         />
         <KpiCard
           label="Present Today"
@@ -159,6 +240,7 @@ export function DashboardModule() {
           iconClass="bg-emerald-500/10 text-emerald-600"
           delta={{ value: "+5%", trend: "up" }}
           onClick={() => setModule("attendance")}
+          sparkline={data.attendanceTrend.map((d) => d.present)}
         />
         <KpiCard
           label="On Leave"
@@ -166,6 +248,7 @@ export function DashboardModule() {
           icon={CalendarDays}
           iconClass="bg-amber-500/10 text-amber-600"
           onClick={() => setModule("leave")}
+          sparkline={data.attendanceTrend.map((d) => d.leave)}
         />
         <KpiCard
           label="Late Today"
@@ -174,6 +257,7 @@ export function DashboardModule() {
           iconClass="bg-rose-500/10 text-rose-600"
           delta={{ value: "-2", trend: "down" }}
           onClick={() => setModule("attendance")}
+          sparkline={data.attendanceTrend.map((d) => d.late)}
         />
         <KpiCard
           label="Pending Leave"
@@ -188,6 +272,7 @@ export function DashboardModule() {
           icon={FileText}
           iconClass="bg-violet-500/10 text-violet-600"
           onClick={() => setModule("documents")}
+          sparkline={[2, 3, 5, 4, 6, 7, kpis.docsGenerated]}
         />
         <KpiCard
           label="Documents Sent"
@@ -195,6 +280,7 @@ export function DashboardModule() {
           icon={Mail}
           iconClass="bg-teal-500/10 text-teal-600"
           onClick={() => setModule("documents")}
+          sparkline={[1, 2, 2, 3, 4, 5, kpis.docsSent]}
         />
         <KpiCard
           label="Failed Emails"

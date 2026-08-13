@@ -7,6 +7,7 @@ import { BulkGenerateDialog } from "./modules/bulk-generate-dialog";
 import { PayslipDialog } from "./modules/payslip-dialog";
 import { AttendanceEntryDialog } from "./modules/attendance-entry-dialog";
 import { LeaveEntryDialog } from "./modules/leave-entry-dialog";
+import { PayrollBatchDialog } from "./modules/payroll-batch-dialog";
 
 export function QuickActions() {
   const quickAction = useApp((s) => s.quickAction);
@@ -28,6 +29,10 @@ export function QuickActions() {
       />
       <PayslipDialog
         open={quickAction === "create-payslip"}
+        onOpenChange={(o) => !o && setQuickAction(null)}
+      />
+      <PayrollBatchDialog
+        open={quickAction === "payroll-batch-create"}
         onOpenChange={(o) => !o && setQuickAction(null)}
       />
       <AttendanceEntryDialog

@@ -58,11 +58,13 @@ import {
   Eye,
   EyeOff,
   MapPin,
+  FileText,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { StatusBadge } from "../shared/status-badge";
 import { EmptyState } from "../shared/empty-state";
+import { EmailTemplateEditor } from "./email-template-editor";
 
 const TABS = [
   { key: "organization", label: "Organization", icon: Building2 },
@@ -71,6 +73,7 @@ const TABS = [
   { key: "designations", label: "Designations", icon: Award },
   { key: "leave-types", label: "Leave Types", icon: CalendarDays },
   { key: "email", label: "Email Settings", icon: Mail },
+  { key: "email-templates", label: "Email Templates", icon: FileText },
   { key: "numbering", label: "Document Numbering", icon: Hash },
 ] as const;
 
@@ -120,6 +123,7 @@ export function SettingsModule() {
           {tab === "designations" && <DesignationsTab />}
           {tab === "leave-types" && <LeaveTypesTab />}
           {tab === "email" && <EmailSettingsTab />}
+          {tab === "email-templates" && <EmailTemplatesTab />}
           {tab === "numbering" && <DocumentNumberingTab />}
         </div>
       </div>
@@ -1019,6 +1023,11 @@ function EmailSettingsTab() {
       )}
     </Card>
   );
+}
+
+// ============================== EMAIL TEMPLATES ==============================
+function EmailTemplatesTab() {
+  return <EmailTemplateEditor />;
 }
 
 function TestEmailDialog({

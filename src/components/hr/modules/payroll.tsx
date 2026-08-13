@@ -41,10 +41,12 @@ import {
   Check,
   Pencil,
   Trash2,
+  Layers,
 } from "lucide-react";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { toast } from "sonner";
 import { PayslipDialog } from "./payslip-dialog";
+import { PayrollBatchDialog } from "./payroll-batch-dialog";
 import { ExportButton } from "../shared/export-button";
 
 export function PayrollModule() {
@@ -59,6 +61,7 @@ export function PayrollModule() {
 
   const [payslipOpen, setPayslipOpen] = useState(false);
   const [presetEmployee, setPresetEmployee] = useState<string | null>(null);
+  const [batchOpen, setBatchOpen] = useState(false);
 
   const { data: departments } = useQuery({
     queryKey: ["departments"],
@@ -155,6 +158,15 @@ export function PayrollModule() {
                 search,
               }}
             />
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setBatchOpen(true)}
+            >
+              <Layers className="size-4 mr-1.5" />{" "}
+              <span className="hidden sm:inline">Batch Create</span>
+              <span className="sm:hidden">Batch</span>
+            </Button>
             <Button size="sm" onClick={() => generatePayslip()}>
               <Plus className="size-4 mr-1.5" /> <span className="hidden sm:inline">Create Payroll</span>
               <span className="sm:hidden">Create</span>
@@ -423,6 +435,14 @@ export function PayrollModule() {
         onSaved={() => {
           qc.invalidateQueries({ queryKey: ["payroll"] });
           qc.invalidateQueries({ queryKey: ["documents"] });
+        }}
+      />
+
+      <PayrollBatchDialog
+        open={batchOpen}
+        onOpenChange={(o) => {
+          setBatchOpen(o);
+          if (!o) qc.invalidateQueries({ queryKey: ["payroll"] });
         }}
       />
     </div>

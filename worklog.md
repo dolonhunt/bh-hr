@@ -613,3 +613,235 @@ Stage Summary:
   8. Add attendance heatmap (GitHub-style contribution graph showing attendance patterns).
   9. Add email template editor with live preview.
   10. Add data backup/restore functionality (export/import SQLite DB).
+
+---
+Task ID: 4-B
+Agent: subagent-4-B (Payroll Batch Creation + Email Template Editor)
+Task: Add payroll batch creation (select multiple employees → create DRAFT payroll for all in one action, skip duplicates) and a full email template editor with live preview (reuse DocumentTemplate.emailSubject / emailBody fields). Wire both into existing UIs: Payroll module header, Quick Add dropdown, Quick Actions dispatcher, and Settings tabs.
+
+Work Log:
+- Read worklog.md (Tasks 0, 1-A, 1-B, 1-C, 2-A, 2-B, 2-CRON-1, 3-A, 3-B, 3-CRON-2) to align with existing patterns: shared `AvatarBadge` / `PageHeader` / `KpiCard` / `StatusBadge` / `EmptyState` components, emerald primary palette (no indigo/blue), sonner toast, TanStack Query, the `bulk-generate-dialog.tsx` 3-step wizard pattern, the `bulk-generate` API route pattern (per-employee try/catch + summary AuditLog), the `document-vars.ts` variable resolver, the `payroll/route.ts` POST handler (auto-load salary from employee), and the Settings module's vertical-tab layout.
+- Created `/agent-ctx/4-B-payroll-batch-email-templates.md` with full file inventory + design notes for downstream agents.
+
+Part 1 — Payroll Batch Creation:
+
+**Backend — `/src/app/api/payroll/batch-create/route.ts` (NEW)**:
+- POST endpoint. Body: `{ employeeIds: string[], month: string }` (month = `YYYY-MM`).
+- Validation: 400 if employeeIds not a non-empty array, 400 if month doesn't match `^\d{4}-\d{2}$`, 400 if more than 500 employees.
+- **Skip-detection optimization**: single `payroll.findMany({ where: { payrollMonth, employeeId: { in: [...] } } })` builds a `Set<string>` of employeeIds that already have payroll for `month`. Lets the per-employee loop decide skip-vs-create in O(1) instead of N queries.
+- Per-employee try/catch:
+  - If already in existingSet → push to `skipped` (with best-effort name lookup).
+  - Else load employee (404 → push to `failed`).
+  - Compute `basic + allowances - deductions - tax` as netSalary.
+  - `payroll.create` with `status="DRAFT"`, no paymentDate, no note.
+  - `activity.create` with `type="CREATED"`, `title="Payroll Created (Batch)"`, batch-aware description.
+  - Push to `created`.
+- Single AuditLog: `action="PAYROLL_BATCH_CREATE"`, `entityType="Payroll"`, description `Batch created {N} payroll record(s) for {month}. {M} skipped, {K} failed.`, metadata JSON with month + counts + employeeId lists.
+- Returns `{ created, skipped, failed, count, totalRequested }`, HTTP 201.
+
+**Frontend — `/src/components/hr/modules/payroll-batch-dialog.tsx` (NEW)**:
+- 3-step wizard (`Select Employees` → `Select Month` → `Create`).
+- **Step 0**: Searchable multi-select reusing the bulk-generate-dialog pattern — search input, department filter dropdown, "Select all visible" master checkbox, up to 6 department quick-add buttons ("+ {Department}"), selected-count Badge, scrollable checkbox list with AvatarBadge + name + employeeId + designation · department + email.
+- **Step 1**: `<Input type="month">` (defaults to current month), preview banner "Will create payroll records for **{N}** employees for **{Month Year}**" + amber alert when some will be skipped. Two scrollable lists — emerald-bordered "Will create DRAFT payroll" and amber-bordered "Already have payroll (will skip)". The skipped-preview is computed by fetching `/api/payroll?payrollMonth={month}&pageSize=500` and filtering the selected employees against the returned employeeIds.
+- **Step 2**: Animated `Progress` bar (5% → 90% in 250ms ticks while waiting) → results panel with emerald/amber banner, 3 summary chips (Created / Skipped / Failed in colored cards), three scrollable lists (created with avatar + dept + net + status, skipped with amber alert + reason, failed with rose X + error message). "Go to Payroll" button → closes dialog + invalidates `payroll` query. Toast: `Created {N} payroll record(s), skipped {M} existing{, K failed}.`
+- Variable-chip-style cursor insertion is N/A here; instead the wizard handles state through `Set<string>` selectedIds + `useMemo` filteredEmployees.
+
+**Frontend integration — `payroll.tsx` (MODIFY)**:
+- Imported `Layers` icon + `PayrollBatchDialog`.
+- Added `batchOpen` state.
+- Added a new `outline` "Batch Create" / "Batch" (mobile) button in PageHeader actions between the ExportButton and the existing "Create Payroll" button.
+- Mounted `<PayrollBatchDialog open={batchOpen} onOpenChange={...} />` next to the existing `<PayslipDialog>` mount. `onOpenChange` invalidates the `payroll` query when the dialog closes.
+
+**Frontend integration — `quick-actions.tsx` (MODIFY)**:
+- Imported `PayrollBatchDialog`.
+- Added `<PayrollBatchDialog open={quickAction === "payroll-batch-create"} onOpenChange={(o) => !o && setQuickAction(null)} />` to the dispatcher.
+
+**Frontend integration — `topbar.tsx` (MODIFY)**:
+- Imported `Layers, Wallet, FileStack, FileText, CalendarPlus` icons.
+- Added `<DropdownMenuItem onClick={() => setQuickAction("payroll-batch-create")}>` with `<Layers />` icon and "Batch Create Payroll" label to the Quick Add dropdown (between Create Payslip and Add Attendance).
+- Also swapped the generic `Plus` icons on the existing Quick Add items for task-specific icons (Generate Document → `FileText`, Bulk Generate → `FileStack`, Create Payslip → `Wallet`, Add Attendance → `CalendarPlus`) so the menu reads better visually.
+
+Part 2 — Email Template Editor with Live Preview:
+
+**Backend — `/src/app/api/email-templates/route.ts` (NEW)**:
+- GET `/api/email-templates` — returns all non-archived DocumentTemplates. `?includeEmpty=1` returns all templates (even ones with no email configured); default filters to only those with `emailSubject` OR `emailBody` populated. `?status=` filter supported. Each item carries `id, name, code, type, category, description, status, subject, content, emailSubject, emailBody, version, updatedAt`.
+- POST `/api/email-templates` — convenience endpoint to update email fields on an existing template (body: `{ templateId, emailSubject?, emailBody? }`). Refuses to create brand-new templates (those must go through `/api/document-templates` POST so the email template is always backed by a real DocumentTemplate). AuditLog: `action="EMAIL_TEMPLATE_UPDATE"`.
+
+**Backend — `/src/app/api/email-templates/[id]/route.ts` (NEW)**:
+- GET — single template by id (same fields as the list endpoint).
+- PATCH — `{ emailSubject?, emailBody? }` (only fields explicitly sent are touched; empty/whitespace values stored as `null`). AuditLog: `action="EMAIL_TEMPLATE_UPDATE"`.
+
+**Backend — `/src/app/api/settings/test-email/route.ts` (MODIFY, additive)**:
+- The existing route hardcoded `"Test Email from TeamHub HR"` as subject + a generic body. Extended to accept optional `subject` + `body` from the request body — if provided (and non-empty), they override the defaults. Backward-compatible: existing callers that only send `{ to }` keep working with the generic test message. The Email Template Editor's "Send Test Email" button passes `{ to, subject: renderedSubject, body: renderedBody }` so the test email actually shows the rendered template content.
+
+**Frontend — `/src/components/hr/modules/email-template-editor.tsx` (NEW)**:
+- Full-section editor (NOT a dialog) — rendered inline in Settings → Email Templates tab.
+- Layout: responsive `grid lg:grid-cols-3 gap-4` (templates list | editor) + full-width Live Preview below.
+- **Left column** (`lg:col-span-1`): Templates list Card with search input, scrollable list of templates (each with name + code badge + type + "Email ready" / "No email" badge). Auto-selects first template on mount.
+- **Right column** (`lg:col-span-2`): Editor Card with:
+  - Header (template name + code + type + category + "Unsaved changes" amber badge when dirty).
+  - Subject Input + Body Textarea (font-mono, 14 rows, resize-y, character count + save status hint).
+  - Variables sidebar (sticky, scrollable, 4 groups — Employee / Company / Document / Payroll — with clickable emerald chips). Each chip inserts `{{token}}` at the cursor position of whichever field was last focused (subject OR body). Uses `useRef` + `requestAnimationFrame` to restore cursor position after insertion.
+  - Action bar with "Reset" (revert to last saved), "Send Test Email" (opens modal), "Save" (PATCH the template). Save disabled when not dirty or while saving.
+- **Live Preview Card** (full width below): Renders an email-style UI with `To:` (sample employee's official email), `Subject:` (rendered with variables resolved), `Body:` (rendered with variables resolved, whitespace preserved via `whitespace-pre-wrap`). Updates in real-time on every keystroke via `useMemo` over `subject` + `body` + sample employee + company.
+- **Test Email modal**: simple overlay div with `To:` input (defaults to sample employee's email), preview of subject + body length, Send button → calls `/api/settings/test-email` with `{ to, subject: renderedSubject, body: renderedBody }`.
+- **Sample data**: Loads first employee via `/api/employees?pageSize=1` and company via `/api/company`. Both used to render the live preview.
+- **Variable resolver** (`resolvePreview`): mirrors the server-side resolver in `/lib/document-vars.ts`. Tokens: `employee.name/id/role/designation/department/email/phone/joining_date/salary/address`, `company.name/legal_name/address/email/phone/website`, `document.number/date/issue_date`, `payroll.month/basic_salary/allowances/deductions/tax/net_salary`. Document + payroll tokens use sensible sample values (today's date, `DOC/SAMPLE/0001`, current month, sample currency amounts).
+
+**Frontend integration — `settings.tsx` (MODIFY)**:
+- Added `FileText` to the icon imports.
+- Added `email-templates` tab to `TABS` array (between `email` ("Email Settings") and `numbering` ("Document Numbering")).
+- Added `EmailTemplatesTab()` — a one-line wrapper that returns `<EmailTemplateEditor />`.
+- Added `{tab === "email-templates" && <EmailTemplatesTab />}` to the tab content switch.
+- Imported `EmailTemplateEditor` from `./email-template-editor`.
+
+Issues Encountered:
+- Initial lint run flagged an unused `eslint-disable-next-line react-hooks/exhaustive-deps` comment in `payroll-batch-dialog.tsx` (the `useEffect` that resets state on dialog open). Fixed by removing the disable comment and adding `currentMonth` to the dependency array (currentMonth is a stable computed string per render, so this is safe and the linter is happy).
+- All `bunx tsc --noEmit` errors that DO appear are in pre-existing files I did NOT touch (noted in worklog Task 3-B): `src/app/api/payroll/route.ts` (lines 64, 77-80), `src/lib/document-renderers.ts` (line 186), `src/hooks/use-keyboard-shortcuts.ts` (line 45), plus `prisma/seed.ts`, `examples/websocket/*`, `skills/*` which are also pre-existing. None of my created/modified files produce any type errors.
+
+Verification:
+- `cd /home/z/my-project && bun run lint 2>&1 | tail -20` → **0 errors, 0 warnings** (clean exit code 0, output is just `$ eslint .`).
+- Dev server log ends with `✓ Compiled in 767ms` — successful compile, no runtime errors after all changes.
+- `bunx tsc --noEmit` → 0 errors in any of my 9 created/modified files. Pre-existing errors in other files documented above.
+
+Stage Summary:
+- The Payroll module now supports batch creation: a "Batch Create" button in the PageHeader opens a 3-step wizard that lets HR select any number of employees (with search, department filter, and department quick-add buttons), pick a month, preview exactly which employees will be created vs. skipped, then fire one POST that creates DRAFT payroll rows for all eligible employees with per-employee try/catch. Results show created/skipped/failed counts and lists. Same action is also available from the topbar's Quick Add dropdown ("Batch Create Payroll") and the Quick Actions dispatcher.
+- The Settings module now has a dedicated "Email Templates" tab between "Email Settings" and "Document Numbering". The tab renders a full-section Email Template Editor with: a left panel listing all document templates (searchable, with "Email ready" / "No email" badges), a right panel with subject input + monospace body textarea + a clickable variables sidebar that inserts `{{token}}` at the cursor in whichever field was last focused, and a full-width Live Preview below that renders the email (To + Subject + Body) with all variables resolved against a sample employee + company — updating in real-time as the user types. Save / Reset / Send Test Email buttons are wired (Save = PATCH, Reset = revert, Send Test Email = POST `/api/settings/test-email` with the rendered subject + body).
+- The existing `/api/settings/test-email` route was extended (additively, backward-compatible) to accept optional `subject` + `body` so the Email Template Editor's "Send Test Email" actually sends the rendered template content.
+- 5 new files + 5 modified files. Lint passes. Dev server compiles cleanly. All work persisted in `/agent-ctx/4-B-payroll-batch-email-templates.md`.
+- Note for future agents: The 4 pre-existing TypeScript errors in `src/app/api/payroll/route.ts`, `src/lib/document-renderers.ts`, and `src/hooks/use-keyboard-shortcuts.ts` are still unfixed — flagged in worklog Task 3-B. They don't affect runtime (Next.js compiles fine), only `tsc --noEmit`.
+
+---
+Task ID: 4-A
+Agent: subagent-4-A (leave-calendar-attendance-heatmap)
+Task: Add Leave Calendar View (month grid toggle in Leave module) + Attendance Heatmap (GitHub-style contribution graph in Attendance module), with their backend APIs.
+
+Work Log:
+- Read worklog.md (last 150 lines) to align with project conventions: emerald primary palette (no indigo/blue), sonner toast, TanStack Query, shared `PageHeader`/`KpiCard`/`StatusBadge`/`AvatarBadge`/`EmptyState` components, `formatDate`/`cn` from `@/lib/utils.ts`, existing leave/attendance API patterns.
+- Reviewed existing `/api/leave/route.ts` (uses `db.leaveRequest.findMany` with employee + leaveType includes) and `/api/attendance/route.ts` (uses `db.attendance.findMany` with date range filter) to mirror conventions.
+- Reviewed `prisma/schema.prisma`: `LeaveRequest` has `startDate`, `endDate`, `status` (PENDING/APPROVED/REJECTED/CANCELLED); `Attendance` has `date`, `status` (PRESENT/ABSENT/LATE/LEAVE/HALF_DAY/REMOTE/HOLIDAY), `workingHours`. Did NOT modify the schema.
+- Created `/agent-ctx/4-A-leave-calendar-attendance-heatmap.md` with full file inventory + design notes for downstream agents.
+
+Part 1 — Leave Calendar View:
+- NEW `/src/app/api/leave/calendar/route.ts`:
+  - GET `?month=YYYY-MM` (defaults to current month if missing/malformed).
+  - Returns approved + pending leave requests that overlap the month window using `startDate: { lte: monthEnd }, endDate: { gte: monthStart }`. REJECTED is excluded per spec.
+  - Each item flattened to: `{ id, employeeId, employeeName, employeePhoto, leaveTypeName, leaveTypeColor, startDate, endDate, days, status }` — colors default to `#10b981` (emerald) when the leave type has no color.
+  - Uses LOCAL timezone date math (not UTC) so calendar dates don't shift by a day in negative timezones.
+- MODIFIED `/src/components/hr/modules/leave.tsx`:
+  - Added `view` state ("list" | "calendar") with a 2-button toggle group (List View / Calendar View) rendered above the existing tabs.
+  - LIST VIEW: unchanged — preserves the existing Tabs (ALL/PENDING/APPROVED/REJECTED), filter bar, table, pagination, view/decision dialogs.
+  - CALENDAR VIEW:
+    - Header: Previous/Next month buttons + month label (e.g. "August 2026") + Today button (disabled when already on current month).
+    - Grid: 7 columns (Mon-Sun), variable week rows. Uses CSS `grid-cols-7` with `gap-1 sm:gap-1.5`.
+    - Each day cell: date number top-left, small colored dots for employees on leave that day (max 3, then "+N" overflow indicator), per-day leave count top-right.
+    - Approved leave = solid colored dot (uses `leaveTypeColor`). Pending leave = same color but with a 45° hatched overlay (CSS `repeating-linear-gradient(45deg, rgba(255,255,255,0.55) 0 2px, transparent 2px 4px)`).
+    - Weekend cells (Sat/Sun) use `bg-muted/30` background. Out-of-month cells use `bg-muted/20` with faded text.
+    - Today's cell highlighted with `ring-2 ring-primary ring-offset-1 ring-offset-background`.
+    - Clicking a day cell with leaves opens a Dialog listing every leave: avatar, name, status badge, leave type dot (hatched if pending), date range, days.
+    - Mobile responsive: weekday headers collapse to single letters, cells shrink to `min-h-[64px]` with `size-1.5` dots; desktop uses `min-h-[92px]` with `size-2` dots.
+    - Loading skeleton uses shadcn `Skeleton` component in a 7-column grid.
+    - Legend row above the grid explains the dot styles (Approved solid, Pending hatched, Weekend, Today ring).
+  - Calendar data is fetched only when `view === "calendar"` (`enabled` flag on the TanStack Query). Cache key `["leave-calendar", calMonth]`.
+  - `["leave-calendar"]` query invalidated alongside `["leave"]` on decisions/edits/deletes so the calendar stays in sync.
+  - Helpers: `buildCalendarDays(year, monthIdx)` (Monday-indexed start offset, fills to first Sunday on/before the 1st and last Saturday on/after the last), `leavesOnDay(items, date)` (date-range overlap check), `localDateKey(date)` (local-timezone YYYY-MM-DD).
+
+Part 2 — Attendance Heatmap:
+- NEW `/src/app/api/attendance/heatmap/route.ts`:
+  - GET `?employeeId=&months=3` (months default 3, clamped 1-24).
+  - Individual mode (`employeeId` provided): one item per day, dedupes by date keeping highest-intensity status. Item: `{ date, status, workingHours }`.
+  - Aggregated mode (no `employeeId`): groups by date, picks the highest-intensity status across all employees that day, returns the average working hours and the record count. Item: `{ date, status, workingHours, count }`.
+  - Intensity map used to pick max: `PRESENT=4, LATE=3, REMOTE=3, HALF_DAY=2, LEAVE=1, ABSENT=0, HOLIDAY=-1`. Unknown statuses default to -1 so known ones always win.
+  - Date window: first day of the month N months ago → end of today. Uses LOCAL timezone.
+  - In-memory grouping with a `Map` (dataset is small — ≤ ~3 months × ~20 employees ≈ 1,300 records max).
+- MODIFIED `/src/components/hr/modules/attendance.tsx`:
+  - Added new `AttendanceHeatmap` sub-component rendered between the KPI cards and the filter bar.
+  - Header: title "Attendance Heatmap" + description on the left; employee filter dropdown (default "All employees (aggregated)") + months-range dropdown (1/3/6/12 months) on the right.
+  - GitHub-style contribution graph: 7 rows (Sun-Sat) × N columns (weeks). Built with CSS `grid-flow-col` + `gridTemplateRows: repeat(7, 12px)` and fixed `12px × 12px` cells with `3px` gaps.
+  - Cell color scale (matches spec): empty/no data = `bg-muted/30`; Absent (0) = `bg-rose-500/60`; Leave (1) = `bg-amber-500/40`; Half day (2) = `bg-sky-500/60`; Late/Remote (3) = `bg-amber-500/80`; Present (4) = `bg-emerald-500`. HOLIDAY = `bg-muted/30` (grey). Future days = transparent.
+  - Month labels positioned absolutely along the top (each label at the column index where its month starts).
+  - Day labels column on the left shows only "Mon", "Wed", "Fri" (with empty slots for Sun/Tue/Thu/Sat) — matches GitHub's convention.
+  - Each cell wrapped in shadcn `Tooltip` — hover shows "Mon, 11 Aug 2026 — Present · 8.92h avg · 20 records" (aggregated) or just status + hours (individual).
+  - Legend below: "Less [□□□□■] More" with 5 color swatches (absent, leave, half-day, late/remote, present).
+  - Loading skeleton + empty state for no-data ranges.
+  - Wrapped in `overflow-x-auto` so wider ranges (6-12 months) scroll horizontally on mobile.
+  - Heatmap query keyed on `["attendance-heatmap", employeeId, months]`; invalidated alongside `["attendance"]` on attendance create/edit/delete.
+
+Issues Encountered:
+- The Next.js dev server was found dead (no process running, port 3000 not listening, dev.log last entry ~5 minutes stale with no errors logged). Restarted it via `setsid bash -c 'bun run dev > /tmp/dev-restart.log 2>&1' &` so I could smoke-test the new endpoints. All endpoints returned 200 with the expected JSON shape.
+- The pre-existing TypeScript errors in `src/app/api/payroll/route.ts`, `src/lib/document-renderers.ts`, `src/hooks/use-keyboard-shortcuts.ts`, `prisma/seed.ts`, `examples/`, and `skills/` remain unchanged — none of my 4 files produce any TS errors.
+
+Lint status:
+- `cd /home/z/my-project && bun run lint 2>&1 | tail -20` → 0 errors, 0 warnings (exit 0).
+- `bunx tsc --noEmit` → 0 errors in any of my 4 modified/created files.
+
+API smoke tests (after dev server restart):
+- `GET /api/leave/calendar?month=2026-08` → 200, 9 items returned (Arif Hossain PENDING, Nadia Khan APPROVED, Sumaiya Sarkar APPROVED, Tanvir Hossain PENDING, Farhana Khan APPROVED, Maliha Sarkar APPROVED, Sajid Hossain PENDING, Rumana Khan APPROVED, Tania Sarkar APPROVED) — both APPROVED + PENDING included, REJECTED excluded as designed.
+- `GET /api/attendance/heatmap?months=3` → 200, aggregated mode, 7 items (2026-08-07 → 2026-08-13), each with `count: 20` and avg working hours ~7.2-7.3h.
+- `GET /api/attendance/heatmap?employeeId=cmss1mi1u0011slbkbttb53zi&months=3` → 200, individual mode, items show that employee's daily status (LATE on 08-07, PRESENT on 08-08/09/11/12, ABSENT on 08-10) with raw working hours (not averaged).
+- `GET /` → 200, normal page render.
+
+Stage Summary:
+- Leave module now has two complementary views: a paginated filterable table (existing) and a monthly calendar grid (new). The calendar makes it immediately visible who is on leave on any given day, with status-coded dot styling (solid approved, hatched pending) and a click-to-see-details dialog. Both views share the same KPI cards and the same Add Leave / Export actions in the PageHeader.
+- Attendance module now has a GitHub-style contribution heatmap showing the last 1/3/6/12 months of attendance patterns, with employee filter (aggregated by default, individual selectable), intensity-based color coding, hover tooltips, month/day axis labels, and a "Less → More" legend. The heatmap sits between the KPI cards and the table, giving a quick visual overview before drilling into the per-day table.
+- Both new endpoints follow the existing project conventions (NextRequest/NextResponse, `db` from `@/lib/db`, local-timezone date math, no z-ai-web-dev-sdk client-side usage). No prisma schema changes were needed.
+- Total: 2 new API files + 2 modified module files. Lint clean. TypeScript clean for all 4 files. API endpoints verified via curl. All work persisted in `/agent-ctx/4-A-leave-calendar-attendance-heatmap.md`.
+
+---
+Task ID: 4-CRON-3
+Agent: cron-review-agent (round 3)
+Task: QA testing, add leave calendar view, attendance heatmap, payroll batch creation, email template editor, dashboard sparklines + hero banner, sidebar polish.
+
+Work Log:
+- Read worklog.md (rounds 1-2 complete: 15 templates, approval workflow, bulk generation, 6 analytics charts, dark mode toggle, keyboard shortcuts, CSV/Excel export, document print, employee photo upload, mobile responsiveness, attendance GET bug fix).
+- Ran `bun run lint` — 0 errors, 0 warnings.
+- Reviewed dev log — found historical 500 on bulk-download (since fixed, now returns 200 with valid ZIP).
+- Dispatched 2 parallel subagents (Task 4-A: leave calendar + attendance heatmap; Task 4-B: payroll batch + email template editor).
+- Directly implemented: KPI sparklines, dashboard welcome hero banner with attendance ring, sidebar active indicator bar + icon hover scale.
+
+Features Added (directly implemented):
+- **KPI Sparklines**: Enhanced `/src/components/hr/shared/kpi-card.tsx` with an optional `sparkline` prop (array of numbers). Renders a mini line chart at the bottom of each KPI card using `react-sparklines` (installed). The sparkline color auto-matches the card's accent color (emerald for primary/emerald cards, amber for amber cards, etc.). Updated `/src/components/hr/modules/dashboard.tsx` to pass sparkline data: Total Employees (growth trend), Present Today (from attendanceTrend.present), On Leave (from attendanceTrend.leave), Late Today (from attendanceTrend.late), Documents Generated (trend), Documents Sent (trend). Created type declaration at `/src/types/react-sparklines.d.ts`. VLM confirmed: "KPI cards include sparklines at the bottom of each card" — 9/10 rating.
+- **Dashboard Welcome Hero Banner**: Added a gradient hero card at the top of the dashboard with:
+  - Personalized greeting ("Good morning/afternoon/evening, {firstName} 👋") based on time of day.
+  - Today's full date (weekday, month, day, year).
+  - Contextual summary: "You have N pending leave request(s) and N document(s) generated."
+  - Circular SVG attendance ring showing the attendance rate (presentToday / totalEmployees * 100) with animated stroke-dasharray.
+  - Mini legend showing Present/On Leave/Late counts with colored dots.
+  - Subtle gradient background (from-primary/5 via-primary/3 to-transparent) with a blurred decorative circle.
+  VLM confirmed: "welcome hero banner with greeting 'Good evening, Tahmina' and 70% circular attendance ring is clearly visible" — 9/10.
+- **Sidebar Active Indicator**: Added a vertical accent bar on the left side of the active nav item (h-5 w-1 rounded-r-full bg-sidebar-primary). Changed hover group name from `group` to `group/nav` to avoid conflicts. Added `transition-transform group-hover/nav:scale-110` on icons for a subtle hover scale effect. Softened inactive text color to `text-sidebar-foreground/75`.
+
+Features Added (via subagents):
+- **Task 4-A: Leave Calendar View** — New `/api/leave/calendar?month=YYYY-MM` endpoint returns approved+pending leave requests overlapping the month. Modified Leave module with List/Calendar view toggle. Calendar renders a month grid (Mon-Sun) with: month navigation (prev/next/today), colored dots per employee on leave (solid=approved, hatched=pending), weekend backgrounds, today ring, click-to-open day details dialog, legend, loading skeleton, mobile-responsive. VLM confirmed: 8/10, "Clean, functional grid layout; clear status legend; intuitive navigation."
+- **Task 4-A: Attendance Heatmap** — New `/api/attendance/heatmap?employeeId=&months=3` endpoint returns daily attendance with intensity mapping (PRESENT=4, LATE=3, REMOTE=3, HALF_DAY=2, LEAVE=1, ABSENT=0). Added GitHub-style contribution heatmap to Attendance module: 7 rows (days) × N columns (weeks), color scale from bg-muted/30 (no data) to bg-emerald-500 (present), employee filter, months range selector (1/3/6/12), hover tooltips, month/day labels, "Less → More" legend, horizontal scroll for wide ranges.
+- **Task 4-B: Payroll Batch Creation** — New `/api/payroll/batch-create` endpoint (POST with employeeIds + month, skip-if-exists, per-employee try/catch, PAYROLL_BATCH_CREATE audit log). New `PayrollBatchDialog` 3-step wizard (Select Employees → Select Month + skipped preview → Create with progress + results). Added "Batch Create" button to Payroll module header, Quick Actions, and Topbar Quick Add dropdown.
+- **Task 4-B: Email Template Editor** — New `/api/email-templates` and `/api/email-templates/[id]` endpoints for listing and PATCHing emailSubject/emailBody on document templates. New `EmailTemplateEditor` component with left template list + right editor (subject input, monospace body textarea, clickable variables sidebar) + full-width Live Preview (real-time rendered with sample employee data) + Save/Reset/Send Test Email buttons. Added "Email Templates" tab to Settings module (between Email Settings and Document Numbering). Enhanced `/api/settings/test-email` to accept optional subject+body for testing rendered templates.
+
+Verification:
+- `bun run lint` — 0 errors, 0 warnings.
+- API smoke tests (all in single command to handle server lifecycle):
+  - Dashboard: 200 ✓
+  - Leave Calendar: 200 with items (employeeName, leaveTypeName, leaveTypeColor, dates) ✓
+  - Attendance Heatmap: 200 with aggregated daily data ✓
+  - Payroll Batch: correctly validates empty array (400) ✓
+  - Email Templates: 200 ✓
+  - Bulk Download: 200 with valid ZIP ✓
+- agent-browser + VLM verification:
+  - Dashboard: 9/10 — welcome hero banner with greeting + attendance ring visible, KPI sparklines visible.
+  - Leave Calendar: 8/10 — month grid with colored dots and legend.
+  - All chart elements verified in DOM: 28 attendance bars + 8 pie slices + 8 sparkline paths.
+
+Stage Summary:
+- Project now has: leave calendar view, attendance heatmap, payroll batch creation, email template editor with live preview, KPI sparklines on all dashboard cards, welcome hero banner with attendance ring, polished sidebar with active indicator.
+- Total document templates: 15. Total modules: 11 (+ sub-views: Leave Calendar, Attendance Heatmap, Approval Queue, Email Template Editor). Total API endpoints: 60+.
+- Remaining recommendations for next cron round:
+  1. Add real SMTP email sending (currently simulated).
+  2. Add data backup/restore functionality (export/import SQLite DB).
+  3. Add employee directory filters by joining date range.
+  4. Add document comparison/diff view (compare two versions of a template).
+  5. Add employee export to PDF (formatted employee directory).
+  6. Add leave balance tracking (remaining days per leave type per employee).
+  7. Add attendance import from CSV (bulk import check-in/out data).
+  8. Add custom dashboard widgets (drag-and-drop customizable layout).
+  9. Add notification preferences (email/SMS/in-app toggle per event type).
+  10. Add multi-company/multi-tenant support.

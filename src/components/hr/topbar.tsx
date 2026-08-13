@@ -24,6 +24,11 @@ import {
   Command,
   ChevronDown,
   Keyboard,
+  Layers,
+  Wallet,
+  FileStack,
+  FileText,
+  CalendarPlus,
 } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -121,16 +126,19 @@ export function Topbar() {
               <UserIcon className="size-4 mr-2" /> Add Employee
             </DropdownMenuItem>
             <DropdownMenuItem onClick={() => setQuickAction("generate-document")}>
-              <Search className="size-4 mr-2" /> Generate Document
+              <FileText className="size-4 mr-2" /> Generate Document
             </DropdownMenuItem>
             <DropdownMenuItem onClick={() => setQuickAction("bulk-generate")}>
-              <Plus className="size-4 mr-2" /> Bulk Generate Documents
+              <FileStack className="size-4 mr-2" /> Bulk Generate Documents
             </DropdownMenuItem>
             <DropdownMenuItem onClick={() => setQuickAction("create-payslip")}>
-              <Plus className="size-4 mr-2" /> Create Payslip
+              <Wallet className="size-4 mr-2" /> Create Payslip
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => setQuickAction("payroll-batch-create")}>
+              <Layers className="size-4 mr-2" /> Batch Create Payroll
             </DropdownMenuItem>
             <DropdownMenuItem onClick={() => setQuickAction("add-attendance")}>
-              <Plus className="size-4 mr-2" /> Add Attendance
+              <CalendarPlus className="size-4 mr-2" /> Add Attendance
             </DropdownMenuItem>
             <DropdownMenuItem onClick={() => setQuickAction("add-leave")}>
               <Plus className="size-4 mr-2" /> Add Leave

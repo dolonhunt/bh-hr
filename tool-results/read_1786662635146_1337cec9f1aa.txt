@@ -1,0 +1,863 @@
+     1→"use client";
+     2→
+     3→import { useEffect, useMemo, useState } from "react";
+     4→import {
+     5→  Dialog,
+     6→  DialogContent,
+     7→  DialogDescription,
+     8→  DialogFooter,
+     9→  DialogHeader,
+    10→  DialogTitle,
+    11→} from "@/components/ui/dialog";
+    12→import { Button } from "@/components/ui/button";
+    13→import { Input } from "@/components/ui/input";
+    14→import { Label } from "@/components/ui/label";
+    15→import { Badge } from "@/components/ui/badge";
+    16→import { Checkbox } from "@/components/ui/checkbox";
+    17→import { Progress } from "@/components/ui/progress";
+    18→import {
+    19→  Select,
+    20→  SelectContent,
+    21→  SelectItem,
+    22→  SelectTrigger,
+    23→  SelectValue,
+    24→} from "@/components/ui/select";
+    25→import { ScrollArea } from "@/components/ui/scroll-area";
+    26→import { AvatarBadge } from "../shared/avatar-badge";
+    27→import { StatusBadge } from "../shared/status-badge";
+    28→import { toast } from "sonner";
+    29→import { useQuery, useQueryClient } from "@tanstack/react-query";
+    30→import {
+    31→  Loader2,
+    32→  ArrowRight,
+    33→  ArrowLeft,
+    34→  Check,
+    35→  CheckCircle2,
+    36→  Mail,
+    37→  Download,
+    38→  FileStack,
+    39→  Search,
+    40→  XCircle,
+    41→  Users,
+    42→  FileText,
+    43→  Layers,
+    44→} from "lucide-react";
+    45→
+    46→const STEPS = [
+    47→  "Select Employees",
+    48→  "Select Template",
+    49→  "Review",
+    50→  "Generate",
+    51→  "Results",
+    52→] as const;
+    53→
+    54→interface Employee {
+    55→  id: string;
+    56→  employeeId: string;
+    57→  fullName: string;
+    58→  officialEmail?: string | null;
+    59→  phone?: string | null;
+    60→  department?: { id?: string; name?: string | null } | null;
+    61→  designation?: { id?: string; name?: string | null } | null;
+    62→  role?: { id?: string; name?: string | null } | null;
+    63→  photo?: string | null;
+    64→  employmentStatus?: string | null;
+    65→}
+    66→
+    67→interface Template {
+    68→  id: string;
+    69→  name: string;
+    70→  code: string;
+    71→  type: string;
+    72→  category?: string | null;
+    73→  description?: string | null;
+    74→  status?: string | null;
+    75→}
+    76→
+    77→interface GeneratedDoc {
+    78→  id: string;
+    79→  documentNumber: string;
+    80→  title: string;
+    81→  type: string;
+    82→  employeeId: string;
+    83→  employee?: Employee | null;
+    84→  template?: Template | null;
+    85→  status?: string | null;
+    86→}
+    87→
+    88→interface BulkGenerateResult {
+    89→  generated: GeneratedDoc[];
+    90→  failed: { employeeId: string; name: string; error: string }[];
+    91→  count: number;
+    92→  totalRequested: number;
+    93→}
+    94→
+    95→interface Props {
+    96→  open: boolean;
+    97→  onOpenChange: (open: boolean) => void;
+    98→}
+    99→
+   100→export function BulkGenerateDialog({ open, onOpenChange }: Props) {
+   101→  const [step, setStep] = useState(0);
+   102→  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+   103→  const [empSearch, setEmpSearch] = useState("");
+   104→  const [deptFilter, setDeptFilter] = useState<string>("ALL");
+   105→  const [templateId, setTemplateId] = useState<string>("");
+   106→  const [generating, setGenerating] = useState(false);
+   107→  const [progress, setProgress] = useState(0);
+   108→  const [result, setResult] = useState<BulkGenerateResult | null>(null);
+   109→  const [emailSending, setEmailSending] = useState(false);
+   110→  const [emailSentCount, setEmailSentCount] = useState(0);
+   111→  const [emailTotal, setEmailTotal] = useState(0);
+   112→
+   113→  const queryClient = useQueryClient();
+   114→
+   115→  // Reset state when dialog opens.
+   116→  useEffect(() => {
+   117→    if (open) {
+   118→      setStep(0);
+   119→      setSelectedIds(new Set());
+   120→      setEmpSearch("");
+   121→      setDeptFilter("ALL");
+   122→      setTemplateId("");
+   123→      setGenerating(false);
+   124→      setProgress(0);
+   125→      setResult(null);
+   126→      setEmailSending(false);
+   127→      setEmailSentCount(0);
+   128→      setEmailTotal(0);
+   129→    }
+   130→  }, [open]);
+   131→
+   132→  // Load all employees (page size 200 to cover the seed's 20 + future growth).
+   133→  const employeesQuery = useQuery<{ items: Employee[] }>({
+   134→    queryKey: ["bulk-employees", "pageSize", 200],
+   135→    queryFn: async () => {
+   136→      const r = await fetch("/api/employees?pageSize=200");
+   137→      if (!r.ok) throw new Error("Failed to load employees");
+   138→      return r.json();
+   139→    },
+   140→    enabled: open,
+   141→  });
+   142→
+   143→  // Load all active templates.
+   144→  const templatesQuery = useQuery<{ items: Template[] }>({
+   145→    queryKey: ["bulk-templates", "ACTIVE"],
+   146→    queryFn: async () => {
+   147→      const r = await fetch("/api/document-templates?status=ACTIVE&pageSize=200");
+   148→      if (!r.ok) throw new Error("Failed to load templates");
+   149→      return r.json();
+   150→    },
+   151→    enabled: open,
+   152→  });
+   153→
+   154→  const employees = employeesQuery.data?.items ?? [];
+   155→  const templates = templatesQuery.data?.items ?? [];
+   156→
+   157→  const departments = useMemo(() => {
+   158→    const map = new Map<string, { id: string; name: string }>();
+   159→    for (const e of employees) {
+   160→      if (e.department?.id && e.department?.name) {
+   161→        if (!map.has(e.department.id)) {
+   162→          map.set(e.department.id, {
+   163→            id: e.department.id,
+   164→            name: e.department.name,
+   165→          });
+   166→        }
+   167→      }
+   168→    }
+   169→    return Array.from(map.values()).sort((a, b) =>
+   170→      a.name.localeCompare(b.name)
+   171→    );
+   172→  }, [employees]);
+   173→
+   174→  const filteredEmployees = useMemo(() => {
+   175→    const q = empSearch.trim().toLowerCase();
+   176→    return employees.filter((e) => {
+   177→      if (deptFilter !== "ALL") {
+   178→        if (e.department?.id !== deptFilter) return false;
+   179→      }
+   180→      if (!q) return true;
+   181→      return (
+   182→        e.fullName?.toLowerCase().includes(q) ||
+   183→        e.employeeId?.toLowerCase().includes(q) ||
+   184→        e.officialEmail?.toLowerCase().includes(q) ||
+   185→        e.department?.name?.toLowerCase().includes(q) ||
+   186→        e.designation?.name?.toLowerCase().includes(q)
+   187→      );
+   188→    });
+   189→  }, [employees, empSearch, deptFilter]);
+   190→
+   191→  const allVisibleSelected =
+   192→    filteredEmployees.length > 0 &&
+   193→    filteredEmployees.every((e) => selectedIds.has(e.id));
+   194→
+   195→  const toggle = (id: string) => {
+   196→    setSelectedIds((prev) => {
+   197→      const next = new Set(prev);
+   198→      if (next.has(id)) next.delete(id);
+   199→      else next.add(id);
+   200→      return next;
+   201→    });
+   202→  };
+   203→
+   204→  const toggleAllVisible = () => {
+   205→    setSelectedIds((prev) => {
+   206→      const next = new Set(prev);
+   207→      if (allVisibleSelected) {
+   208→        for (const e of filteredEmployees) next.delete(e.id);
+   209→      } else {
+   210→        for (const e of filteredEmployees) next.add(e.id);
+   211→      }
+   212→      return next;
+   213→    });
+   214→  };
+   215→
+   216→  const selectAllByDept = (deptId: string) => {
+   217→    setSelectedIds((prev) => {
+   218→      const next = new Set(prev);
+   219→      for (const e of employees) {
+   220→        if (e.department?.id === deptId) next.add(e.id);
+   221→      }
+   222→      return next;
+   223→    });
+   224→  };
+   225→
+   226→  const selectedTemplate = useMemo(
+   227→    () => templates.find((t) => t.id === templateId) ?? null,
+   228→    [templates, templateId]
+   229→  );
+   230→
+   231→  const selectedEmployees = useMemo(
+   232→    () => employees.filter((e) => selectedIds.has(e.id)),
+   233→    [employees, selectedIds]
+   234→  );
+   235→
+   236→  const canNext =
+   237→    (step === 0 && selectedIds.size > 0) ||
+   238→    (step === 1 && !!selectedTemplate) ||
+   239→    step === 2 ||
+   240→    step === 3;
+   241→
+   242→  const handleGenerate = async () => {
+   243→    if (!selectedTemplate) return;
+   244→    setGenerating(true);
+   245→    setProgress(5);
+   246→
+   247→    // Animate progress while we wait for the server.
+   248→    let pct = 5;
+   249→    const interval = setInterval(() => {
+   250→      pct = Math.min(pct + 7, 90);
+   251→      setProgress(pct);
+   252→    }, 250);
+   253→
+   254→    try {
+   255→      const r = await fetch("/api/documents/bulk-generate", {
+   256→        method: "POST",
+   257→        headers: { "Content-Type": "application/json" },
+   258→        body: JSON.stringify({
+   259→          employeeIds: Array.from(selectedIds),
+   260→          templateId: selectedTemplate.id,
+   261→          type: selectedTemplate.type,
+   262→        }),
+   263→      });
+   264→      const data = await r.json();
+   265→      clearInterval(interval);
+   266→      setProgress(100);
+   267→
+   268→      if (!r.ok) {
+   269→        toast.error(data?.error ?? "Bulk generation failed.");
+   270→        setGenerating(false);
+   271→        return;
+   272→      }
+   273→      setResult(data);
+   274→      toast.success(
+   275→        `Generated ${data.count} of ${data.totalRequested} document(s) successfully.`
+   276→      );
+   277→      setStep(4);
+   278→      queryClient.invalidateQueries({ queryKey: ["documents"] });
+   279→    } catch (err: any) {
+   280→      clearInterval(interval);
+   281→      toast.error(err?.message ?? "Network error during bulk generation.");
+   282→    } finally {
+   283→      setGenerating(false);
+   284→    }
+   285→  };
+   286→
+   287→  const handleDownloadZip = async () => {
+   288→    if (!result || result.generated.length === 0) return;
+   289→    try {
+   290→      const r = await fetch("/api/documents/bulk-download", {
+   291→        method: "POST",
+   292→        headers: { "Content-Type": "application/json" },
+   293→        body: JSON.stringify({
+   294→          documentIds: result.generated.map((g) => g.id),
+   295→        }),
+   296→      });
+   297→      if (!r.ok) {
+   298→        const j = await r.json().catch(() => ({}));
+   299→        toast.error(j?.error ?? "Failed to build ZIP.");
+   300→        return;
+   301→      }
+   302→      const blob = await r.blob();
+   303→      const url = URL.createObjectURL(blob);
+   304→      const a = document.createElement("a");
+   305→      a.href = url;
+   306→      a.download = "documents.zip";
+   307→      document.body.appendChild(a);
+   308→      a.click();
+   309→      document.body.removeChild(a);
+   310→      URL.revokeObjectURL(url);
+   311→      toast.success("ZIP download started.");
+   312→    } catch (err: any) {
+   313→      toast.error(err?.message ?? "Failed to download ZIP.");
+   314→    }
+   315→  };
+   316→
+   317→  // SECURITY: Send emails one-by-one, each to its corresponding employee's
+   318→  // official email. Employee A must NEVER receive Employee B's document.
+   319→  const handleSendAllEmails = async () => {
+   320→    if (!result || result.generated.length === 0) return;
+   321→    setEmailSending(true);
+   322→    setEmailSentCount(0);
+   323→    setEmailTotal(result.generated.length);
+   324→
+   325→    let ok = 0;
+   326→    let fail = 0;
+   327→
+   328→    for (let i = 0; i < result.generated.length; i++) {
+   329→      const doc = result.generated[i];
+   330→      const dataJson: any = (() => {
+   331→        try {
+   332→          return JSON.parse((doc as any)?.dataJson ?? "{}");
+   333→        } catch {
+   334→          return {};
+   335→        }
+   336→      })();
+   337→      // Resolve recipient from the employee record loaded by the bulk
+   338→      // generate API. The official email is the only allowed recipient —
+   339→      // we do NOT batch emails or share recipients across documents.
+   340→      const emp = employees.find((e) => e.id === doc.employeeId);
+   341→      const recipient = emp?.officialEmail ?? dataJson?.employee?.officialEmail ?? "";
+   342→
+   343→      if (!recipient) {
+   344→        fail += 1;
+   345→        setEmailSentCount(i + 1);
+   346→        continue;
+   347→      }
+   348→
+   349→      const subject = dataJson?.emailSubject ?? `${selectedTemplate?.name ?? "Document"} - ${doc.documentNumber}`;
+   350→      const body = dataJson?.emailBody ?? `Dear ${emp?.fullName ?? "Employee"},\n\nPlease find attached your document ${doc.documentNumber}.\n\nRegards,\nHR Team`;
+   351→
+   352→      try {
+   353→        const r = await fetch(`/api/documents/${doc.id}/send-email`, {
+   354→          method: "POST",
+   355→          headers: { "Content-Type": "application/json" },
+   356→          body: JSON.stringify({
+   357→            to: recipient,
+   358→            subject,
+   359→            body,
+   360→          }),
+   361→        });
+   362→        if (r.ok) ok += 1;
+   363→        else fail += 1;
+   364→      } catch {
+   365→        fail += 1;
+   366→      }
+   367→      setEmailSentCount(i + 1);
+   368→    }
+   369→
+   370→    setEmailSending(false);
+   371→    toast.success(`Sent ${ok} email(s)${fail ? `, ${fail} failed` : ""}.`);
+   372→    queryClient.invalidateQueries({ queryKey: ["documents"] });
+   373→    queryClient.invalidateQueries({ queryKey: ["email-logs"] });
+   374→  };
+   375→
+   376→  const close = () => onOpenChange(false);
+   377→
+   378→  return (
+   379→    <Dialog open={open} onOpenChange={onOpenChange}>
+   380→      <DialogContent className="max-w-3xl max-h-[90vh] flex flex-col">
+   381→        <DialogHeader>
+   382→          <DialogTitle className="flex items-center gap-2">
+   383→            <Layers className="size-5 text-primary" />
+   384→            Bulk Document Generation
+   385→          </DialogTitle>
+   386→          <DialogDescription>
+   387→            Generate HR documents for multiple employees at once. Each employee
+   388→            receives their own personalised document — no cross-recipient
+   389→            sharing of documents or emails.
+   390→          </DialogDescription>
+   391→        </DialogHeader>
+   392→
+   393→        {/* Stepper */}
+   394→        <div className="flex items-center gap-1 mb-2 flex-wrap">
+   395→          {STEPS.map((label, i) => {
+   396→            const active = i === step;
+   397→            const done = i < step;
+   398→            return (
+   399→              <div key={label} className="flex items-center">
+   400→                <div
+   401→                  className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition ${
+   402→                    active
+   403→                      ? "bg-primary text-primary-foreground"
+   404→                      : done
+   405→                        ? "bg-primary/10 text-primary"
+   406→                        : "bg-muted text-muted-foreground"
+   407→                  }`}
+   408→                >
+   409→                  <span className="size-4 rounded-full bg-background/30 flex items-center justify-center text-[10px]">
+   410→                    {done ? <Check className="size-3" /> : i + 1}
+   411→                  </span>
+   412→                  {label}
+   413→                </div>
+   414→                {i < STEPS.length - 1 && (
+   415→                  <ArrowRight className="size-3 text-muted-foreground mx-1" />
+   416→                )}
+   417→              </div>
+   418→            );
+   419→          })}
+   420→        </div>
+   421→
+   422→        <ScrollArea className="flex-1 pr-3">
+   423→          <div className="min-h-[260px]">
+   424→            {/* STEP 0: Select Employees */}
+   425→            {step === 0 && (
+   426→              <div className="space-y-3">
+   427→                <div className="flex flex-col md:flex-row gap-2">
+   428→                  <div className="relative flex-1">
+   429→                    <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+   430→                    <Input
+   431→                      placeholder="Search by name, ID, email…"
+   432→                      value={empSearch}
+   433→                      onChange={(e) => setEmpSearch(e.target.value)}
+   434→                      className="pl-8"
+   435→                    />
+   436→                  </div>
+   437→                  <Select
+   438→                    value={deptFilter}
+   439→                    onValueChange={(v) => setDeptFilter(v)}
+   440→                  >
+   441→                    <SelectTrigger className="md:w-52">
+   442→                      <SelectValue placeholder="All departments" />
+   443→                    </SelectTrigger>
+   444→                    <SelectContent>
+   445→                      <SelectItem value="ALL">All departments</SelectItem>
+   446→                      {departments.map((d) => (
+   447→                        <SelectItem key={d.id} value={d.id}>
+   448→                          {d.name}
+   449→                        </SelectItem>
+   450→                      ))}
+   451→                    </SelectContent>
+   452→                  </Select>
+   453→                </div>
+   454→
+   455→                <div className="flex items-center justify-between flex-wrap gap-2">
+   456→                  <div className="flex items-center gap-2">
+   457→                    <Checkbox
+   458→                      id="select-all"
+   459→                      checked={allVisibleSelected}
+   460→                      onCheckedChange={toggleAllVisible}
+   461→                    />
+   462→                    <Label
+   463→                      htmlFor="select-all"
+   464→                      className="text-sm cursor-pointer"
+   465→                    >
+   466→                      Select all visible ({filteredEmployees.length})
+   467→                    </Label>
+   468→                  </div>
+   469→                  <div className="flex items-center gap-1.5 flex-wrap">
+   470→                    <span className="text-xs text-muted-foreground mr-1">
+   471→                      Quick add:
+   472→                    </span>
+   473→                    {departments.slice(0, 6).map((d) => (
+   474→                      <Button
+   475→                        key={d.id}
+   476→                        variant="outline"
+   477→                        size="sm"
+   478→                        className="h-7 text-xs"
+   479→                        onClick={() => selectAllByDept(d.id)}
+   480→                      >
+   481→                        + {d.name}
+   482→                      </Button>
+   483→                    ))}
+   484→                  </div>
+   485→                  <Badge variant="secondary" className="ml-auto">
+   486→                    <Users className="size-3 mr-1" />
+   487→                    {selectedIds.size} selected
+   488→                  </Badge>
+   489→                </div>
+   490→
+   491→                <div className="border rounded-lg max-h-[40vh] overflow-y-auto">
+   492→                  {employeesQuery.isLoading && (
+   493→                    <div className="p-6 text-center text-sm text-muted-foreground">
+   494→                      <Loader2 className="size-4 animate-spin inline mr-2" />
+   495→                      Loading employees…
+   496→                    </div>
+   497→                  )}
+   498→                  {!employeesQuery.isLoading &&
+   499→                    filteredEmployees.length === 0 && (
+   500→                      <div className="p-6 text-center text-sm text-muted-foreground">
+   501→                        No employees match your filters.
+   502→                      </div>
+   503→                    )}
+   504→                  {filteredEmployees.map((e) => {
+   505→                    const checked = selectedIds.has(e.id);
+   506→                    return (
+   507→                      <label
+   508→                        key={e.id}
+   509→                        className={`flex items-center gap-3 px-3 py-2 border-b last:border-b-0 cursor-pointer hover:bg-muted/40 ${
+   510→                          checked ? "bg-primary/5" : ""
+   511→                        }`}
+   512→                      >
+   513→                        <Checkbox
+   514→                          checked={checked}
+   515→                          onCheckedChange={() => toggle(e.id)}
+   516→                        />
+   517→                        <AvatarBadge name={e.fullName} photo={e.photo} size="sm" />
+   518→                        <div className="min-w-0 flex-1">
+   519→                          <div className="text-sm font-medium truncate">
+   520→                            {e.fullName}{" "}
+   521→                            <span className="text-xs text-muted-foreground">
+   522→                              {e.employeeId}
+   523→                            </span>
+   524→                          </div>
+   525→                          <div className="text-xs text-muted-foreground truncate">
+   526→                            {e.designation?.name ?? "—"} ·{" "}
+   527→                            {e.department?.name ?? "—"}
+   528→                          </div>
+   529→                        </div>
+   530→                        <div className="text-xs text-muted-foreground hidden md:block truncate max-w-[200px]">
+   531→                          {e.officialEmail ?? "—"}
+   532→                        </div>
+   533→                      </label>
+   534→                    );
+   535→                  })}
+   536→                </div>
+   537→              </div>
+   538→            )}
+   539→
+   540→            {/* STEP 1: Select Template */}
+   541→            {step === 1 && (
+   542→              <div className="space-y-3">
+   543→                <div className="flex items-center justify-between flex-wrap gap-2">
+   544→                  <Label className="text-sm font-medium">
+   545→                    Choose a template
+   546→                  </Label>
+   547→                  <Badge variant="secondary">
+   548→                    {templates.length} active templates
+   549→                  </Badge>
+   550→                </div>
+   551→                {templatesQuery.isLoading && (
+   552→                  <div className="p-6 text-center text-sm text-muted-foreground">
+   553→                    <Loader2 className="size-4 animate-spin inline mr-2" />
+   554→                    Loading templates…
+   555→                  </div>
+   556→                )}
+   557→                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-[50vh] overflow-y-auto pr-1">
+   558→                  {templates.map((t) => {
+   559→                    const active = t.id === templateId;
+   560→                    return (
+   561→                      <button
+   562→                        key={t.id}
+   563→                        onClick={() => setTemplateId(t.id)}
+   564→                        className={`text-left p-3 rounded-lg border transition ${
+   565→                          active
+   566→                            ? "border-primary bg-primary/5 ring-1 ring-primary"
+   567→                            : "border-border hover:bg-muted/40"
+   568→                        }`}
+   569→                      >
+   570→                        <div className="flex items-start gap-2">
+   571→                          <FileText
+   572→                            className={`size-4 mt-0.5 ${
+   573→                              active ? "text-primary" : "text-muted-foreground"
+   574→                            }`}
+   575→                          />
+   576→                          <div className="min-w-0">
+   577→                            <div className="text-sm font-medium truncate">
+   578→                              {t.name}
+   579→                            </div>
+   580→                            <div className="text-xs text-muted-foreground flex items-center gap-1.5 mt-0.5">
+   581→                              <Badge variant="outline" className="text-[10px] py-0">
+   582→                                {t.code}
+   583→                              </Badge>
+   584→                              <span>{t.type.replace(/_/g, " ")}</span>
+   585→                              {t.category && (
+   586→                                <span className="text-muted-foreground/70">
+   587→                                  · {t.category}
+   588→                                </span>
+   589→                              )}
+   590→                            </div>
+   591→                            {t.description && (
+   592→                              <div className="text-xs text-muted-foreground mt-1 line-clamp-2">
+   593→                                {t.description}
+   594→                              </div>
+   595→                            )}
+   596→                          </div>
+   597→                        </div>
+   598→                      </button>
+   599→                    );
+   600→                  })}
+   601→                </div>
+   602→              </div>
+   603→            )}
+   604→
+   605→            {/* STEP 2: Review */}
+   606→            {step === 2 && (
+   607→              <div className="space-y-3">
+   608→                <div className="rounded-lg border bg-muted/20 p-4 space-y-2">
+   609→                  <div className="text-sm">
+   610→                    <span className="text-muted-foreground">Template:</span>{" "}
+   611→                    <strong>
+   612→                      {selectedTemplate?.name} ({selectedTemplate?.code})
+   613→                    </strong>
+   614→                  </div>
+   615→                  <div className="text-sm">
+   616→                    <span className="text-muted-foreground">Type:</span>{" "}
+   617→                    <Badge variant="outline" className="ml-1">
+   618→                      {selectedTemplate?.type.replace(/_/g, " ")}
+   619→                    </Badge>
+   620→                  </div>
+   621→                  <div className="text-sm">
+   622→                    <span className="text-muted-foreground">Recipients:</span>{" "}
+   623→                    <strong>{selectedIds.size}</strong> employee(s)
+   624→                  </div>
+   625→                  <div className="text-sm text-primary font-medium">
+   626→                    Will generate {selectedIds.size}{" "}
+   627→                    {selectedTemplate?.name.toLowerCase()} document(s) for{" "}
+   628→                    {selectedIds.size} employees.
+   629→                  </div>
+   630→                </div>
+   631→
+   632→                <div className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+   633→                  Selected employees ({selectedEmployees.length})
+   634→                </div>
+   635→                <div className="border rounded-lg max-h-[40vh] overflow-y-auto">
+   636→                  {selectedEmployees.map((e) => (
+   637→                    <div
+   638→                      key={e.id}
+   639→                      className="flex items-center gap-3 px-3 py-2 border-b last:border-b-0"
+   640→                    >
+   641→                      <AvatarBadge name={e.fullName} photo={e.photo} size="sm" />
+   642→                      <div className="min-w-0 flex-1">
+   643→                        <div className="text-sm font-medium truncate">
+   644→                          {e.fullName}{" "}
+   645→                          <span className="text-xs text-muted-foreground">
+   646→                            {e.employeeId}
+   647→                          </span>
+   648→                        </div>
+   649→                        <div className="text-xs text-muted-foreground truncate">
+   650→                          {e.officialEmail ?? "—"}
+   651→                        </div>
+   652→                      </div>
+   653→                      <StatusBadge status={e.employmentStatus ?? "ACTIVE"} />
+   654→                    </div>
+   655→                  ))}
+   656→                </div>
+   657→              </div>
+   658→            )}
+   659→
+   660→            {/* STEP 3: Generate (progress) */}
+   661→            {step === 3 && (
+   662→              <div className="space-y-4 py-6">
+   663→                <div className="text-center">
+   664→                  <FileStack className="size-10 mx-auto text-primary mb-2" />
+   665→                  <div className="text-sm font-medium">
+   666→                    Generating {selectedIds.size} document(s)…
+   667→                  </div>
+   668→                  <div className="text-xs text-muted-foreground">
+   669→                    Each employee gets their own personalised document.
+   670→                  </div>
+   671→                </div>
+   672→                <Progress value={progress} className="h-2" />
+   673→                <div className="text-center text-xs text-muted-foreground">
+   674→                  {progress < 100 ? "Working… please wait" : "Done"}
+   675→                </div>
+   676→              </div>
+   677→            )}
+   678→
+   679→            {/* STEP 4: Results */}
+   680→            {step === 4 && result && (
+   681→              <div className="space-y-3">
+   682→                <div
+   683→                  className={`rounded-lg p-4 border ${
+   684→                    result.failed.length > 0
+   685→                      ? "bg-amber-500/5 border-amber-500/30"
+   686→                      : "bg-emerald-500/5 border-emerald-500/30"
+   687→                  }`}
+   688→                >
+   689→                  <div className="flex items-center gap-2">
+   690→                    <CheckCircle2 className="size-5 text-emerald-600" />
+   691→                    <div className="text-sm font-semibold">
+   692→                      Generated {result.count} of {result.totalRequested}{" "}
+   693→                      document(s) successfully.
+   694→                    </div>
+   695→                  </div>
+   696→                  {result.failed.length > 0 && (
+   697→                    <div className="text-xs text-muted-foreground mt-1">
+   698→                      {result.failed.length} employee(s) failed — see the list
+   699→                      below.
+   700→                    </div>
+   701→                  )}
+   702→                </div>
+   703→
+   704→                {result.generated.length > 0 && (
+   705→                  <div className="flex flex-wrap gap-2">
+   706→                    <Button
+   707→                      size="sm"
+   708→                      variant="outline"
+   709→                      onClick={handleDownloadZip}
+   710→                    >
+   711→                      <Download className="size-4 mr-1.5" /> Download All (ZIP)
+   712→                    </Button>
+   713→                    <Button
+   714→                      size="sm"
+   715→                      onClick={handleSendAllEmails}
+   716→                      disabled={emailSending}
+   717→                    >
+   718→                      {emailSending ? (
+   719→                        <Loader2 className="size-4 mr-1.5 animate-spin" />
+   720→                      ) : (
+   721→                        <Mail className="size-4 mr-1.5" />
+   722→                      )}
+   723→                      Send All Emails
+   724→                    </Button>
+   725→                  </div>
+   726→                )}
+   727→
+   728→                {emailSending && (
+   729→                  <div className="space-y-1">
+   730→                    <Progress
+   731→                      value={
+   732→                        emailTotal ? (emailSentCount / emailTotal) * 100 : 0
+   733→                      }
+   734→                      className="h-1.5"
+   735→                    />
+   736→                    <div className="text-xs text-muted-foreground text-center">
+   737→                      Sending {emailSentCount} / {emailTotal} emails… (one at a
+   738→                      time, each to its own employee)
+   739→                    </div>
+   740→                  </div>
+   741→                )}
+   742→
+   743→                {result.generated.length > 0 && (
+   744→                  <>
+   745→                    <div className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+   746→                      Generated documents ({result.generated.length})
+   747→                    </div>
+   748→                    <div className="border rounded-lg max-h-[28vh] overflow-y-auto">
+   749→                      {result.generated.map((d) => (
+   750→                        <div
+   751→                          key={d.id}
+   752→                          className="flex items-center gap-3 px-3 py-2 border-b last:border-b-0"
+   753→                        >
+   754→                          <FileText className="size-4 text-primary flex-shrink-0" />
+   755→                          <div className="min-w-0 flex-1">
+   756→                            <div className="text-sm font-medium truncate">
+   757→                              {d.documentNumber}
+   758→                            </div>
+   759→                            <div className="text-xs text-muted-foreground truncate">
+   760→                              {d.title}
+   761→                            </div>
+   762→                          </div>
+   763→                          <StatusBadge status={d.status ?? "GENERATED"} />
+   764→                        </div>
+   765→                      ))}
+   766→                    </div>
+   767→                  </>
+   768→                )}
+   769→
+   770→                {result.failed.length > 0 && (
+   771→                  <>
+   772→                    <div className="text-xs font-medium text-rose-600 uppercase tracking-wider">
+   773→                      Failed ({result.failed.length})
+   774→                    </div>
+   775→                    <div className="border border-rose-500/20 rounded-lg max-h-[20vh] overflow-y-auto">
+   776→                      {result.failed.map((f, i) => (
+   777→                        <div
+   778→                          key={`${f.employeeId}-${i}`}
+   779→                          className="flex items-center gap-2 px-3 py-2 border-b last:border-b-0"
+   780→                        >
+   781→                          <XCircle className="size-4 text-rose-600 flex-shrink-0" />
+   782→                          <div className="text-sm flex-1 truncate">
+   783→                            {f.name}{" "}
+   784→                            <span className="text-xs text-muted-foreground">
+   785→                              ({f.employeeId})
+   786→                            </span>
+   787→                          </div>
+   788→                          <div className="text-xs text-muted-foreground truncate max-w-[260px]">
+   789→                            {f.error}
+   790→                          </div>
+   791→                        </div>
+   792→                      ))}
+   793→                    </div>
+   794→                  </>
+   795→                )}
+   796→              </div>
+   797→            )}
+   798→          </div>
+   799→        </ScrollArea>
+   800→
+   801→        <DialogFooter className="flex items-center justify-between border-t pt-3">
+   802→          <div className="text-xs text-muted-foreground">
+   803→            {step === 0 && `${selectedIds.size} employee(s) selected`}
+   804→            {step === 1 && selectedTemplate && `Template: ${selectedTemplate.name}`}
+   805→            {step === 2 &&
+   806→              `Ready to generate ${selectedIds.size} document(s)`}
+   807→            {step === 3 && "Generating…"}
+   808→            {step === 4 && result && `Done — ${result.count} generated`}
+   809→          </div>
+   810→          <div className="flex items-center gap-2">
+   811→            <Button variant="ghost" size="sm" onClick={close}>
+   812→              Close
+   813→            </Button>
+   814→            {step > 0 && step < 3 && (
+   815→              <Button
+   816→                variant="outline"
+   817→                size="sm"
+   818→                onClick={() => setStep(step - 1)}
+   819→                disabled={generating}
+   820→              >
+   821→                <ArrowLeft className="size-4 mr-1.5" /> Back
+   822→              </Button>
+   823→            )}
+   824→            {step < 2 && (
+   825→              <Button
+   826→                size="sm"
+   827→                onClick={() => setStep(step + 1)}
+   828→                disabled={!canNext}
+   829→              >
+   830→                Next <ArrowRight className="size-4 ml-1.5" />
+   831→              </Button>
+   832→            )}
+   833→            {step === 2 && (
+   834→              <Button
+   835→                size="sm"
+   836→                onClick={() => {
+   837→                  setStep(3);
+   838→                  // Fire-and-forget; the progress UI animates while we wait.
+   839→                  handleGenerate();
+   840→                }}
+   841→                disabled={generating}
+   842→              >
+   843→                <FileStack className="size-4 mr-1.5" /> Generate{" "}
+   844→                {selectedIds.size} Document(s)
+   845→              </Button>
+   846→            )}
+   847→            {step === 3 && (
+   848→              <Button size="sm" disabled>
+   849→                <Loader2 className="size-4 mr-1.5 animate-spin" /> Generating…
+   850→              </Button>
+   851→            )}
+   852→            {step === 4 && (
+   853→              <Button size="sm" onClick={close}>
+   854→                Done
+   855→              </Button>
+   856→            )}
+   857→          </div>
+   858→        </DialogFooter>
+   859→      </DialogContent>
+   860→    </Dialog>
+   861→  );
+   862→}
+   863→

@@ -84,20 +84,24 @@ export function Sidebar() {
                     setMobileSidebarOpen(false);
                   }}
                   className={cn(
-                    "w-full group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all",
+                    "w-full group/nav flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all relative",
                     active
                       ? "bg-sidebar-accent text-sidebar-accent-foreground shadow-soft"
-                      : "text-sidebar-foreground/80 hover:bg-sidebar-accent/60 hover:text-sidebar-foreground",
+                      : "text-sidebar-foreground/75 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground",
                     sidebarCollapsed && "justify-center px-2"
                   )}
                   title={sidebarCollapsed ? item.label : undefined}
                 >
+                  {/* Active indicator bar on the left */}
+                  {active && (
+                    <span className="absolute left-0 top-1/2 -translate-y-1/2 h-5 w-1 rounded-r-full bg-sidebar-primary" />
+                  )}
                   <Icon
                     className={cn(
-                      "size-[18px] flex-shrink-0",
+                      "size-[18px] flex-shrink-0 transition-transform group-hover/nav:scale-110",
                       active
                         ? "text-sidebar-primary"
-                        : "text-muted-foreground group-hover:text-sidebar-foreground"
+                        : "text-muted-foreground group-hover/nav:text-sidebar-foreground"
                     )}
                   />
                   {!sidebarCollapsed && (
