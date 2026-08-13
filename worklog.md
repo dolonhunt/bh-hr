@@ -217,3 +217,214 @@ Stage Summary:
   8. Add CSV/Excel export for all major tables.
   9. Add real email sending via SMTP (currently simulated).
   10. Add keyboard shortcuts (g d for dashboard, g e for employees, etc.).
+
+---
+
+Task ID: 2-A
+Agent: bulk-templates-and-generation-agent
+
+Task: Add 10 new document templates (Promotion, Transfer, Warning, Show Cause, Salary Certificate, Increment, Resignation Acceptance, Relieving, NOC, Employment Certificate) via an idempotent seed script, and build the full Bulk Document Generation feature (backend APIs + multi-step frontend wizard + integration with Documents module header, Quick Actions, and Topbar Quick Add dropdown).
+
+Work Log:
+- Read project context: `worklog.md` (incl. FINAL section's recommendations), `prisma/schema.prisma`, `prisma/seed.ts`, `/agent-ctx/1-A-documents-module-agent.md`, existing helpers (`document-vars.ts`, `document-number.ts`, `document-renderers.ts`), `/api/documents` POST route, `/api/documents/[id]/send-email` route, `documents.tsx`, `generate-document-dialog.tsx`, `quick-actions.tsx`, `topbar.tsx`, `store.ts`, `next.config.ts`, `package.json`.
+- Created `/agent-ctx/2-A-bulk-templates-and-generation.md` with full implementation notes.
+- Created `/home/z/my-project/prisma/seed-templates.ts`:
+  - Idempotent (uses `findUnique({where:{code}})` then `create` or `update`).
+  - 10 templates: PROMO, TRANS, WARN, SCN, SALC, INCR, RESIG, REL, NOC, EMPC.
+  - Each template includes HTML `content` with `{{employee.*}}`/`{{company.*}}`/`{{document.*}}`/`{{payroll.*}}` variables, `emailSubject`, `emailBody`, `status="ACTIVE"`, `version="1.0"`.
+  - Ran successfully: "Created 10, updated 0 template(s)."
+- Created `/src/app/api/documents/bulk-generate/route.ts`:
+  - POST `{ employeeIds: string[], templateId: string, type?: string }`.
+  - Per-employee try/catch so one failure doesn't block others.
+  - Reuses `resolveVariables()` and `generateDocumentNumber()` from existing helpers.
+  - For PAYSLIP type, loads latest payroll (or falls back to employee salary fields).
+  - Returns `{ generated: [...], failed: [...], count: number, totalRequested: number }`.
+  - Writes a single AuditLog entry: action=`BULK_DOCUMENT_GENERATE`, description=`Bulk generated N document(s) using template X (CODE). M failed.`, with metadata including all generated document IDs and failed employee IDs.
+  - Also writes an Activity log entry per generated document.
+- Created `/src/app/api/documents/bulk-download/route.ts`:
+  - POST `{ documentIds: string[] }`.
+  - Returns a `application/zip` response with `Content-Disposition: attachment; filename="documents.zip"`.
+  - Uses `archiver`'s `ZipArchive` (v8 is ESM-only with named exports — initial `import archiver from "archiver"` + `archiver("zip",…)` failed with `TypeError: {imported module}.default is not a function`; switched to `import { ZipArchive } from "archiver"` + `new ZipArchive({zlib:{level:6}})` which extends Node's Transform stream so `.on("data")/.append()/.finalize()` work the same as the v7 default export).
+  - For each document, renders the DOCX buffer via the existing `renderDocxBuffer` and appends it to the ZIP with filename `{documentNumber}_{employeeName}.docx` (sanitised; collisions get `_{n}` suffix).
+- Created `/src/components/hr/modules/bulk-generate-dialog.tsx`:
+  - 5-step wizard: Select Employees → Select Template → Review → Generate → Results.
+  - Step 1: searchable multi-select with checkboxes, department filter, "Select all visible", per-department quick-add buttons, live selected count. Loads all employees via TanStack Query (`/api/employees?pageSize=200`).
+  - Step 2: dropdown grid of all ACTIVE templates (TanStack Query `/api/document-templates?status=ACTIVE&pageSize=200`).
+  - Step 3: review summary — "Will generate N {templateName} documents for N employees", plus a scrollable list of selected employees (avatar, name, ID, email, status).
+  - Step 4: progress bar (animated 5%→90% while waiting, 100% on success) using shadcn `Progress`.
+  - Step 5: success/failure summary, generated documents list (with status badges), failed list (with error reasons), and "Download All (ZIP)" + "Send All Emails" buttons.
+  - "Send All Emails" loops through each generated document one-at-a-time, deriving the recipient from the corresponding employee's `officialEmail`. Each `POST /api/documents/[id]/send-email` carries only that one document's pre-rendered emailSubject/emailBody (stored in `dataJson`). Employee A's document is never sent to Employee B. A second Progress bar tracks per-email send progress.
+  - Uses shadcn components (Dialog, Button, Input, Label, Checkbox, Select, ScrollArea, Progress, Badge), TanStack Query, sonner toast, AvatarBadge/StatusBadge shared components. Emerald primary palette only — no indigo/blue.
+- Modified `/src/components/hr/modules/documents.tsx`:
+  - Extended `DOC_TYPES` constant to include all 22 types defined in the Prisma schema (CONTRACT, JOINING, SALARY_CERT, INCREMENT, SALARY_REVISION, PROMOTION, TRANSFER, WARNING, SHOW_CAUSE, EMPLOYMENT_CERT, NOC, LEAVE_CANCELLATION, RESIGN_ACCEPT, FINAL_SETTLEMENT were missing).
+  - Imported `Layers` icon and `BulkGenerateDialog`.
+  - Added a "Bulk Generate" outline button in the PageHeader actions between "Template" and "Generate Document".
+  - Added `<BulkGenerateDialog open={bulkOpen} onOpenChange={setBulkOpen} />` to the module render tree.
+- Modified `/src/components/hr/quick-actions.tsx`:
+  - Imported `BulkGenerateDialog` and rendered it for the `bulk-generate` quick action.
+- Modified `/src/components/hr/topbar.tsx`:
+  - Added a "Bulk Generate Documents" item to the Quick Add dropdown menu.
+- Modified `/next.config.ts`:
+  - Added `archiver` to `serverExternalPackages` (kept the existing pdfkit/docx/fontkit/linebreak/png-js entries).
+- Modified `/package.json` (via `bun add archiver @types/archiver`):
+  - Installed `archiver@8.0.0` and `@types/archiver@8.0.0`.
+
+Issues encountered & fixes:
+1. **archiver v8 ESM import** — the package dropped its CommonJS default export in v8. Initial `import archiver from "archiver"` + `archiver("zip", …)` failed at runtime with `TypeError: {imported module [externals]/archiver}.default is not a function`. Fixed by using the named `ZipArchive` class import (`new ZipArchive({ zlib: { level: 6 } })`) — it extends Node's `Transform` stream so the rest of the API (`.on("data")`, `.append()`, `.finalize()`, `.on("end")`) is unchanged.
+2. **Unused eslint-disable directives** — initial bulk-download route had two `// eslint-disable-next-line no-console` comments; the project's eslint config doesn't actually flag `console.*` calls, so the directives were flagged as unused. Removed both directives; `console.warn`/`console.error` calls now stand alone.
+
+Verification:
+- `bun run prisma/seed-templates.ts` → "Created 10, updated 0 template(s)." (idempotent on re-run).
+- `GET /api/document-templates?status=ACTIVE&pageSize=200` → 15 templates (5 original + 10 new).
+- `POST /api/documents/bulk-generate` with 3 employees + PROMO template → 201, count=3, document numbers `NWL/DES/PROMO/08132026/EMP020`, `NWL/PROD/PROMO/08132026/EMP019`, `NWL/ENG/PROMO/08132026/EMP018`.
+- `POST /api/documents/bulk-generate` with 2 employees + NOC template → 201, count=2.
+- `POST /api/documents/bulk-generate` with 2 employees + WARN template → 201, count=2.
+- `POST /api/documents/bulk-download` with 2 doc IDs → 200, `application/zip`, 14,371 bytes. `unzip -l` confirms two entries: `NWL_DES_WARN_08132026_EMP020_Priya_Sarkar.docx` (9,023 B) and `NWL_PROD_WARN_08132026_EMP019_Rashed_Karim.docx` (9,022 B).
+- `POST /api/documents/[id]/send-email` for one of the bulk-generated docs with `to: priya.sarkar@northwindlabs.io` → 201, EmailLog status=SENT (recipient validation passed: matches employee official email).
+- `GET /api/audit-logs?action=BULK_DOCUMENT_GENERATE&pageSize=5` → 3 audit log entries with descriptions like "Bulk generated 2 document(s) using template Warning Letter (WARN). 0 failed."
+- `cd /home/z/my-project && bun run lint` → 0 errors, 0 warnings across the entire project (including all my new/modified files).
+- Dev server log shows clean compilation and 200/201 responses for all new endpoints after the archiver import fix.
+
+Stage Summary:
+- 10 new document templates are now seeded and available across the Documents module (template gallery, single Generate Document wizard, Bulk Generate wizard).
+- Bulk Document Generation is fully functional end-to-end: select N employees → pick a template → review → generate → download ZIP and/or send each employee their own personalised document via email.
+- The strict "Employee A never receives Employee B's document" security rule is enforced at the API level — each email is sent one-at-a-time with the recipient derived from the corresponding employee's `officialEmail`.
+- All work persisted in `/agent-ctx/2-A-bulk-templates-and-generation.md` for downstream agents to consume.
+
+---
+
+Task ID: 2-B
+Agent: subagent-2-B (approval-workflow + reports-charts)
+Task: Build the full Document approval workflow (PENDING_APPROVAL → APPROVED → ISSUED → SENT) end-to-end — backend status-transition APIs with validation + audit logs + lock-on-issue, an Approval Queue UI as the 5th tab in the Documents module, status-flow pills + status-based action buttons in the documents table — and rewrite the Reports module as a real analytics dashboard (KPIs + 6 Recharts visualizations + a custom recruitment funnel) while preserving the existing CSV/Excel/PDF export cards.
+
+Work Log:
+- Read project context from worklog.md (Tasks 0, 1-A, 1-B, 1-C, FINAL), prisma/schema.prisma, src/lib/db.ts, src/lib/utils.ts, src/lib/store.ts, shared components (PageHeader, KpiCard, StatusBadge, AvatarBadge, EmptyState), existing documents.tsx, existing reports.tsx, existing API routes (/api/documents, /api/documents/[id], /api/documents/[id]/send-email, /api/dashboard, /api/reports/generate) — to align with sibling agents' response shapes, audit-log conventions, and the existing Tab/Dialog/KpiCard patterns.
+- Created `/agent-ctx/2-B-approval-workflow-reports-charts.md` with the full file inventory + smoke-test results.
+
+API routes built (all using `import { db } from "@/lib/db"`):
+1. `/api/documents/[id]/route.ts` (REWRITTEN PATCH) — Validates every status transition against an allow-list map (`VALID_TRANSITIONS`). Writes a `DOCUMENT_STATUS_CHANGE` AuditLog on every transition with the exact format `Document {docNumber} status changed from {oldStatus} to {newStatus}` plus a JSON metadata blob (from/to/note). Mirrors the transition as an Activity on the employee timeline. **Locks content edits** when status ∈ {APPROVED, ISSUED, SENT, ARCHIVED} — PATCH silently ignores `title`/`content`/`month` changes for locked docs. Returns 400 with a descriptive error on invalid transitions (e.g. "Invalid status transition: ISSUED → APPROVED. Allowed: SENT, ARCHIVED").
+2. `/api/documents/pending-approval/route.ts` (NEW GET) — Returns PENDING_APPROVAL docs (with employee + template + generatedBy includes) plus queue KPIs: `{ pending, approvedToday, issuedToday, rejectedToday }`. "Rejected Today" is derived from the AuditLog (counts `DOCUMENT_STATUS_CHANGE` entries today whose description contains "to GENERATED"), so it captures rejection events even though the document's current status is GENERATED.
+3. `/api/documents/[id]/approve/route.ts` (NEW POST) — Body `{ note? }`. Validates status is PENDING_APPROVAL, transitions to APPROVED, writes AuditLog + Activity (DOCUMENT_APPROVED).
+4. `/api/documents/[id]/reject/route.ts` (NEW POST) — Body `{ note? }`. Transitions PENDING_APPROVAL → GENERATED (back to draft), writes AuditLog + Activity (DOCUMENT_REJECTED) with the rejection reason in metadata + description.
+5. `/api/documents/[id]/issue/route.ts` (NEW POST) — Transitions APPROVED → ISSUED. This locks the document (PATCH route enforces the lock via `LOCKED_STATUSES`). Writes AuditLog + Activity (DOCUMENT_ISSUED).
+6. `/api/reports/analytics/route.ts` (NEW GET) — Returns aggregate analytics:
+   - `kpis`: totalEmployees, avgAttendanceRate (over 30d trend), totalPayrollThisMonth, docsGeneratedThisMonth.
+   - `employeeGrowth`: last 12 months, each `{month, hires, cumulative}`. Cumulative baseline is pre-counted (employees joined before the 12-month window).
+   - `attendanceTrend`: last 30 days, each `{date, rate, present, total}`. Rate = (PRESENT + LATE) / total.
+   - `leaveUtilization`: per-leave-type days + count + color (from LeaveType.color).
+   - `payrollByDepartment`: this-month net salary grouped by department name.
+   - `documentTrend`: last 6 months, `{data: rows, types: top5types}` for a stacked bar chart (everything outside top-5 collapses to "Other").
+   - `performanceDistribution`: histogram buckets 0-40 / 41-60 / 61-75 / 76-85 / 86-100.
+   - `recruitmentFunnel`: 7 stages (Applied → Screening → Shortlisted → Interview → Selected → Offer → Hired), each `{stage, count, atStage}`. `count` is **cumulative** (candidates who reached stage X or beyond, excluding REJECTED) for a proper monotonically-decreasing funnel; `atStage` is the per-stage count.
+
+Frontend modules built:
+7. `approval-queue.tsx` (NEW) — Rendered as the 5th tab in Documents. Top: 4 KPI cards (Pending Approval / Approved Today / Issued Today / Rejected Today) sourced from the pending-approval endpoint's `kpis` block. Filter bar (search + type select) + an emerald "Approve All (N)" button that sequentially approves all visible pending docs with a "Bulk approved" note. Table columns: Document Number (click → preview), Employee (avatar + name + ID), Type (badge), Submitted Date (formatted + relative), Submitted By (avatar + name + email from `generatedBy`), Actions. Row actions: Preview (Eye icon), Quick Approve (green CheckCircle2 → POST /approve with empty body), Reject (red X → opens RejectDialog with optional reason textarea), Review (opens ApproveDialog with optional note + "Preview First" button). Loading skeleton + EmptyState ("No documents awaiting approval"). Sonner toast feedback. TanStack Query for data + invalidation on every action.
+8. `reports.tsx` (REWRITE) — Top: 4 KPI cards (Total Employees / Avg Attendance 30d % / Payroll This Month / Docs This Month). Middle: "Analytics Dashboard" section with 6 Recharts in a responsive `lg:grid-cols-2` grid, each in a `ChartCard` wrapper with title + subtitle:
+   1. Employee Growth — LineChart (hires + cumulative, 12 months, emerald + amber lines, dashed cumulative).
+   2. Attendance Rate Trend — AreaChart (30 days, gradient fill, Y domain 0-100%).
+   3. Leave Utilization by Type — Donut PieChart (per-type colors from LeaveType.color, tooltip shows days + request count).
+   4. Payroll by Department — horizontal BarChart (reversed so largest at top, k-formatted X axis, formatCurrency tooltip).
+   5. Document Generation Trend — stacked BarChart by type (6 months, up to 5 stacked types + "Other", per-type colors).
+   6. Performance Score Distribution — BarChart histogram (5 buckets, per-bucket colors).
+   All charts use `ResponsiveContainer` + `CartesianGrid` + `Tooltip` + `Legend` (where applicable) + custom tooltip styling using `hsl(var(--popover))` etc. so they look right in light/dark mode. Loading skeletons while analytics load; "No data available" empty state per chart when data is missing.
+   Below charts: "Recruitment Funnel" section — custom horizontal funnel visualization (NOT a Recharts component). Each stage renders as a labeled bar with: color dot + capitalized stage name + conversion % vs previous stage + cumulative count + "(N at stage)" suffix. Bars are width-proportional to the max stage count. Includes loading skeletons + empty state.
+   Bottom: "Export Reports" section — the original 5 report-type cards (Employee / Attendance / Leave / Payroll / Document) with icon + description + Generate button → preserved GenerateDialog (date range + format select + Download that streams from `/api/reports/generate`).
+9. `documents.tsx` (MODIFIED):
+   - Added the 5th `TabsTrigger` "Approval Queue" (TabsList is now `md:grid-cols-5`).
+   - Wired `{documentsTab === "approval-queue" && <ApprovalQueue onPreview={setPreviewDoc} />}`.
+   - Added a `StatusFlowPills` component rendering `Draft → Generated → Pending → Approved → Issued → Sent` as small horizontal pills (current stage highlighted in `bg-primary text-primary-foreground`, past stages in `bg-primary/15 text-primary`, future stages in `bg-muted text-muted-foreground`, with `ChevronRight` separators). Replaced the "Status" table cell with these pills. ARCHIVED falls back to a single StatusBadge.
+   - Replaced the row action buttons with a single Preview icon + a unified `MoreVertical` dropdown that shows **status-based action items at the top** (labelled "Workflow" / "Approval" / "Delivery"):
+     - GENERATED → "Submit for Approval" (PATCH status=PENDING_APPROVAL, Forward icon, emerald)
+     - PENDING_APPROVAL → "Approve" (POST /approve, CheckCircle2, emerald) + "Reject (return to draft)" (POST /reject, X icon, rose, uses a `prompt()` for the optional reason)
+     - APPROVED → "Issue & Lock" (POST /issue, Stamp icon, teal, with confirm dialog)
+     - ISSUED → "Send Email" (existing DirectSendEmailDialog)
+     - SENT → "Resend Email"
+     Followed by the standard actions: Preview, Download DOCX/PDF, Send Email (hidden when ISSUED/SENT/ARCHIVED — those have their own delivery section), Archive. TanStack Query invalidation on every status action.
+   - Restored the `BulkGenerateDialog` wiring (a parallel agent added the file while I was working).
+10. `store.ts` (MODIFIED) — Added `"approval-queue"` to the `documentsTab` union type (and to the persisted partialize).
+
+Issues Encountered:
+- When I started, `documents.tsx` had a `import { BulkGenerateDialog } from "./bulk-generate-dialog"` line but the file didn't exist (a parallel agent was mid-edit). This broke the whole app's compilation, which in turn broke Turbopack's compile cache and made `/api/reports/analytics` return 500 (compile error, not a runtime error). I removed the broken import to unblock compilation, then later re-added it once the parallel agent finished creating `bulk-generate-dialog.tsx`.
+- The `/api/documents/bulk-download` route (NOT my file, owned by the documents-module agent) has a runtime error: `{imported module [externals]/archiver}.default is not a function`. This is the same `serverExternalPackages` issue that pdfkit had — `archiver` needs to be added to `next.config.ts`'s `serverExternalPackages` array. Flagged for the documents-module agent.
+
+Lint status:
+- Ran `cd /home/z/my-project && bun run lint 2>&1 | tail -30`.
+- **0 errors and 0 warnings** across the entire project. All 6 of my new files + 4 modified files pass cleanly.
+
+Dev server verification (all endpoints return 200, smoke-tested via curl):
+- `PATCH /api/documents/{id} {status:"PENDING_APPROVAL"}` → 200, status=PENDING_APPROVAL ✓
+- `GET /api/documents/pending-approval` → 200, returns total=1 + kpis ✓
+- `POST /api/documents/{id}/approve {note:"Looks good"}` → 200, status=APPROVED ✓
+- `POST /api/documents/{id}/issue` → 200, status=ISSUED ✓
+- `PATCH /api/documents/{id} {status:"APPROVED"}` from ISSUED → 400 "Invalid status transition: ISSUED → APPROVED. Allowed: SENT, ARCHIVED" ✓
+- `PATCH /api/documents/{id} {title:"HACKED", content:"..."}` on locked doc → 200, title unchanged (lock works) ✓
+- `POST /api/documents/{id}/reject {note:"Needs revision"}` → 200, status=GENERATED ✓
+- `GET /api/reports/analytics` → 200 with full payload (kpis + 12mo growth + 30d attendance + 7 leave types + 8 departments + 6mo doc trend × 5 types + 5 perf buckets + 7-stage recruitment funnel) ✓
+- `GET /` → 200 (page renders cleanly with all modules loaded)
+
+Stage Summary:
+- The Document approval workflow is now fully functional end-to-end: HR can submit a GENERATED doc for approval → approve or reject (with reason) → issue (lock) → send email → archive. Every transition is validated, audit-logged, and pushed to the employee's activity feed. Locked documents cannot have their content edited.
+- The Approval Queue tab gives HR a dedicated review surface with KPIs, bulk-approve, and per-row Approve/Reject/Review actions with optional notes.
+- The status flow pills in the documents table give at-a-glance visibility into where each document sits in the pipeline.
+- The Reports module has evolved from a simple "download 5 CSV/PDF reports" page into a real analytics dashboard with 6 live charts + a recruitment funnel + the original export cards. All charts use the emerald-primary palette (no indigo/blue), are responsive (stack on mobile via `lg:grid-cols-2`), have proper tooltips + legends, and show loading skeletons while analytics load.
+- 6 new API endpoints + 2 new frontend files + 4 modified files. Lint passes. Dev server responds 200 on `/` and all new routes.
+
+---
+Task ID: 2-CRON-1
+Agent: cron-review-agent (round 1)
+Task: QA testing via agent-browser, fix UI/UX issues, add new features (bulk generation, approval workflow, more templates, reports analytics), polish styling.
+
+Work Log:
+- Read worklog.md to understand project context (all P0 modules complete, 15-min cron job active).
+- Ran `bun run lint` — 0 errors, 0 warnings (clean baseline).
+- Performed comprehensive QA via agent-browser across all 11 modules (Dashboard, Employees, Attendance, Leave, Payroll, Performance, Recruitment, Documents, Reports, Audit Log, Settings).
+- Used VLM (z-ai vision) to visually inspect screenshots and identify UI/UX issues:
+  - Dashboard: attendance AreaChart looked like a "range chart" (misleading), donut colors too vibrant, legend truncation, widget height misalignment, KPI cards needed more polish.
+  - Employees: needed zebra striping, redundant search bars, status badge consistency.
+  - Documents: KPI cards too wide causing truncation, tabs needed more contrast.
+  - Settings: needed sticky save button, visual grouping, logo preview.
+  - Reports: 6 analytics charts were NOT rendering (critical bug — hsl(var()) color references incompatible with OKLCH theme).
+- Dispatched 2 parallel subagents (Task 2-A and Task 2-B) for feature work.
+
+Bug Fixes:
+- **CRITICAL: Reports charts not rendering** — The reports.tsx module used `hsl(var(--border))`, `hsl(var(--muted-foreground))`, etc. for chart element colors, but the project theme uses OKLCH color values (not HSL). Wrapped in `hsl()` produced invalid colors making chart axes/grids/bars invisible. Replaced all 16 `hsl(var())` references with direct hex values (#e5e7eb for borders, #6b7280 for muted text, #ffffff for background, etc.). All 6 analytics charts now render correctly (confirmed via VLM: Employee Growth LineChart ✓, Attendance Rate AreaChart ✓, Leave Utilization PieChart ✓, Payroll by Dept BarChart ✓, Document Trend Stacked BarChart ✓, Performance Histogram ✓).
+
+Styling Polish (directly implemented):
+- **Dashboard attendance chart**: Changed from AreaChart (misleading "range" look) to stacked BarChart with Present/Late/Absent/Leave series. Added inline legend with color dots. Improved tooltip styling with shadow.
+- **Dashboard donut chart**: Reduced height (180px), added white stroke between slices, improved legend grid (2 columns, 8 items, with title tooltips, bold count numbers).
+- **KpiCard component**: Added hover accent bar on top (color-matched to icon), improved delta indicator with background pill (bg-emerald-500/10 etc.), increased number size to 26px, added group hover scale on icon, made label font-weight semibold.
+- **Table component (global)**: Increased cell padding (p-2 → p-3), header height (h-10 → h-11), header text now uppercase tracking-wider semibold text-muted-foreground, row hover now uses muted/40, border color lighter (border/50).
+- **Tabs component (global)**: Active tab now uses bg-primary text-primary-foreground (emerald) instead of bg-background — much higher contrast. Added hover:text-foreground transition.
+- **Card component (global)**: Added border-border/60 for softer borders.
+- **StatusBadge component**: Added colored dot indicator (1.5px circle) before the label, changed shape from rounded-md to rounded-full (pill), comprehensive dot color map for all statuses.
+- **AppShell footer**: Added backdrop-blur, animated emerald pulse dot, bg-card/60, softer border.
+- **AppShell background**: Added subtle bg-dots pattern (2.5% opacity) for texture.
+- **Settings OrganizationTab**: Rewrote with 3 visual field groups (Legal Details, Contact Information, Location) each with icon header. Added logo preview (14x14 rounded box showing logo image or Building2 icon fallback). Added sticky save bar at bottom (sticky bottom-4 z-10) with backdrop-blur and contextual help text. Changed button label from "Save Changes" to "Update Profile".
+
+Features Added (via subagents):
+- **Task 2-A: 10 new document templates** — Promotion Letter, Transfer Letter, Warning Letter, Show Cause Notice, Salary Certificate, Increment Letter, Resignation Acceptance, Relieving Letter, NOC, Employment Certificate. Total templates now: 15. Seed script at prisma/seed-templates.ts (idempotent).
+- **Task 2-A: Bulk Document Generation** — New /api/documents/bulk-generate and /api/documents/bulk-download (ZIP via archiver) endpoints. New BulkGenerateDialog component (5-step wizard: Select Employees → Select Template → Review → Generate → Results) with searchable multi-select, department quick-add buttons, progress bar, Download All (ZIP), Send All Emails (one-at-a-time with strict employee-doc-recipient validation). Added "Bulk Generate" button to Documents module header and Quick Add dropdown.
+- **Task 2-B: Document Approval Workflow** — Full status flow: DRAFT → GENERATED → PENDING_APPROVAL → APPROVED → ISSUED → SENT (+ ARCHIVED). New endpoints: /api/documents/pending-approval, /api/documents/[id]/approve, /api/documents/[id]/reject, /api/documents/[id]/issue. Enhanced PATCH /api/documents/[id] with transition validation + content locking on APPROVED/ISSUED/SENT. New ApprovalQueue component (5th tab in Documents module) with KPIs (Pending/Approved Today/Issued Today/Rejected Today), Approve All bulk action, per-row Approve/Reject/Review/Preview. Added StatusFlowPills component showing the pipeline stage visually. Added status-based action buttons in row dropdown.
+- **Task 2-B: Enhanced Reports Module** — Complete rewrite with 4 KPI cards + 6 Recharts visualizations (Employee Growth LineChart, Attendance Rate AreaChart, Leave Utilization DonutChart, Payroll by Dept horizontal BarChart, Document Generation Stacked BarChart, Performance Score Histogram) + custom Recruitment Funnel with conversion rates. New /api/reports/analytics endpoint returning 8 data sections. Preserved existing export functionality.
+
+Verification:
+- `bun run lint` — 0 errors, 0 warnings.
+- Dev server log — no runtime errors after all changes.
+- agent-browser QA: all 11 modules render correctly.
+- VLM confirmed: Dashboard 8/10 polish, attendance chart bars visible (28 bars in DOM), all 6 Reports charts rendering, Documents tabs highly visible (emerald active state), Approval Queue shows KPIs + empty state, Bulk Generate dialog works with employee selection, 15 templates visible in Templates tab.
+- Smoke tested APIs: /api/reports/analytics 200, /api/documents/bulk-download 200 (valid ZIP), /api/documents/pending-approval 200, /api/documents/[id]/approve 200, /api/documents/[id]/issue 200.
+
+Stage Summary:
+- Project now has 15 document templates (was 5), full approval workflow, bulk generation with ZIP download, 6 analytics charts in Reports, and significantly polished UI/UX across all modules.
+- All P0 + most P1 items from the original spec are now complete.
+- Remaining recommendations for next cron round:
+  1. Add real SMTP email sending (currently simulated).
+  2. Add employee photo upload (file upload, not just URL).
+  3. Add keyboard shortcuts (g d, g e, etc. for navigation).
+  4. Add CSV/Excel export buttons to all major tables (Employees, Attendance, Leave, Payroll).
+  5. Add more seed data variety (different attendance patterns per day, more historical documents).
+  6. Mobile responsiveness audit at 375px width for all modules.
+  7. Add dark mode toggle visibility in topbar.
+  8. Add document preview print functionality.
+  9. Add employee directory filters by joining date range.
+  10. Add payroll batch creation (select multiple employees → create payroll for all).

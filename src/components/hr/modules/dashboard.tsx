@@ -29,6 +29,8 @@ import {
 import {
   AreaChart,
   Area,
+  BarChart,
+  Bar,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -38,8 +40,8 @@ import {
   Pie,
   Cell,
   Legend,
-  BarChart,
-  Bar,
+  LineChart,
+  Line,
 } from "recharts";
 import { formatDate, relativeTime } from "@/lib/utils";
 import Link from "next/link";
@@ -211,35 +213,19 @@ export function DashboardModule() {
                 Attendance Overview
               </CardTitle>
               <p className="text-xs text-muted-foreground mt-0.5">
-                Last 7 days attendance breakdown
+                Last 7 days — stacked by status
               </p>
             </div>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="text-xs"
-              onClick={() => setModule("attendance")}
-            >
-              View all <ChevronRight className="size-3.5 ml-1" />
-            </Button>
+            <div className="flex items-center gap-3 text-[11px]">
+              <Legend2 color="#10b981" label="Present" />
+              <Legend2 color="#f59e0b" label="Late" />
+              <Legend2 color="#ef4444" label="Absent" />
+              <Legend2 color="#94a3b8" label="Leave" />
+            </div>
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={260}>
-              <AreaChart data={data.attendanceTrend}>
-                <defs>
-                  <linearGradient id="cp" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#10b981" stopOpacity={0.4} />
-                    <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
-                  </linearGradient>
-                  <linearGradient id="cl" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.4} />
-                    <stop offset="95%" stopColor="#f59e0b" stopOpacity={0} />
-                  </linearGradient>
-                  <linearGradient id="ca" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#ef4444" stopOpacity={0.35} />
-                    <stop offset="95%" stopColor="#ef4444" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
+              <BarChart data={data.attendanceTrend} barCategoryGap="28%">
                 <CartesianGrid
                   strokeDasharray="3 3"
                   stroke="oklch(0.92 0 0)"
@@ -257,37 +243,19 @@ export function DashboardModule() {
                   tick={{ fontSize: 12, fill: "oklch(0.5 0 0)" }}
                 />
                 <Tooltip
+                  cursor={{ fill: "oklch(0.96 0 0)" }}
                   contentStyle={{
-                    borderRadius: 8,
-                    border: "1px solid oklch(0.92 0 0)",
+                    borderRadius: 10,
+                    border: "1px solid oklch(0.9 0 0)",
                     fontSize: 12,
+                    boxShadow: "0 4px 12px oklch(0 0 0 / 0.08)",
                   }}
                 />
-                <Area
-                  type="monotone"
-                  dataKey="present"
-                  name="Present"
-                  stroke="#10b981"
-                  strokeWidth={2}
-                  fill="url(#cp)"
-                />
-                <Area
-                  type="monotone"
-                  dataKey="late"
-                  name="Late"
-                  stroke="#f59e0b"
-                  strokeWidth={2}
-                  fill="url(#cl)"
-                />
-                <Area
-                  type="monotone"
-                  dataKey="absent"
-                  name="Absent"
-                  stroke="#ef4444"
-                  strokeWidth={2}
-                  fill="url(#ca)"
-                />
-              </AreaChart>
+                <Bar dataKey="present" name="Present" stackId="a" fill="#10b981" radius={[0, 0, 0, 0]} />
+                <Bar dataKey="late" name="Late" stackId="a" fill="#f59e0b" />
+                <Bar dataKey="absent" name="Absent" stackId="a" fill="#ef4444" />
+                <Bar dataKey="leave" name="Leave" stackId="a" fill="#94a3b8" radius={[6, 6, 0, 0]} />
+              </BarChart>
             </ResponsiveContainer>
           </CardContent>
         </Card>
@@ -303,7 +271,7 @@ export function DashboardModule() {
             </p>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={220}>
+            <ResponsiveContainer width="100%" height={180}>
               <PieChart>
                 <Pie
                   data={data.deptDistribution}
@@ -311,9 +279,11 @@ export function DashboardModule() {
                   nameKey="name"
                   cx="50%"
                   cy="50%"
-                  innerRadius={50}
+                  innerRadius={55}
                   outerRadius={80}
                   paddingAngle={2}
+                  stroke="oklch(1 0 0)"
+                  strokeWidth={2}
                 >
                   {data.deptDistribution.map((entry, idx) => (
                     <Cell key={idx} fill={entry.color} />
@@ -321,24 +291,31 @@ export function DashboardModule() {
                 </Pie>
                 <Tooltip
                   contentStyle={{
-                    borderRadius: 8,
-                    border: "1px solid oklch(0.92 0 0)",
+                    borderRadius: 10,
+                    border: "1px solid oklch(0.9 0 0)",
                     fontSize: 12,
+                    boxShadow: "0 4px 12px oklch(0 0 0 / 0.08)",
                   }}
                 />
               </PieChart>
             </ResponsiveContainer>
-            <div className="grid grid-cols-2 gap-1.5 mt-2">
-              {data.deptDistribution.slice(0, 6).map((d) => (
-                <div key={d.name} className="flex items-center gap-1.5 text-xs">
+            <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 mt-3">
+              {data.deptDistribution.slice(0, 8).map((d) => (
+                <div
+                  key={d.name}
+                  className="flex items-center gap-1.5 text-xs"
+                  title={`${d.name}: ${d.count} employees`}
+                >
                   <span
-                    className="size-2.5 rounded-sm"
+                    className="size-2.5 rounded-sm flex-shrink-0"
                     style={{ background: d.color }}
                   />
-                  <span className="text-muted-foreground truncate flex-1">
+                  <span className="text-muted-foreground truncate flex-1 min-w-0">
                     {d.name}
                   </span>
-                  <span className="font-medium tabular-nums">{d.count}</span>
+                  <span className="font-semibold tabular-nums text-foreground">
+                    {d.count}
+                  </span>
                 </div>
               ))}
             </div>
@@ -553,5 +530,17 @@ export function DashboardModule() {
         </Card>
       </div>
     </div>
+  );
+}
+
+function Legend2({ color, label }: { color: string; label: string }) {
+  return (
+    <span className="inline-flex items-center gap-1.5 text-muted-foreground">
+      <span
+        className="size-2.5 rounded-sm"
+        style={{ background: color }}
+      />
+      {label}
+    </span>
   );
 }

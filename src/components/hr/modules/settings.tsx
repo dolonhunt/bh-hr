@@ -57,6 +57,7 @@ import {
   Check,
   Eye,
   EyeOff,
+  MapPin,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -201,73 +202,132 @@ function OrganizationTab() {
     );
   }
 
-  const fields = [
-    { key: "name", label: "Company Name *", full: true },
-    { key: "legalName", label: "Legal Name" },
-    { key: "taxId", label: "Tax ID / TIN" },
-    { key: "email", label: "Email" },
-    { key: "phone", label: "Phone" },
-    { key: "website", label: "Website" },
-    { key: "logo", label: "Logo URL" },
-    { key: "address", label: "Address", full: true, textarea: true },
-    { key: "city", label: "City" },
-    { key: "state", label: "State / Province" },
-    { key: "country", label: "Country" },
-    { key: "zipCode", label: "ZIP / Postal Code" },
+  const fieldGroups = [
+    {
+      title: "Legal Details",
+      icon: Building2,
+      fields: [
+        { key: "name", label: "Company Name *", full: true },
+        { key: "legalName", label: "Legal Name" },
+        { key: "taxId", label: "Tax ID / TIN" },
+      ],
+    },
+    {
+      title: "Contact Information",
+      icon: Mail,
+      fields: [
+        { key: "email", label: "Email" },
+        { key: "phone", label: "Phone" },
+        { key: "website", label: "Website" },
+        { key: "logo", label: "Logo URL", full: true },
+      ],
+    },
+    {
+      title: "Location",
+      icon: MapPin,
+      fields: [
+        { key: "address", label: "Address", full: true, textarea: true },
+        { key: "city", label: "City" },
+        { key: "state", label: "State / Province" },
+        { key: "country", label: "Country" },
+        { key: "zipCode", label: "ZIP / Postal Code" },
+      ],
+    },
   ];
 
   return (
-    <Card className="border-border/60 shadow-soft">
-      <CardContent className="p-6 space-y-4">
-        <div className="flex items-center justify-between pb-3 border-b border-border/60">
-          <div>
-            <div className="font-semibold">Organization Profile</div>
-            <p className="text-xs text-muted-foreground">
-              These details appear on documents, emails, and reports.
-            </p>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-2 gap-4">
-          {fields.map((f) => (
-            <div
-              key={f.key}
-              className={cn("space-y-1.5", f.full && "col-span-2")}
-            >
-              <Label>{f.label}</Label>
-              {f.textarea ? (
-                <Textarea
-                  rows={2}
-                  value={form[f.key]}
-                  onChange={(e) =>
-                    setForm({ ...form, [f.key]: e.target.value })
-                  }
-                />
-              ) : (
-                <Input
-                  value={form[f.key]}
-                  onChange={(e) =>
-                    setForm({ ...form, [f.key]: e.target.value })
-                  }
-                />
-              )}
+    <div className="space-y-4">
+      <Card className="border-border/60 shadow-soft">
+        <CardContent className="p-6 space-y-5">
+          {/* Header with logo preview */}
+          <div className="flex items-start justify-between pb-4 border-b border-border/60 gap-4">
+            <div>
+              <div className="font-semibold text-base">Organization Profile</div>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                These details appear on documents, emails, and reports.
+              </p>
             </div>
-          ))}
-        </div>
+            <div className="flex items-center gap-3">
+              <div className="size-14 rounded-xl bg-primary/10 border border-border/60 flex items-center justify-center overflow-hidden flex-shrink-0">
+                {form.logo ? (
+                  <img
+                    src={form.logo}
+                    alt="Logo"
+                    className="size-full object-contain p-1"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).style.display = "none";
+                    }}
+                  />
+                ) : (
+                  <Building2 className="size-6 text-primary" />
+                )}
+              </div>
+            </div>
+          </div>
 
-        <div className="flex justify-end pt-3 border-t border-border/60">
-          <Button onClick={save} disabled={saving}>
+          {/* Grouped fields */}
+          {fieldGroups.map((group) => {
+            const GroupIcon = group.icon;
+            return (
+              <div key={group.title} className="space-y-3">
+                <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                  <div className="size-7 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
+                    <GroupIcon className="size-4" />
+                  </div>
+                  {group.title}
+                </div>
+                <div className="grid grid-cols-2 gap-4 pl-9">
+                  {group.fields.map((f) => (
+                    <div
+                      key={f.key}
+                      className={cn("space-y-1.5", f.full && "col-span-2")}
+                    >
+                      <Label className="text-xs text-muted-foreground">
+                        {f.label}
+                      </Label>
+                      {f.textarea ? (
+                        <Textarea
+                          rows={2}
+                          value={form[f.key]}
+                          onChange={(e) =>
+                            setForm({ ...form, [f.key]: e.target.value })
+                          }
+                        />
+                      ) : (
+                        <Input
+                          value={form[f.key]}
+                          onChange={(e) =>
+                            setForm({ ...form, [f.key]: e.target.value })
+                          }
+                        />
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+        </CardContent>
+      </Card>
+
+      {/* Sticky save bar */}
+      <div className="sticky bottom-4 z-10 flex justify-end">
+        <div className="inline-flex items-center gap-3 rounded-xl border border-border/60 bg-card/95 backdrop-blur-md shadow-card-hover px-4 py-2.5">
+          <span className="text-xs text-muted-foreground hidden sm:inline">
+            Changes apply to all generated documents
+          </span>
+          <Button onClick={save} disabled={saving} size="sm">
             {saving ? (
               "Saving…"
             ) : (
               <>
-                <Save className="size-4 mr-1.5" /> Save Changes
+                <Save className="size-4 mr-1.5" /> Update Profile
               </>
             )}
           </Button>
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }
 

@@ -21,7 +21,7 @@ export function AppShell() {
   const activeModule = useApp((s) => s.activeModule);
 
   return (
-    <div className="min-h-screen flex bg-background">
+    <div className="min-h-screen flex bg-background bg-dots">
       <Sidebar />
       <div className="flex-1 flex flex-col min-w-0 lg:pl-0">
         <Topbar />
@@ -40,15 +40,16 @@ export function AppShell() {
             {activeModule === "settings" && <SettingsModule />}
           </div>
         </main>
-        <footer className="mt-auto border-t border-border bg-card/40 px-6 py-3 text-xs text-muted-foreground flex flex-col sm:flex-row items-center justify-between gap-2">
+        <footer className="mt-auto border-t border-border/60 bg-card/60 backdrop-blur-sm px-6 py-3 text-xs text-muted-foreground flex flex-col sm:flex-row items-center justify-between gap-2">
           <div className="flex items-center gap-2">
+            <span className="size-1.5 rounded-full bg-emerald-500 animate-pulse" />
             <span className="font-medium text-foreground">TeamHub HR</span>
-            <span>·</span>
+            <span className="opacity-50">·</span>
             <span>HR Operations Console v1.0</span>
           </div>
           <div className="flex items-center gap-4">
             <span>© {new Date().getFullYear()} Northwind Labs</span>
-            <span className="hidden sm:inline">·</span>
+            <span className="hidden sm:inline opacity-50">·</span>
             <span className="hidden sm:inline">All HR data is encrypted at rest</span>
           </div>
         </footer>

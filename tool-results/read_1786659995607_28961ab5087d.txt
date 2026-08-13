@@ -1,0 +1,1031 @@
+     1→"use client";
+     2→
+     3→import { useEffect, useState, useCallback } from "react";
+     4→import {
+     5→  Dialog,
+     6→  DialogContent,
+     7→  DialogDescription,
+     8→  DialogFooter,
+     9→  DialogHeader,
+    10→  DialogTitle,
+    11→} from "@/components/ui/dialog";
+    12→import { Button } from "@/components/ui/button";
+    13→import { Input } from "@/components/ui/input";
+    14→import { Label } from "@/components/ui/label";
+    15→import { Textarea } from "@/components/ui/textarea";
+    16→import { Badge } from "@/components/ui/badge";
+    17→import {
+    18→  Select,
+    19→  SelectContent,
+    20→  SelectItem,
+    21→  SelectTrigger,
+    22→  SelectValue,
+    23→} from "@/components/ui/select";
+    24→import { ScrollArea } from "@/components/ui/scroll-area";
+    25→import { AvatarBadge } from "../shared/avatar-badge";
+    26→import { StatusBadge } from "../shared/status-badge";
+    27→import { toast } from "sonner";
+    28→import {
+    29→  Loader2,
+    30→  FileText,
+    31→  ArrowRight,
+    32→  ArrowLeft,
+    33→  Check,
+    34→  Download,
+    35→  Mail,
+    36→  Eye,
+    37→  Search,
+    38→  CheckCircle2,
+    39→  Paperclip,
+    40→  Send,
+    41→} from "lucide-react";
+    42→import { useQuery, useQueryClient } from "@tanstack/react-query";
+    43→import { formatDate, formatCurrency } from "@/lib/utils";
+    44→
+    45→const TEMPLATE_TYPES = [
+    46→  "OFFER",
+    47→  "APPOINTMENT",
+    48→  "CONTRACT",
+    49→  "JOINING",
+    50→  "CONFIRMATION",
+    51→  "PAYSLIP",
+    52→  "SALARY_CERT",
+    53→  "INCREMENT",
+    54→  "SALARY_REVISION",
+    55→  "PROMOTION",
+    56→  "TRANSFER",
+    57→  "WARNING",
+    58→  "SHOW_CAUSE",
+    59→  "EXPERIENCE",
+    60→  "EMPLOYMENT_CERT",
+    61→  "NOC",
+    62→  "LEAVE_APPROVAL",
+    63→  "LEAVE_CANCELLATION",
+    64→  "RESIGN_ACCEPT",
+    65→  "RELIEVING",
+    66→  "FINAL_SETTLEMENT",
+    67→  "CUSTOM",
+    68→];
+    69→
+    70→const STEPS = [
+    71→  "Select Employee",
+    72→  "Document Type",
+    73→  "Template",
+    74→  "Review Data",
+    75→  "Preview",
+    76→  "Generate",
+    77→];
+    78→
+    79→interface Props {
+    80→  open: boolean;
+    81→  onOpenChange: (v: boolean) => void;
+    82→  /** Optionally pre-select an employee (e.g. from the employee profile). */
+    83→  presetEmployeeId?: string | null;
+    84→  /** Optionally pre-select a document type. */
+    85→  presetType?: string | null;
+    86→  onGenerated?: (docId: string) => void;
+    87→}
+    88→
+    89→export function GenerateDocumentDialog({
+    90→  open,
+    91→  onOpenChange,
+    92→  presetEmployeeId,
+    93→  presetType,
+    94→  onGenerated,
+    95→}: Props) {
+    96→  const qc = useQueryClient();
+    97→  const [step, setStep] = useState(0);
+    98→  const [employeeId, setEmployeeId] = useState<string>("");
+    99→  const [type, setType] = useState<string>("");
+   100→  const [templateId, setTemplateId] = useState<string>("");
+   101→  const [month, setMonth] = useState<string>("");
+   102→  const [dataOverride, setDataOverride] = useState<any>({});
+   103→  const [previewData, setPreviewData] = useState<{
+   104→    content: string;
+   105→    documentNumber: string;
+   106→    emailSubject: string;
+   107→    emailBody: string;
+   108→    title: string;
+   109→  } | null>(null);
+   110→  const [previewLoading, setPreviewLoading] = useState(false);
+   111→  const [generating, setGenerating] = useState(false);
+   112→  const [generatedDoc, setGeneratedDoc] = useState<any | null>(null);
+   113→  const [sendEmailOpen, setSendEmailOpen] = useState(false);
+   114→  const [empSearch, setEmpSearch] = useState("");
+   115→
+   116→  // Reset state when dialog opens.
+   117→  useEffect(() => {
+   118→    if (open) {
+   119→      setStep(0);
+   120→      setPreviewData(null);
+   121→      setGeneratedDoc(null);
+   122→      setDataOverride({});
+   123→      setTemplateId("");
+   124→      setMonth("");
+   125→      setEmpSearch("");
+   126→      if (presetEmployeeId) {
+   127→        setEmployeeId(presetEmployeeId);
+   128→        setStep(1);
+   129→      } else {
+   130→        setEmployeeId("");
+   131→      }
+   132→      if (presetType) {
+   133→        setType(presetType);
+   134→      } else {
+   135→        setType("");
+   136→      }
+   137→    }
+   138→  }, [open, presetEmployeeId, presetType]);
+   139→
+   140→  // Employees list (filtered by search).
+   141→  const { data: empData, isLoading: empLoading } = useQuery({
+   142→    queryKey: ["employees", empSearch, "doc-gen"],
+   143→    queryFn: async () => {
+   144→      const params = new URLSearchParams();
+   145→      if (empSearch) params.set("search", empSearch);
+   146→      params.set("pageSize", "50");
+   147→      const r = await fetch(`/api/employees?${params.toString()}`);
+   148→      return r.json();
+   149→    },
+   150→    enabled: open,
+   151→  });
+   152→  const employees = empData?.items ?? [];
+   153→
+   154→  // Selected employee (full record).
+   155→  const { data: employee } = useQuery({
+   156→    queryKey: ["employee", employeeId],
+   157→    queryFn: async () => {
+   158→      const r = await fetch(`/api/employees/${employeeId}`);
+   159→      return r.json();
+   160→    },
+   161→    enabled: !!employeeId && open,
+   162→  });
+   163→
+   164→  // Templates list filtered by selected type.
+   165→  const { data: templateData } = useQuery({
+   166→    queryKey: ["document-templates", type],
+   167→    queryFn: async () => {
+   168→      const params = new URLSearchParams();
+   169→      if (type) params.set("type", type);
+   170→      params.set("status", "ACTIVE");
+   171→      const r = await fetch(`/api/document-templates?${params.toString()}`);
+   172→      return r.json();
+   173→    },
+   174→    enabled: open,
+   175→  });
+   176→  const templates = templateData?.items ?? [];
+   177→
+   178→  const selectedTemplate = templates.find((t: any) => t.id === templateId);
+   179→
+   180→  // Auto-advance type → template when only one matches.
+   181→  useEffect(() => {
+   182→    if (templates.length === 1 && !templateId) {
+   183→      setTemplateId(templates[0].id);
+   184→    }
+   185→  }, [templates, templateId]);
+   186→
+   187→  // Payroll month default for payslips.
+   188→  useEffect(() => {
+   189→    if (type === "PAYSLIP" && !month) {
+   190→      const now = new Date();
+   191→      setMonth(
+   192→        `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`
+   193→      );
+   194→    }
+   195→  }, [type, month]);
+   196→
+   197→  const canNext = useCallback(() => {
+   198→    if (step === 0) return !!employeeId;
+   199→    if (step === 1) return !!type;
+   200→    if (step === 2) return !!templateId;
+   201→    if (step === 3) return true;
+   202→    if (step === 4) return !!previewData;
+   203→    return false;
+   204→  }, [step, employeeId, type, templateId, previewData]);
+   205→
+   206→  // Build the request body for both preview and generate.
+   207→  const buildBody = useCallback(
+   208→    (isPreview: boolean) => {
+   209→      const body: any = {
+   210→        employeeId,
+   211→        templateId,
+   212→        preview: isPreview,
+   213→      };
+   214→      if (type) body.type = type;
+   215→      if (type === "PAYSLIP" && month) body.month = month;
+   216→      if (Object.keys(dataOverride).length > 0) {
+   217→        body.dataOverride = dataOverride;
+   218→      }
+   219→      return body;
+   220→    },
+   221→    [employeeId, templateId, type, month, dataOverride]
+   222→  );
+   223→
+   224→  // Fetch preview when entering step 4 (Preview).
+   225→  const fetchPreview = useCallback(async () => {
+   226→    setPreviewLoading(true);
+   227→    try {
+   228→      const res = await fetch("/api/documents", {
+   229→        method: "POST",
+   230→        headers: { "Content-Type": "application/json" },
+   231→        body: JSON.stringify(buildBody(true)),
+   232→      });
+   233→      if (!res.ok) {
+   234→        const err = await res.json().catch(() => ({}));
+   235→        throw new Error(err.error || "Preview failed");
+   236→      }
+   237→      const data = await res.json();
+   238→      setPreviewData(data);
+   239→    } catch (err: any) {
+   240→      toast.error(err.message || "Preview failed");
+   241→      setStep(3);
+   242→    } finally {
+   243→      setPreviewLoading(false);
+   244→    }
+   245→  }, [buildBody]);
+   246→
+   247→  useEffect(() => {
+   248→    if (step === 4 && !previewData && !previewLoading && employeeId && templateId) {
+   249→      fetchPreview();
+   250→    }
+   251→  }, [step, previewData, previewLoading, employeeId, templateId, fetchPreview]);
+   252→
+   253→  // Regenerate preview when data overrides change.
+   254→  const refreshPreview = () => {
+   255→    setPreviewData(null);
+   256→  };
+   257→
+   258→  // Actually generate the document.
+   259→  async function handleGenerate() {
+   260→    setGenerating(true);
+   261→    try {
+   262→      const res = await fetch("/api/documents", {
+   263→        method: "POST",
+   264→        headers: { "Content-Type": "application/json" },
+   265→        body: JSON.stringify(buildBody(false)),
+   266→      });
+   267→      if (!res.ok) {
+   268→        const err = await res.json().catch(() => ({}));
+   269→        throw new Error(err.error || "Generation failed");
+   270→      }
+   271→      const doc = await res.json();
+   272→      setGeneratedDoc(doc);
+   273→      setStep(5);
+   274→      toast.success(`Document ${doc.documentNumber} generated.`);
+   275→      qc.invalidateQueries({ queryKey: ["documents"] });
+   276→      qc.invalidateQueries({ queryKey: ["dashboard"] });
+   277→      onGenerated?.(doc.id);
+   278→    } catch (err: any) {
+   279→      toast.error(err.message || "Generation failed");
+   280→    } finally {
+   281→      setGenerating(false);
+   282→    }
+   283→  }
+   284→
+   285→  // Download handlers.
+   286→  function downloadDoc(format: "docx" | "pdf") {
+   287→    if (!generatedDoc) return;
+   288→    const url = `/api/documents/${generatedDoc.id}/download?format=${format}`;
+   289→    const a = document.createElement("a");
+   290→    a.href = url;
+   291→    a.download = `${generatedDoc.documentNumber}.${format}`;
+   292→    document.body.appendChild(a);
+   293→    a.click();
+   294→    document.body.removeChild(a);
+   295→    toast.success(`Downloading ${format.toUpperCase()}…`);
+   296→  }
+   297→
+   298→  return (
+   299→    <>
+   300→      <Dialog open={open} onOpenChange={onOpenChange}>
+   301→        <DialogContent className="max-w-4xl max-h-[92vh] p-0 gap-0">
+   302→          <DialogHeader className="px-6 py-4 border-b border-border">
+   303→            <DialogTitle className="flex items-center gap-2">
+   304→              <FileText className="size-5 text-primary" />
+   305→              Generate Document
+   306→            </DialogTitle>
+   307→            <DialogDescription>
+   308→              Walk through the steps to generate, preview and deliver an HR
+   309→              document.
+   310→            </DialogDescription>
+   311→          </DialogHeader>
+   312→
+   313→          {/* Stepper */}
+   314→          <div className="px-6 py-3 border-b border-border bg-muted/30">
+   315→            <div className="flex items-center gap-1 overflow-x-auto">
+   316→              {STEPS.map((s, idx) => {
+   317→                const isDone = idx < step;
+   318→                const isActive = idx === step;
+   319→                return (
+   320→                  <div
+   321→                    key={s}
+   322→                    className="flex items-center gap-1 flex-shrink-0"
+   323→                  >
+   324→                    <div
+   325→                      className={`flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium transition-colors ${
+   326→                        isActive
+   327→                          ? "bg-primary text-primary-foreground"
+   328→                          : isDone
+   329→                            ? "bg-primary/10 text-primary"
+   330→                            : "text-muted-foreground"
+   331→                      }`}
+   332→                    >
+   333→                      <div
+   334→                        className={`size-4 rounded-full flex items-center justify-center text-[10px] ${
+   335→                          isActive
+   336→                            ? "bg-primary-foreground/20"
+   337→                            : isDone
+   338→                              ? "bg-primary"
+   339→                              : "bg-muted"
+   340→                        }`}
+   341→                      >
+   342→                        {isDone ? (
+   343→                          <Check className="size-3" />
+   344→                        ) : (
+   345→                          idx + 1
+   346→                        )}
+   347→                      </div>
+   348→                      <span className="whitespace-nowrap">{s}</span>
+   349→                    </div>
+   350→                    {idx < STEPS.length - 1 && (
+   351→                      <div className="w-3 h-px bg-border" />
+   352→                    )}
+   353→                  </div>
+   354→                );
+   355→              })}
+   356→            </div>
+   357→          </div>
+   358→
+   359→          <ScrollArea className="max-h-[58vh]">
+   360→            <div className="px-6 py-5">
+   361→              {/* STEP 0: Select employee */}
+   362→              {step === 0 && (
+   363→                <div className="space-y-4">
+   364→                  <div className="text-sm text-muted-foreground">
+   365→                    Choose the employee this document is for.
+   366→                  </div>
+   367→                  <div className="relative">
+   368→                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+   369→                    <Input
+   370→                      placeholder="Search by name, ID, email…"
+   371→                      value={empSearch}
+   372→                      onChange={(e) => setEmpSearch(e.target.value)}
+   373→                      className="pl-9"
+   374→                    />
+   375→                  </div>
+   376→                  <div className="border border-border rounded-lg overflow-hidden">
+   377→                    <ScrollArea className="h-72">
+   378→                      {empLoading && (
+   379→                        <div className="p-4 text-sm text-muted-foreground">
+   380→                          Loading…
+   381→                        </div>
+   382→                      )}
+   383→                      {!empLoading && employees.length === 0 && (
+   384→                        <div className="p-6 text-center text-sm text-muted-foreground">
+   385→                          No employees found.
+   386→                        </div>
+   387→                      )}
+   388→                      <div className="divide-y divide-border">
+   389→                        {employees.map((emp: any) => (
+   390→                          <button
+   391→                            key={emp.id}
+   392→                            onClick={() => setEmployeeId(emp.id)}
+   393→                            className={`w-full flex items-center gap-3 p-3 text-left hover:bg-muted/60 transition ${
+   394→                              employeeId === emp.id ? "bg-primary/5" : ""
+   395→                            }`}
+   396→                          >
+   397→                            <AvatarBadge
+   398→                              name={emp.fullName}
+   399→                              photo={emp.photo}
+   400→                              size="md"
+   401→                            />
+   402→                            <div className="flex-1 min-w-0">
+   403→                              <div className="font-medium truncate">
+   404→                                {emp.fullName}
+   405→                              </div>
+   406→                              <div className="text-xs text-muted-foreground truncate">
+   407→                                {emp.employeeId} ·{" "}
+   408→                                {emp.designation?.name ?? "—"} ·{" "}
+   409→                                {emp.department?.name ?? "—"}
+   410→                              </div>
+   411→                            </div>
+   412→                            {employeeId === emp.id && (
+   413→                              <Check className="size-4 text-primary" />
+   414→                            )}
+   415→                          </button>
+   416→                        ))}
+   417→                      </div>
+   418→                    </ScrollArea>
+   419→                  </div>
+   420→                  {employee && (
+   421→                    <div className="rounded-lg bg-primary/5 border border-primary/20 p-3 text-sm">
+   422→                      <div className="flex items-center gap-2">
+   423→                        <CheckCircle2 className="size-4 text-primary" />
+   424→                        <span className="font-medium">
+   425→                          Selected: {employee.fullName}
+   426→                        </span>
+   427→                        <Badge variant="outline" className="font-mono text-xs">
+   428→                          {employee.employeeId}
+   429→                        </Badge>
+   430→                      </div>
+   431→                    </div>
+   432→                  )}
+   433→                </div>
+   434→              )}
+   435→
+   436→              {/* STEP 1: Select type */}
+   437→              {step === 1 && (
+   438→                <div className="space-y-4">
+   439→                  <div className="text-sm text-muted-foreground">
+   440→                    Pick the kind of document you want to generate.
+   441→                  </div>
+   442→                  <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+   443→                    {TEMPLATE_TYPES.map((t) => (
+   444→                      <button
+   445→                        key={t}
+   446→                        onClick={() => {
+   447→                          setType(t);
+   448→                          setTemplateId("");
+   449→                        }}
+   450→                        className={`rounded-lg border p-3 text-left transition ${
+   451→                          type === t
+   452→                            ? "border-primary bg-primary/5 text-primary"
+   453→                            : "border-border hover:bg-muted/60"
+   454→                        }`}
+   455→                      >
+   456→                        <div className="text-sm font-medium">
+   457→                          {t.replace(/_/g, " ")}
+   458→                        </div>
+   459→                        <div className="text-[10px] text-muted-foreground mt-0.5">
+   460→                          {type === t ? "Selected" : "Click to select"}
+   461→                        </div>
+   462→                      </button>
+   463→                    ))}
+   464→                  </div>
+   465→                </div>
+   466→              )}
+   467→
+   468→              {/* STEP 2: Select template */}
+   469→              {step === 2 && (
+   470→                <div className="space-y-4">
+   471→                  <div className="text-sm text-muted-foreground">
+   472→                    Choose a template. Only active templates of type{" "}
+   473→                    <Badge variant="outline" className="font-mono">
+   474→                      {type}
+   475→                    </Badge>{" "}
+   476→                    are shown.
+   477→                  </div>
+   478→                  {templates.length === 0 && (
+   479→                    <div className="rounded-lg border border-dashed border-border p-8 text-center">
+   480→                      <FileText className="size-8 text-muted-foreground mx-auto mb-2" />
+   481→                      <div className="text-sm font-medium">
+   482→                        No templates found for this type
+   483→                      </div>
+   484→                      <div className="text-xs text-muted-foreground mt-1">
+   485→                        Create a template first from the Templates tab.
+   486→                      </div>
+   487→                    </div>
+   488→                  )}
+   489→                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+   490→                    {templates.map((t: any) => (
+   491→                      <button
+   492→                        key={t.id}
+   493→                        onClick={() => setTemplateId(t.id)}
+   494→                        className={`rounded-lg border p-4 text-left transition ${
+   495→                          templateId === t.id
+   496→                            ? "border-primary bg-primary/5"
+   497→                            : "border-border hover:bg-muted/60"
+   498→                        }`}
+   499→                      >
+   500→                        <div className="flex items-start justify-between gap-2">
+   501→                          <div>
+   502→                            <div className="font-medium text-sm">{t.name}</div>
+   503→                            <div className="text-xs text-muted-foreground mt-0.5">
+   504→                              {t.description ?? "No description"}
+   505→                            </div>
+   506→                          </div>
+   507→                          <Badge variant="outline" className="font-mono text-[10px]">
+   508→                            {t.code}
+   509→                          </Badge>
+   510→                        </div>
+   511→                        <div className="mt-2 flex items-center gap-2 text-[11px] text-muted-foreground">
+   512→                          <span>v{t.version}</span>
+   513→                          <span>·</span>
+   514→                          <span>{t.category}</span>
+   515→                        </div>
+   516→                      </button>
+   517→                    ))}
+   518→                  </div>
+   519→                  {selectedTemplate && (
+   520→                    <div className="rounded-lg bg-muted/40 p-3 text-xs">
+   521→                      <div className="font-medium mb-1">Template preview:</div>
+   522→                      <div
+   523→                        className="prose prose-sm max-w-none line-clamp-3"
+   524→                        dangerouslySetInnerHTML={{
+   525→                          __html: selectedTemplate.content,
+   526→                        }}
+   527→                      />
+   528→                    </div>
+   529→                  )}
+   530→                </div>
+   531→              )}
+   532→
+   533→              {/* STEP 3: Review data */}
+   534→              {step === 3 && employee && (
+   535→                <div className="space-y-4">
+   536→                  <div className="text-sm text-muted-foreground">
+   537→                    Confirm the data that will be merged into the template.
+   538→                    Override any value below if needed.
+   539→                  </div>
+   540→                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+   541→                    <ReviewField
+   542→                      label="Employee Name"
+   543→                      value={
+   544→                        dataOverride.employee?.name ?? employee.fullName
+   545→                      }
+   546→                      onChange={(v) =>
+   547→                        setDataOverride((d: any) => ({
+   548→                          ...d,
+   549→                          employee: { ...d.employee, name: v },
+   550→                        }))
+   551→                      }
+   552→                    />
+   553→                    <ReviewField
+   554→                      label="Employee ID"
+   555→                      value={
+   556→                        dataOverride.employee?.id ?? employee.employeeId
+   557→                      }
+   558→                      onChange={(v) =>
+   559→                        setDataOverride((d: any) => ({
+   560→                          ...d,
+   561→                          employee: { ...d.employee, id: v },
+   562→                        }))
+   563→                      }
+   564→                    />
+   565→                    <ReviewField
+   566→                      label="Designation"
+   567→                      value={
+   568→                        dataOverride.employee?.designation ??
+   569→                        employee.designation?.name ??
+   570→                        ""
+   571→                      }
+   572→                      onChange={(v) =>
+   573→                        setDataOverride((d: any) => ({
+   574→                          ...d,
+   575→                          employee: { ...d.employee, designation: v },
+   576→                        }))
+   577→                      }
+   578→                    />
+   579→                    <ReviewField
+   580→                      label="Department"
+   581→                      value={
+   582→                        dataOverride.employee?.department ??
+   583→                        employee.department?.name ??
+   584→                        ""
+   585→                      }
+   586→                      onChange={(v) =>
+   587→                        setDataOverride((d: any) => ({
+   588→                          ...d,
+   589→                          employee: { ...d.employee, department: v },
+   590→                        }))
+   591→                      }
+   592→                    />
+   593→                    <ReviewField
+   594→                      label="Joining Date"
+   595→                      value={
+   596→                        dataOverride.employee?.joining_date ??
+   597→                        (employee.joiningDate
+   598→                          ? formatDate(employee.joiningDate)
+   599→                          : "")
+   600→                      }
+   601→                      onChange={(v) =>
+   602→                        setDataOverride((d: any) => ({
+   603→                          ...d,
+   604→                          employee: { ...d.employee, joining_date: v },
+   605→                        }))
+   606→                      }
+   607→                    />
+   608→                    <ReviewField
+   609→                      label="Basic Salary"
+   610→                      value={
+   611→                        dataOverride.employee?.salary ??
+   612→                        (employee.basicSalary
+   613→                          ? formatCurrency(employee.basicSalary)
+   614→                          : "")
+   615→                      }
+   616→                      onChange={(v) =>
+   617→                        setDataOverride((d: any) => ({
+   618→                          ...d,
+   619→                          employee: { ...d.employee, salary: v },
+   620→                        }))
+   621→                      }
+   622→                    />
+   623→                    <ReviewField
+   624→                      label="Official Email"
+   625→                      value={
+   626→                        dataOverride.employee?.email ??
+   627→                        employee.officialEmail ??
+   628→                        ""
+   629→                      }
+   630→                      onChange={(v) =>
+   631→                        setDataOverride((d: any) => ({
+   632→                          ...d,
+   633→                          employee: { ...d.employee, email: v },
+   634→                        }))
+   635→                      }
+   636→                    />
+   637→                    <ReviewField
+   638→                      label="Phone"
+   639→                      value={
+   640→                        dataOverride.employee?.phone ?? employee.phone ?? ""
+   641→                      }
+   642→                      onChange={(v) =>
+   643→                        setDataOverride((d: any) => ({
+   644→                          ...d,
+   645→                          employee: { ...d.employee, phone: v },
+   646→                        }))
+   647→                      }
+   648→                    />
+   649→                  </div>
+   650→
+   651→                  {type === "PAYSLIP" && (
+   652→                    <div className="rounded-lg border border-border p-3 space-y-2">
+   653→                      <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+   654→                        Payroll Period
+   655→                      </div>
+   656→                      <Input
+   657→                        type="month"
+   658→                        value={month}
+   659→                        onChange={(e) => setMonth(e.target.value)}
+   660→                        className="w-48"
+   661→                      />
+   662→                      <div className="text-[11px] text-muted-foreground">
+   663→                        Payroll values will be pulled from the latest payslip
+   664→                        for this month, or fall back to the employee&apos;s
+   665→                        salary fields.
+   666→                      </div>
+   667→                    </div>
+   668→                  )}
+   669→
+   670→                  <div className="text-xs text-muted-foreground bg-muted/40 rounded-lg p-3">
+   671→                    Document number will be auto-generated (e.g.{" "}
+   672→                    <span className="font-mono">NWL/HR/{type?.slice(0, 4)}/
+   673→                      {`${String(new Date().getMonth() + 1).padStart(2, "0")}${String(new Date().getDate()).padStart(2, "0")}${new Date().getFullYear()}`}
+   674→                      /{employee.employeeId}
+   675→                    </span>
+   676→                    ).
+   677→                  </div>
+   678→                </div>
+   679→              )}
+   680→
+   681→              {/* STEP 4: Preview */}
+   682→              {step === 4 && (
+   683→                <div className="space-y-3">
+   684→                  <div className="flex items-center justify-between">
+   685→                    <div className="text-sm text-muted-foreground">
+   686→                      Preview of the rendered document. Variables have been
+   687→                      resolved from the data above.
+   688→                    </div>
+   689→                    <Button
+   690→                      variant="ghost"
+   691→                      size="sm"
+   692→                      onClick={refreshPreview}
+   693→                      disabled={previewLoading}
+   694→                    >
+   695→                      <Eye className="size-3.5 mr-1.5" /> Refresh
+   696→                    </Button>
+   697→                  </div>
+   698→                  {previewLoading && (
+   699→                    <div className="rounded-lg border border-border p-8 flex flex-col items-center justify-center text-muted-foreground">
+   700→                      <Loader2 className="size-6 animate-spin mb-2" />
+   701→                      <div className="text-sm">Rendering preview…</div>
+   702→                    </div>
+   703→                  )}
+   704→                  {!previewLoading && previewData && (
+   705→                    <>
+   706→                      <div className="rounded-md border border-border bg-muted/30 px-3 py-2 text-xs flex items-center gap-3 flex-wrap">
+   707→                        <span className="text-muted-foreground">Doc No:</span>
+   708→                        <span className="font-mono font-medium">
+   709→                          {previewData.documentNumber}
+   710→                        </span>
+   711→                        <span className="text-muted-foreground ml-auto">
+   712→                          Title:
+   713→                        </span>
+   714→                        <span className="font-medium">
+   715→                          {previewData.title}
+   716→                        </span>
+   717→                      </div>
+   718→                      <div className="rounded-lg border border-border bg-white p-6 max-h-[44vh] overflow-y-auto">
+   719→                        <div
+   720→                          className="prose prose-sm max-w-none"
+   721→                          dangerouslySetInnerHTML={{
+   722→                            __html: previewData.content,
+   723→                          }}
+   724→                        />
+   725→                      </div>
+   726→                    </>
+   727→                  )}
+   728→                </div>
+   729→              )}
+   730→
+   731→              {/* STEP 5: Generated */}
+   732→              {step === 5 && generatedDoc && (
+   733→                <div className="space-y-4">
+   734→                  <div className="rounded-xl border border-primary/20 bg-primary/5 p-5 text-center">
+   735→                    <CheckCircle2 className="size-10 text-primary mx-auto mb-2" />
+   736→                    <div className="font-semibold text-base">
+   737→                      Document generated successfully
+   738→                    </div>
+   739→                    <div className="text-xs text-muted-foreground mt-1">
+   740→                      {generatedDoc.documentNumber} · {generatedDoc.title}
+   741→                    </div>
+   742→                  </div>
+   743→                  <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+   744→                    <Button
+   745→                      variant="outline"
+   746→                      onClick={() =>
+   747→                        window.open(
+   748→                          `/api/documents/${generatedDoc.id}/preview`,
+   749→                          "_blank"
+   750→                        )
+   751→                      }
+   752→                    >
+   753→                      <Eye className="size-4 mr-1.5" /> Preview
+   754→                    </Button>
+   755→                    <Button
+   756→                      variant="outline"
+   757→                      onClick={() => downloadDoc("docx")}
+   758→                    >
+   759→                      <Download className="size-4 mr-1.5" /> DOCX
+   760→                    </Button>
+   761→                    <Button
+   762→                      variant="outline"
+   763→                      onClick={() => downloadDoc("pdf")}
+   764→                    >
+   765→                      <Download className="size-4 mr-1.5" /> PDF
+   766→                    </Button>
+   767→                  </div>
+   768→                  <Button
+   769→                    className="w-full"
+   770→                    onClick={() => setSendEmailOpen(true)}
+   771→                  >
+   772→                    <Mail className="size-4 mr-1.5" /> Send via Email
+   773→                  </Button>
+   774→                </div>
+   775→              )}
+   776→            </div>
+   777→          </ScrollArea>
+   778→
+   779→          <DialogFooter className="px-6 py-4 border-t border-border justify-between">
+   780→            <Button
+   781→              variant="ghost"
+   782→              onClick={() => onOpenChange(false)}
+   783→              disabled={generating}
+   784→            >
+   785→              {step === 5 ? "Close" : "Cancel"}
+   786→            </Button>
+   787→            <div className="flex items-center gap-2">
+   788→              {step > 0 && step < 5 && (
+   789→                <Button
+   790→                  variant="outline"
+   791→                  onClick={() => setStep((s) => Math.max(0, s - 1))}
+   792→                  disabled={generating || previewLoading}
+   793→                >
+   794→                  <ArrowLeft className="size-4 mr-1.5" /> Back
+   795→                </Button>
+   796→              )}
+   797→              {step < 4 && (
+   798→                <Button
+   799→                  onClick={() => setStep((s) => s + 1)}
+   800→                  disabled={!canNext()}
+   801→                >
+   802→                  Next <ArrowRight className="size-4 ml-1.5" />
+   803→                </Button>
+   804→              )}
+   805→              {step === 4 && (
+   806→                <Button
+   807→                  onClick={handleGenerate}
+   808→                  disabled={generating || !previewData}
+   809→                >
+   810→                  {generating ? (
+   811→                    <Loader2 className="size-4 mr-2 animate-spin" />
+   812→                  ) : (
+   813→                    <FileText className="size-4 mr-1.5" />
+   814→                  )}
+   815→                  Generate Document
+   816→                </Button>
+   817→              )}
+   818→            </div>
+   819→          </DialogFooter>
+   820→        </DialogContent>
+   821→      </Dialog>
+   822→
+   823→      {/* Send Email sub-dialog */}
+   824→      <SendEmailDialog
+   825→        open={sendEmailOpen}
+   826→        onOpenChange={setSendEmailOpen}
+   827→        doc={generatedDoc}
+   828→        employee={employee}
+   829→        presetSubject={previewData?.emailSubject}
+   830→        presetBody={previewData?.emailBody}
+   831→        onSent={() => {
+   832→          qc.invalidateQueries({ queryKey: ["documents"] });
+   833→          qc.invalidateQueries({ queryKey: ["email-logs"] });
+   834→        }}
+   835→      />
+   836→    </>
+   837→  );
+   838→}
+   839→
+   840→function ReviewField({
+   841→  label,
+   842→  value,
+   843→  onChange,
+   844→}: {
+   845→  label: string;
+   846→  value: string;
+   847→  onChange: (v: string) => void;
+   848→}) {
+   849→  return (
+   850→    <div>
+   851→      <Label className="text-xs font-medium text-muted-foreground mb-1.5 block">
+   852→        {label}
+   853→      </Label>
+   854→      <Input value={value} onChange={(e) => onChange(e.target.value)} />
+   855→    </div>
+   856→  );
+   857→}
+   858→
+   859→// =============================================================
+   860→// Send Email sub-dialog
+   861→// =============================================================
+   862→
+   863→function SendEmailDialog({
+   864→  open,
+   865→  onOpenChange,
+   866→  doc,
+   867→  employee,
+   868→  presetSubject,
+   869→  presetBody,
+   870→  onSent,
+   871→}: {
+   872→  open: boolean;
+   873→  onOpenChange: (v: boolean) => void;
+   874→  doc: any;
+   875→  employee: any;
+   876→  presetSubject?: string;
+   877→  presetBody?: string;
+   878→  onSent?: () => void;
+   879→}) {
+   880→  const [sending, setSending] = useState(false);
+   881→  const [to, setTo] = useState("");
+   882→  const [cc, setCc] = useState("");
+   883→  const [bcc, setBcc] = useState("");
+   884→  const [subject, setSubject] = useState("");
+   885→  const [body, setBody] = useState("");
+   886→
+   887→  useEffect(() => {
+   888→    if (open && doc) {
+   889→      setTo(employee?.officialEmail ?? "");
+   890→      setCc("");
+   891→      setBcc("");
+   892→      setSubject(presetSubject || `Your document - ${doc.documentNumber}`);
+   893→      setBody(
+   894→        presetBody ||
+   895→          `Dear ${employee?.fullName ?? ""},\n\nPlease find attached your document ${doc.documentNumber}.\n\nRegards,\nHR Team`
+   896→      );
+   897→    }
+   898→  }, [open, doc]);
+   899→
+   900→  async function handleSend() {
+   901→    if (!doc) return;
+   902→    if (!to || !subject || !body) {
+   903→      toast.error("To, subject and body are required.");
+   904→      return;
+   905→    }
+   906→    setSending(true);
+   907→    try {
+   908→      const res = await fetch(`/api/documents/${doc.id}/send-email`, {
+   909→        method: "POST",
+   910→        headers: { "Content-Type": "application/json" },
+   911→        body: JSON.stringify({ to, cc, bcc, subject, body }),
+   912→      });
+   913→      if (!res.ok) {
+   914→        const err = await res.json().catch(() => ({}));
+   915→        throw new Error(err.error || "Failed to send email");
+   916→      }
+   917→      toast.success(`Email sent to ${to}`);
+   918→      onSent?.();
+   919→      onOpenChange(false);
+   920→    } catch (err: any) {
+   921→      toast.error(err.message || "Send failed");
+   922→    } finally {
+   923→      setSending(false);
+   924→    }
+   925→  }
+   926→
+   927→  return (
+   928→    <Dialog open={open} onOpenChange={onOpenChange}>
+   929→      <DialogContent className="max-w-2xl">
+   930→        <DialogHeader>
+   931→          <DialogTitle className="flex items-center gap-2">
+   932→            <Mail className="size-5 text-primary" />
+   933→            Send Document via Email
+   934→          </DialogTitle>
+   935→          <DialogDescription>
+   936→            The generated PDF will be attached automatically. The recipient
+   937→            must be the employee&apos;s official email — overrides are logged
+   938→            for audit.
+   939→          </DialogDescription>
+   940→        </DialogHeader>
+   941→
+   942→        <div className="space-y-3">
+   943→          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+   944→            <div className="md:col-span-2">
+   945→              <Label className="text-xs font-medium text-muted-foreground mb-1.5 block">
+   946→                To *
+   947→              </Label>
+   948→              <Input
+   949→                type="email"
+   950→                value={to}
+   951→                onChange={(e) => setTo(e.target.value)}
+   952→                placeholder="employee@company.com"
+   953→              />
+   954→              {employee?.officialEmail &&
+   955→                to.toLowerCase() !==
+   956→                  employee.officialEmail.toLowerCase() && (
+   957→                  <div className="text-[11px] text-amber-600 mt-1">
+   958→                    Override: recipient differs from{" "}
+   959→                    {employee.officialEmail}. This will be logged.
+   960→                  </div>
+   961→                )}
+   962→            </div>
+   963→            <div>
+   964→              <Label className="text-xs font-medium text-muted-foreground mb-1.5 block">
+   965→                CC
+   966→              </Label>
+   967→              <Input
+   968→                value={cc}
+   969→                onChange={(e) => setCc(e.target.value)}
+   970→                placeholder="cc@example.com"
+   971→              />
+   972→            </div>
+   973→            <div>
+   974→              <Label className="text-xs font-medium text-muted-foreground mb-1.5 block">
+   975→                BCC
+   976→              </Label>
+   977→              <Input
+   978→                value={bcc}
+   979→                onChange={(e) => setBcc(e.target.value)}
+   980→                placeholder="bcc@example.com"
+   981→              />
+   982→            </div>
+   983→            <div className="md:col-span-2">
+   984→              <Label className="text-xs font-medium text-muted-foreground mb-1.5 block">
+   985→                Subject *
+   986→              </Label>
+   987→              <Input
+   988→                value={subject}
+   989→                onChange={(e) => setSubject(e.target.value)}
+   990→              />
+   991→            </div>
+   992→            <div className="md:col-span-2">
+   993→              <Label className="text-xs font-medium text-muted-foreground mb-1.5 block">
+   994→                Body *
+   995→              </Label>
+   996→              <Textarea
+   997→                value={body}
+   998→                onChange={(e) => setBody(e.target.value)}
+   999→                rows={8}
+  1000→              />
+  1001→            </div>
+  1002→          </div>
+  1003→          <div className="rounded-lg bg-muted/40 p-3 text-xs flex items-start gap-2">
+  1004→            <Paperclip className="size-3.5 mt-0.5 flex-shrink-0" />
+  1005→            <div>
+  1006→              <div className="font-medium">Attachment</div>
+  1007→              <div className="text-muted-foreground">
+  1008→                {doc?.documentNumber ?? "document"}.pdf (auto-generated)
+  1009→              </div>
+  1010→            </div>
+  1011→          </div>
+  1012→        </div>
+  1013→
+  1014→        <DialogFooter>
+  1015→          <Button variant="outline" onClick={() => onOpenChange(false)}>
+  1016→            Cancel
+  1017→          </Button>
+  1018→          <Button onClick={handleSend} disabled={sending}>
+  1019→            {sending ? (
+  1020→              <Loader2 className="size-4 mr-2 animate-spin" />
+  1021→            ) : (
+  1022→              <Send className="size-4 mr-2" />
+  1023→            )}
+  1024→            Send Email
+  1025→          </Button>
+  1026→        </DialogFooter>
+  1027→      </DialogContent>
+  1028→    </Dialog>
+  1029→  );
+  1030→}
+  1031→

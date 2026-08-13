@@ -3,6 +3,7 @@
 import { useApp } from "@/lib/store";
 import { EmployeeFormDialog } from "./modules/employee-form-dialog";
 import { GenerateDocumentDialog } from "./modules/generate-document-dialog";
+import { BulkGenerateDialog } from "./modules/bulk-generate-dialog";
 import { PayslipDialog } from "./modules/payslip-dialog";
 import { AttendanceEntryDialog } from "./modules/attendance-entry-dialog";
 import { LeaveEntryDialog } from "./modules/leave-entry-dialog";
@@ -19,6 +20,10 @@ export function QuickActions() {
       />
       <GenerateDocumentDialog
         open={quickAction === "generate-document"}
+        onOpenChange={(o) => !o && setQuickAction(null)}
+      />
+      <BulkGenerateDialog
+        open={quickAction === "bulk-generate"}
         onOpenChange={(o) => !o && setQuickAction(null)}
       />
       <PayslipDialog

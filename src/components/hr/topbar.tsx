@@ -119,6 +119,9 @@ export function Topbar() {
             <DropdownMenuItem onClick={() => setQuickAction("generate-document")}>
               <Search className="size-4 mr-2" /> Generate Document
             </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => setQuickAction("bulk-generate")}>
+              <Plus className="size-4 mr-2" /> Bulk Generate Documents
+            </DropdownMenuItem>
             <DropdownMenuItem onClick={() => setQuickAction("create-payslip")}>
               <Plus className="size-4 mr-2" /> Create Payslip
             </DropdownMenuItem>

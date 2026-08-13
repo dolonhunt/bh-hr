@@ -174,8 +174,8 @@
     background-size: 24px 24px;
   }
   .bg-dots {
-    background-image: radial-gradient(oklch(0 0 0 / 0.06) 1px, transparent 1px);
-    background-size: 16px 16px;
+    background-image: radial-gradient(oklch(0 0 0 / 0.025) 1px, transparent 1px);
+    background-size: 18px 18px;
   }
   /* Glass surface */
   .glass {

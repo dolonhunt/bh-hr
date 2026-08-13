@@ -37,7 +37,12 @@ export interface AppState {
   openEmployee: (id: string) => void;
 
   // Documents module tab
-  documentsTab: "all" | "templates" | "generated" | "email-history";
+  documentsTab:
+    | "all"
+    | "templates"
+    | "generated"
+    | "email-history"
+    | "approval-queue";
   setDocumentsTab: (t: AppState["documentsTab"]) => void;
 
   // Global command palette

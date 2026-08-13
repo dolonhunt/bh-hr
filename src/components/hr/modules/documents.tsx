@@ -65,22 +65,40 @@ import {
   MailX,
   FileStack,
   MailCheck,
+  Layers,
+  Forward,
+  X,
+  Stamp,
+  ChevronRight,
 } from "lucide-react";
-import { formatDate, relativeTime } from "@/lib/utils";
+import { formatDate, relativeTime, cn } from "@/lib/utils";
 import { TemplateFormDialog } from "./template-form-dialog";
 import { GenerateDocumentDialog } from "./generate-document-dialog";
+import { BulkGenerateDialog } from "./bulk-generate-dialog";
+import { ApprovalQueue } from "./approval-queue";
 
 const DOC_TYPES = [
   "OFFER",
   "APPOINTMENT",
-  "PAYSLIP",
-  "EXPERIENCE",
-  "LEAVE_APPROVAL",
+  "CONTRACT",
+  "JOINING",
   "CONFIRMATION",
+  "PAYSLIP",
+  "SALARY_CERT",
   "INCREMENT",
+  "SALARY_REVISION",
   "PROMOTION",
+  "TRANSFER",
   "WARNING",
+  "SHOW_CAUSE",
+  "EXPERIENCE",
+  "EMPLOYMENT_CERT",
+  "NOC",
+  "LEAVE_APPROVAL",
+  "LEAVE_CANCELLATION",
+  "RESIGN_ACCEPT",
   "RELIEVING",
+  "FINAL_SETTLEMENT",
   "CUSTOM",
 ];
 
@@ -97,6 +115,7 @@ export function DocumentsModule() {
   const documentsTab = useApp((s) => s.documentsTab);
   const setDocumentsTab = useApp((s) => s.setDocumentsTab);
   const [generateOpen, setGenerateOpen] = useState(false);
+  const [bulkOpen, setBulkOpen] = useState(false);
   const [templateFormOpen, setTemplateFormOpen] = useState(false);
   const [editTemplate, setEditTemplate] = useState<{ id: string } | null>(null);
   const [previewDoc, setPreviewDoc] = useState<any | null>(null);
@@ -117,6 +136,13 @@ export function DocumentsModule() {
             >
               <Plus className="size-4 mr-1.5" /> Template
             </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setBulkOpen(true)}
+            >
+              <Layers className="size-4 mr-1.5" /> Bulk Generate
+            </Button>
             <Button size="sm" onClick={() => setGenerateOpen(true)}>
               <FilePlus className="size-4 mr-1.5" /> Generate Document
             </Button>
@@ -128,7 +154,7 @@ export function DocumentsModule() {
         value={documentsTab}
         onValueChange={(v) => setDocumentsTab(v as any)}
       >
-        <TabsList className="grid w-full grid-cols-2 md:grid-cols-4 h-auto">
+        <TabsList className="grid w-full grid-cols-2 md:grid-cols-5 h-auto">
           <TabsTrigger value="all" className="py-1.5">
             All Documents
           </TabsTrigger>
@@ -140,6 +166,9 @@ export function DocumentsModule() {
           </TabsTrigger>
           <TabsTrigger value="email-history" className="py-1.5">
             Email History
+          </TabsTrigger>
+          <TabsTrigger value="approval-queue" className="py-1.5">
+            Approval Queue
           </TabsTrigger>
         </TabsList>
       </Tabs>
@@ -166,6 +195,9 @@ export function DocumentsModule() {
         />
       )}
       {documentsTab === "email-history" && <EmailHistoryTab />}
+      {documentsTab === "approval-queue" && (
+        <ApprovalQueue onPreview={setPreviewDoc} />
+      )}
 
       {/* Generate dialog */}
       <GenerateDocumentDialog
@@ -175,6 +207,9 @@ export function DocumentsModule() {
           /* could navigate */
         }}
       />
+
+      {/* Bulk generate dialog */}
+      <BulkGenerateDialog open={bulkOpen} onOpenChange={setBulkOpen} />
 
       {/* Template form dialog */}
       <TemplateFormDialog
@@ -839,6 +874,59 @@ function EmailHistoryTab() {
 // Shared documents table
 // =============================================================
 
+// Status pipeline shown as small horizontal pills.
+const STATUS_PIPELINE: { key: string; label: string }[] = [
+  { key: "DRAFT", label: "Draft" },
+  { key: "GENERATED", label: "Generated" },
+  { key: "PENDING_APPROVAL", label: "Pending" },
+  { key: "APPROVED", label: "Approved" },
+  { key: "ISSUED", label: "Issued" },
+  { key: "SENT", label: "Sent" },
+];
+
+function StatusFlowPills({ status }: { status: string }) {
+  const currentIdx = STATUS_PIPELINE.findIndex((s) => s.key === status);
+  if (status === "ARCHIVED") {
+    return <StatusBadge status="ARCHIVED" />;
+  }
+  if (currentIdx === -1) {
+    return <StatusBadge status={status} />;
+  }
+  return (
+    <div className="flex items-center gap-0.5 flex-wrap">
+      {STATUS_PIPELINE.map((s, idx) => {
+        const isCurrent = idx === currentIdx;
+        const isPast = idx < currentIdx;
+        return (
+          <div key={s.key} className="flex items-center">
+            <span
+              className={cn(
+                "inline-flex items-center px-1.5 h-5 rounded text-[9px] font-medium leading-none",
+                isCurrent &&
+                  "bg-primary text-primary-foreground shadow-soft",
+                isPast && "bg-primary/15 text-primary",
+                !isCurrent && !isPast &&
+                  "bg-muted text-muted-foreground"
+              )}
+              title={s.label}
+            >
+              {s.label}
+            </span>
+            {idx < STATUS_PIPELINE.length - 1 && (
+              <ChevronRight
+                className={cn(
+                  "size-2.5 mx-0.5 flex-shrink-0",
+                  idx < currentIdx ? "text-primary" : "text-muted-foreground/50"
+                )}
+              />
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 function DocumentsTable({
   docs,
   loading,
@@ -854,6 +942,8 @@ function DocumentsTable({
   onDownload?: (id: string, format: "docx" | "pdf", docNumber: string) => void;
   onArchive?: (id: string) => void;
 }) {
+  const qc = useQueryClient();
+
   if (loading) {
     return (
       <div className="p-6 space-y-2">
@@ -876,6 +966,84 @@ function DocumentsTable({
     );
   }
 
+  // ----- Status-transition helpers (call the dedicated endpoints). -----
+  async function submitForApproval(d: any) {
+    try {
+      const res = await fetch(`/api/documents/${d.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "PENDING_APPROVAL" }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || "Failed");
+      }
+      toast.success(`Submitted ${d.documentNumber} for approval.`);
+      qc.invalidateQueries({ queryKey: ["documents"] });
+    } catch (err: any) {
+      toast.error(err.message || "Failed to submit");
+    }
+  }
+
+  async function approveDoc(d: any) {
+    try {
+      const res = await fetch(`/api/documents/${d.id}/approve`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || "Failed");
+      }
+      toast.success(`Approved ${d.documentNumber}.`);
+      qc.invalidateQueries({ queryKey: ["documents"] });
+      qc.invalidateQueries({ queryKey: ["dashboard"] });
+    } catch (err: any) {
+      toast.error(err.message || "Failed to approve");
+    }
+  }
+
+  async function rejectDoc(d: any) {
+    const reason = prompt("Rejection reason (optional):");
+    if (reason === null) return; // user cancelled
+    try {
+      const res = await fetch(`/api/documents/${d.id}/reject`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ note: reason.trim() || undefined }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || "Failed");
+      }
+      toast.success(`Rejected ${d.documentNumber} — returned to draft.`);
+      qc.invalidateQueries({ queryKey: ["documents"] });
+      qc.invalidateQueries({ queryKey: ["dashboard"] });
+    } catch (err: any) {
+      toast.error(err.message || "Failed to reject");
+    }
+  }
+
+  async function issueDoc(d: any) {
+    if (!confirm(`Issue ${d.documentNumber}? This locks the document content.`))
+      return;
+    try {
+      const res = await fetch(`/api/documents/${d.id}/issue`, {
+        method: "POST",
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || "Failed");
+      }
+      toast.success(`Issued ${d.documentNumber}.`);
+      qc.invalidateQueries({ queryKey: ["documents"] });
+      qc.invalidateQueries({ queryKey: ["dashboard"] });
+    } catch (err: any) {
+      toast.error(err.message || "Failed to issue");
+    }
+  }
+
   return (
     <div className="overflow-x-auto">
       <Table>
@@ -885,7 +1053,7 @@ function DocumentsTable({
             <TableHead>Employee</TableHead>
             <TableHead>Type</TableHead>
             <TableHead>Created</TableHead>
-            <TableHead>Status</TableHead>
+            <TableHead className="min-w-[260px]">Status Flow</TableHead>
             <TableHead>Email Status</TableHead>
             <TableHead className="text-right">Actions</TableHead>
           </TableRow>
@@ -933,7 +1101,7 @@ function DocumentsTable({
                 </div>
               </TableCell>
               <TableCell>
-                <StatusBadge status={d.status} />
+                <StatusFlowPills status={d.status} />
               </TableCell>
               <TableCell>
                 {d.latestEmail ? (
@@ -958,56 +1126,125 @@ function DocumentsTable({
                   >
                     <Eye className="size-4" />
                   </Button>
-                  {onDownload && (
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="size-8"
-                          title="Download"
-                        >
-                          <Download className="size-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem
-                          onClick={() =>
-                            onDownload(d.id, "docx", d.documentNumber)
-                          }
-                        >
-                          <Download className="size-4 mr-2" /> Download DOCX
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={() =>
-                            onDownload(d.id, "pdf", d.documentNumber)
-                          }
-                        >
-                          <Download className="size-4 mr-2" /> Download PDF
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  )}
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="size-8"
-                    onClick={() => onSendEmail(d)}
-                    title="Send Email"
-                  >
-                    <Mail className="size-4" />
-                  </Button>
-                  {onArchive && (
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="size-8 text-muted-foreground"
-                      onClick={() => onArchive(d.id)}
-                      title="Archive"
-                    >
-                      <Archive className="size-4" />
-                    </Button>
-                  )}
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="size-8"
+                        title="More actions"
+                      >
+                        <MoreVertical className="size-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-56">
+                      {/* Status-based actions at top of menu */}
+                      {d.status === "GENERATED" && (
+                        <>
+                          <DropdownMenuLabel>Workflow</DropdownMenuLabel>
+                          <DropdownMenuItem
+                            onClick={() => submitForApproval(d)}
+                            className="text-emerald-700 focus:text-emerald-700"
+                          >
+                            <Forward className="size-4 mr-2" /> Submit for
+                            Approval
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                        </>
+                      )}
+                      {d.status === "PENDING_APPROVAL" && (
+                        <>
+                          <DropdownMenuLabel>Approval</DropdownMenuLabel>
+                          <DropdownMenuItem
+                            onClick={() => approveDoc(d)}
+                            className="text-emerald-700 focus:text-emerald-700"
+                          >
+                            <CheckCircle2 className="size-4 mr-2" /> Approve
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => rejectDoc(d)}
+                            className="text-rose-700 focus:text-rose-700"
+                          >
+                            <X className="size-4 mr-2" /> Reject (return to
+                            draft)
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                        </>
+                      )}
+                      {d.status === "APPROVED" && (
+                        <>
+                          <DropdownMenuLabel>Workflow</DropdownMenuLabel>
+                          <DropdownMenuItem
+                            onClick={() => issueDoc(d)}
+                            className="text-teal-700 focus:text-teal-700"
+                          >
+                            <Stamp className="size-4 mr-2" /> Issue &amp; Lock
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                        </>
+                      )}
+                      {d.status === "ISSUED" && (
+                        <>
+                          <DropdownMenuLabel>Delivery</DropdownMenuLabel>
+                          <DropdownMenuItem onClick={() => onSendEmail(d)}>
+                            <Mail className="size-4 mr-2" /> Send Email
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                        </>
+                      )}
+                      {d.status === "SENT" && (
+                        <>
+                          <DropdownMenuLabel>Delivery</DropdownMenuLabel>
+                          <DropdownMenuItem
+                            onClick={() => onSendEmail(d)}
+                          >
+                            <Mail className="size-4 mr-2" /> Resend Email
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                        </>
+                      )}
+                      {/* Standard actions */}
+                      <DropdownMenuItem onClick={() => onPreview(d)}>
+                        <Eye className="size-4 mr-2" /> Preview
+                      </DropdownMenuItem>
+                      {onDownload && (
+                        <>
+                          <DropdownMenuItem
+                            onClick={() =>
+                              onDownload(d.id, "docx", d.documentNumber)
+                            }
+                          >
+                            <Download className="size-4 mr-2" /> Download DOCX
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() =>
+                              onDownload(d.id, "pdf", d.documentNumber)
+                            }
+                          >
+                            <Download className="size-4 mr-2" /> Download PDF
+                          </DropdownMenuItem>
+                        </>
+                      )}
+                      {d.status !== "ISSUED" &&
+                        d.status !== "SENT" &&
+                        d.status !== "ARCHIVED" && (
+                          <DropdownMenuItem onClick={() => onSendEmail(d)}>
+                            <Mail className="size-4 mr-2" /> Send Email
+                          </DropdownMenuItem>
+                        )}
+                      {onArchive && (
+                        <>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem
+                            className="text-rose-600 focus:text-rose-600"
+                            onClick={() => onArchive(d.id)}
+                          >
+                            <Archive className="size-4 mr-2" /> Archive
+                          </DropdownMenuItem>
+                        </>
+                      )}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </div>
               </TableCell>
             </TableRow>
