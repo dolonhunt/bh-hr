@@ -129,19 +129,21 @@ export function DashboardModule() {
             <Button
               variant="outline"
               size="sm"
+              className="hidden sm:inline-flex"
               onClick={() => setQuickAction("generate-document")}
             >
               <FilePlus className="size-4 mr-1.5" /> Generate Document
             </Button>
             <Button size="sm" onClick={() => setQuickAction("add-employee")}>
-              <Plus className="size-4 mr-1.5" /> Add Employee
+              <Plus className="size-4 mr-1.5" /> <span className="hidden sm:inline">Add Employee</span>
+              <span className="sm:hidden">Add</span>
             </Button>
           </>
         }
       />
 
       {/* KPI row */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
         <KpiCard
           label="Total Employees"
           value={kpis.totalEmployees}
@@ -208,7 +210,7 @@ export function DashboardModule() {
         {/* Attendance trend */}
         <Card className="lg:col-span-2 border-border/60 shadow-soft">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <div>
+            <div className="min-w-0">
               <CardTitle className="text-base font-semibold">
                 Attendance Overview
               </CardTitle>
@@ -216,7 +218,7 @@ export function DashboardModule() {
                 Last 7 days — stacked by status
               </p>
             </div>
-            <div className="flex items-center gap-3 text-[11px]">
+            <div className="flex items-center gap-2 sm:gap-3 text-[10px] sm:text-[11px] flex-wrap justify-end">
               <Legend2 color="#10b981" label="Present" />
               <Legend2 color="#f59e0b" label="Late" />
               <Legend2 color="#ef4444" label="Absent" />

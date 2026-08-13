@@ -45,6 +45,7 @@ import {
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { toast } from "sonner";
 import { PayslipDialog } from "./payslip-dialog";
+import { ExportButton } from "../shared/export-button";
 
 export function PayrollModule() {
   const qc = useQueryClient();
@@ -144,14 +145,26 @@ export function PayrollModule() {
         description="Manage monthly salary disbursements and payslips"
         icon={<Wallet className="size-5" />}
         actions={
-          <Button size="sm" onClick={() => generatePayslip()}>
-            <Plus className="size-4 mr-1.5" /> Create Payroll
-          </Button>
+          <>
+            <ExportButton
+              module="payroll"
+              filters={{
+                payrollMonth: month,
+                status,
+                departmentId,
+                search,
+              }}
+            />
+            <Button size="sm" onClick={() => generatePayslip()}>
+              <Plus className="size-4 mr-1.5" /> <span className="hidden sm:inline">Create Payroll</span>
+              <span className="sm:hidden">Create</span>
+            </Button>
+          </>
         }
       />
 
       {/* KPIs */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
         <KpiCard
           label="Total Net Payroll"
           value={formatCurrency(totalNet)}

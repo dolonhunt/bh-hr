@@ -16,9 +16,14 @@ import { AuditModule } from "./modules/audit";
 import { SettingsModule } from "./modules/settings";
 import { CommandPalette } from "./command-palette";
 import { QuickActions } from "./quick-actions";
+import { useKeyboardShortcuts } from "@/hooks/use-keyboard-shortcuts";
+import { ShortcutsHelp } from "./shortcuts-help";
 
 export function AppShell() {
   const activeModule = useApp((s) => s.activeModule);
+  const helpOpen = useApp((s) => s.shortcutsHelpOpen);
+  const setHelpOpen = useApp((s) => s.setShortcutsHelpOpen);
+  useKeyboardShortcuts();
 
   return (
     <div className="min-h-screen flex bg-background bg-dots">
@@ -57,6 +62,7 @@ export function AppShell() {
 
       <CommandPalette />
       <QuickActions />
+      <ShortcutsHelp open={helpOpen} onOpenChange={setHelpOpen} />
     </div>
   );
 }

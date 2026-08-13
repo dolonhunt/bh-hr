@@ -29,8 +29,10 @@ import {
   Mail,
   Eye,
   CheckCircle2,
+  Printer,
 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
+import { printDocument } from "@/lib/print";
 
 interface Props {
   open: boolean;
@@ -177,7 +179,7 @@ export function PayslipDialog({
   return (
     <>
       <Dialog open={open} onOpenChange={(o) => !o && reset()}>
-        <DialogContent className="max-w-lg p-0 gap-0">
+        <DialogContent className="max-w-[95vw] sm:max-w-lg p-0 gap-0">
           <DialogHeader className="px-6 py-4 border-b border-border">
             <DialogTitle className="flex items-center gap-2">
               <Wallet className="size-5 text-primary" />
@@ -317,18 +319,35 @@ export function PayslipDialog({
                   <Button
                     variant="outline"
                     size="sm"
+                    onClick={() =>
+                      printDocument({
+                        title: generatedDoc.title || generatedDoc.documentNumber || "Payslip",
+                        html: generatedDoc.content ?? "",
+                        docNumber: generatedDoc.documentNumber,
+                      })
+                    }
+                  >
+                    <Printer className="size-4 mr-2" /> Print
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
                     onClick={() => downloadUrl("docx")}
                   >
-                    <Download className="size-4 mr-2" /> Download DOCX
+                    <Download className="size-4 mr-2" /> DOCX
                   </Button>
                   <Button
                     variant="outline"
                     size="sm"
                     onClick={() => downloadUrl("pdf")}
                   >
-                    <Download className="size-4 mr-2" /> Download PDF
+                    <Download className="size-4 mr-2" /> PDF
                   </Button>
-                  <Button size="sm" onClick={() => setEmailOpen(true)}>
+                  <Button
+                    size="sm"
+                    className="col-span-2"
+                    onClick={() => setEmailOpen(true)}
+                  >
                     <Mail className="size-4 mr-2" /> Send Email
                   </Button>
                 </div>
@@ -360,14 +379,36 @@ export function PayslipDialog({
 
       {/* Preview sub-dialog */}
       <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
-        <DialogContent className="max-w-2xl max-h-[85vh] overflow-hidden p-0 gap-0">
-          <DialogHeader className="px-6 py-4 border-b border-border">
-            <DialogTitle>Payslip Preview</DialogTitle>
-            <DialogDescription>{generatedDoc?.title}</DialogDescription>
+        <DialogContent className="max-w-[95vw] sm:max-w-2xl max-h-[85vh] overflow-hidden p-0 gap-0">
+          <DialogHeader className="px-4 sm:px-6 py-4 border-b border-border">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0 flex-1">
+                <DialogTitle className="truncate">Payslip Preview</DialogTitle>
+                <DialogDescription className="truncate">
+                  {generatedDoc?.title}
+                </DialogDescription>
+              </div>
+              {generatedDoc && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="flex-shrink-0"
+                  onClick={() =>
+                    printDocument({
+                      title: generatedDoc.title || generatedDoc.documentNumber || "Payslip",
+                      html: generatedDoc.content ?? "",
+                      docNumber: generatedDoc.documentNumber,
+                    })
+                  }
+                >
+                  <Printer className="size-4 mr-1.5" /> Print
+                </Button>
+              )}
+            </div>
           </DialogHeader>
           <div className="overflow-y-auto max-h-[65vh] bg-white">
             <div
-              className="p-6 prose prose-sm max-w-none"
+              className="p-4 sm:p-6 prose prose-sm max-w-none"
               dangerouslySetInnerHTML={{
                 __html: generatedDoc?.content ?? "",
               }}
@@ -378,7 +419,7 @@ export function PayslipDialog({
 
       {/* Email sub-dialog */}
       <Dialog open={emailOpen} onOpenChange={setEmailOpen}>
-        <DialogContent className="max-w-lg p-0 gap-0">
+        <DialogContent className="max-w-[95vw] sm:max-w-lg p-0 gap-0">
           <DialogHeader className="px-6 py-4 border-b border-border">
             <DialogTitle className="flex items-center gap-2">
               <Mail className="size-5 text-primary" />

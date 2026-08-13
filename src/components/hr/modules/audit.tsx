@@ -26,6 +26,7 @@ import {
 } from "@/components/ui/table";
 import { History, Search, ShieldCheck, FileText, UserCog, Mail, Trash2 } from "lucide-react";
 import { cn, relativeTime, formatDate } from "@/lib/utils";
+import { ExportButton } from "../shared/export-button";
 
 const ACTION_CATEGORIES: { value: string; label: string }[] = [
   { value: "LOGIN", label: "Login" },
@@ -127,6 +128,12 @@ export function AuditModule() {
         title="Audit Log"
         description="Complete trail of user actions across the HR system"
         icon={<History className="size-5" />}
+        actions={
+          <ExportButton
+            module="audit"
+            filters={{ search, action, entityType, from, to }}
+          />
+        }
       />
 
       {/* Filters */}
@@ -209,7 +216,7 @@ export function AuditModule() {
         </div>
       </div>
 
-      <div className="flex items-center justify-between text-sm">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-sm">
         <div className="text-muted-foreground">
           Showing{" "}
           <span className="font-medium text-foreground">{logs.length}</span> of{" "}

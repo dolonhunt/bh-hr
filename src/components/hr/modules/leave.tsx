@@ -62,6 +62,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { LeaveEntryDialog } from "./leave-entry-dialog";
+import { ExportButton } from "../shared/export-button";
 
 export function LeaveModule() {
   const qc = useQueryClient();
@@ -173,14 +174,25 @@ export function LeaveModule() {
         description="Apply, approve, and track employee leave requests"
         icon={<CalendarDays className="size-5" />}
         actions={
-          <Button size="sm" onClick={addNew}>
-            <Plus className="size-4 mr-1.5" /> Add Leave
-          </Button>
+          <>
+            <ExportButton
+              module="leave"
+              filters={{
+                search,
+                status: tab !== "ALL" ? tab : "",
+                leaveTypeId,
+              }}
+            />
+            <Button size="sm" onClick={addNew}>
+              <Plus className="size-4 mr-1.5" /> <span className="hidden sm:inline">Add Leave</span>
+              <span className="sm:hidden">Add</span>
+            </Button>
+          </>
         }
       />
 
       {/* KPIs */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
         <KpiCard
           label="Total Requests"
           value={total}
@@ -215,12 +227,14 @@ export function LeaveModule() {
           setPage(1);
         }}
       >
-        <TabsList>
-          <TabsTrigger value="ALL">All Requests</TabsTrigger>
-          <TabsTrigger value="PENDING">Pending Approval</TabsTrigger>
-          <TabsTrigger value="APPROVED">Approved</TabsTrigger>
-          <TabsTrigger value="REJECTED">Rejected</TabsTrigger>
-        </TabsList>
+        <div className="overflow-x-auto pb-1 -mx-1 px-1">
+          <TabsList className="flex w-max">
+            <TabsTrigger value="ALL">All Requests</TabsTrigger>
+            <TabsTrigger value="PENDING">Pending Approval</TabsTrigger>
+            <TabsTrigger value="APPROVED">Approved</TabsTrigger>
+            <TabsTrigger value="REJECTED">Rejected</TabsTrigger>
+          </TabsList>
+        </div>
       </Tabs>
 
       {/* Filters */}
@@ -296,13 +310,13 @@ export function LeaveModule() {
             <Table>
               <TableHeader>
                 <TableRow className="bg-muted/40 hover:bg-muted/40">
-                  <TableHead className="min-w-[200px]">Employee</TableHead>
-                  <TableHead>Leave Type</TableHead>
+                  <TableHead className="min-w-[180px]">Employee</TableHead>
+                  <TableHead className="hidden md:table-cell">Leave Type</TableHead>
                   <TableHead>Start</TableHead>
-                  <TableHead>End</TableHead>
+                  <TableHead className="hidden sm:table-cell">End</TableHead>
                   <TableHead>Days</TableHead>
-                  <TableHead className="min-w-[180px]">Reason</TableHead>
-                  <TableHead>Applied</TableHead>
+                  <TableHead className="min-w-[180px] hidden lg:table-cell">Reason</TableHead>
+                  <TableHead className="hidden md:table-cell">Applied</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
@@ -324,10 +338,17 @@ export function LeaveModule() {
                           <div className="text-xs text-muted-foreground font-mono">
                             {l.employee?.employeeId}
                           </div>
+                          <div className="md:hidden text-[11px] text-muted-foreground mt-0.5 flex items-center gap-1">
+                            <span
+                              className="size-1.5 rounded-full"
+                              style={{ background: l.leaveType?.color ?? "#94a3b8" }}
+                            />
+                            {l.leaveType?.name}
+                          </div>
                         </div>
                       </div>
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="hidden md:table-cell">
                       <div className="flex items-center gap-1.5">
                         <span
                           className="size-2 rounded-full"
@@ -339,16 +360,16 @@ export function LeaveModule() {
                     <TableCell className="text-xs">
                       {formatDate(l.startDate)}
                     </TableCell>
-                    <TableCell className="text-xs">
+                    <TableCell className="text-xs hidden sm:table-cell">
                       {formatDate(l.endDate)}
                     </TableCell>
                     <TableCell className="text-xs tabular-nums font-medium">
                       {l.days}d
                     </TableCell>
-                    <TableCell className="text-xs text-muted-foreground max-w-[220px] truncate">
+                    <TableCell className="text-xs text-muted-foreground max-w-[220px] truncate hidden lg:table-cell">
                       {l.reason}
                     </TableCell>
-                    <TableCell className="text-xs text-muted-foreground">
+                    <TableCell className="text-xs text-muted-foreground hidden md:table-cell">
                       {relativeTime(l.appliedAt)}
                     </TableCell>
                     <TableCell>
@@ -453,7 +474,7 @@ export function LeaveModule() {
 
       {/* View dialog */}
       <Dialog open={!!viewRecord} onOpenChange={(o) => !o && setViewRecord(null)}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-[95vw] sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>Leave Request Details</DialogTitle>
             <DialogDescription>
@@ -521,7 +542,7 @@ export function LeaveModule() {
           }
         }}
       >
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-[95vw] sm:max-w-md">
           <DialogHeader>
             <DialogTitle>
               {decision?.action === "APPROVED" ? "Approve Leave" : "Reject Leave"}

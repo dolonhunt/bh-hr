@@ -51,6 +51,7 @@ import {
 import { formatDate, formatCurrency } from "@/lib/utils";
 import { EmployeeFormDialog } from "./employee-form-dialog";
 import { EmployeeProfile } from "./employee-profile";
+import { ExportButton } from "../shared/export-button";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 export function EmployeesModule() {
@@ -121,6 +122,10 @@ function EmployeeList() {
         icon={<Users className="size-5" />}
         actions={
           <>
+            <ExportButton
+              module="employees"
+              filters={{ search, departmentId, status }}
+            />
             <div className="flex rounded-lg border border-border overflow-hidden">
               <button
                 className={`p-2 ${view === "list" ? "bg-primary text-primary-foreground" : "hover:bg-muted"}`}
@@ -138,7 +143,8 @@ function EmployeeList() {
               </button>
             </div>
             <Button size="sm" onClick={addNew}>
-              <Plus className="size-4 mr-1.5" /> Add Employee
+              <Plus className="size-4 mr-1.5" /> <span className="hidden sm:inline">Add Employee</span>
+              <span className="sm:hidden">Add</span>
             </Button>
           </>
         }
@@ -237,12 +243,12 @@ function EmployeeList() {
             <Table>
               <TableHeader>
                 <TableRow className="bg-muted/40 hover:bg-muted/40">
-                  <TableHead className="min-w-[220px]">Employee</TableHead>
-                  <TableHead>Employee ID</TableHead>
-                  <TableHead>Department</TableHead>
-                  <TableHead>Designation</TableHead>
-                  <TableHead>Joining Date</TableHead>
-                  <TableHead>Salary</TableHead>
+                  <TableHead className="min-w-[200px]">Employee</TableHead>
+                  <TableHead className="hidden md:table-cell">Employee ID</TableHead>
+                  <TableHead className="hidden lg:table-cell">Department</TableHead>
+                  <TableHead className="hidden lg:table-cell">Designation</TableHead>
+                  <TableHead className="hidden md:table-cell">Joining Date</TableHead>
+                  <TableHead className="hidden md:table-cell">Salary</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
@@ -268,13 +274,16 @@ function EmployeeList() {
                           <div className="text-xs text-muted-foreground truncate">
                             {emp.officialEmail}
                           </div>
+                          <div className="md:hidden text-[11px] text-muted-foreground font-mono mt-0.5">
+                            {emp.employeeId} · {emp.department?.name ?? "—"}
+                          </div>
                         </div>
                       </div>
                     </TableCell>
-                    <TableCell className="font-mono text-xs">
+                    <TableCell className="font-mono text-xs hidden md:table-cell">
                       {emp.employeeId}
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="hidden lg:table-cell">
                       <div className="flex items-center gap-1.5">
                         <span
                           className="size-2 rounded-full"
@@ -283,11 +292,11 @@ function EmployeeList() {
                         {emp.department?.name ?? "—"}
                       </div>
                     </TableCell>
-                    <TableCell>{emp.designation?.name ?? "—"}</TableCell>
-                    <TableCell className="text-xs">
+                    <TableCell className="hidden lg:table-cell">{emp.designation?.name ?? "—"}</TableCell>
+                    <TableCell className="text-xs hidden md:table-cell">
                       {formatDate(emp.joiningDate)}
                     </TableCell>
-                    <TableCell className="text-xs tabular-nums">
+                    <TableCell className="text-xs tabular-nums hidden md:table-cell">
                       {formatCurrency(emp.basicSalary)}
                     </TableCell>
                     <TableCell>

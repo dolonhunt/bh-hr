@@ -90,7 +90,7 @@ export function SettingsModule() {
       <div className="flex flex-col md:flex-row gap-6">
         {/* Vertical tab nav */}
         <nav className="md:w-56 flex-shrink-0">
-          <div className="flex md:flex-col gap-1 overflow-x-auto md:overflow-visible pb-1 md:pb-0">
+          <div className="flex md:flex-col gap-1 overflow-x-auto md:overflow-visible pb-1 md:pb-0 -mx-1 px-1 md:mx-0 md:px-0">
             {TABS.map((t) => {
               const Icon = t.icon;
               return (
@@ -104,7 +104,7 @@ export function SettingsModule() {
                       : "hover:bg-muted text-muted-foreground hover:text-foreground"
                   )}
                 >
-                  <Icon className="size-4" />
+                  <Icon className="size-4 flex-shrink-0" />
                   {t.label}
                 </button>
               );
@@ -276,11 +276,11 @@ function OrganizationTab() {
                   </div>
                   {group.title}
                 </div>
-                <div className="grid grid-cols-2 gap-4 pl-9">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pl-9">
                   {group.fields.map((f) => (
                     <div
                       key={f.key}
-                      className={cn("space-y-1.5", f.full && "col-span-2")}
+                      className={cn("space-y-1.5", f.full && "sm:col-span-2")}
                     >
                       <Label className="text-xs text-muted-foreground">
                         {f.label}
@@ -908,7 +908,7 @@ function EmailSettingsTab() {
           </Button>
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="space-y-1.5">
             <Label>Sender Name</Label>
             <Input
@@ -1038,7 +1038,7 @@ function TestEmailDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-[95vw] sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Send Test Email</DialogTitle>
           <DialogDescription>
@@ -1138,7 +1138,7 @@ function DocumentNumberingTab() {
           </p>
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="space-y-1.5">
             <Label>Name</Label>
             <Input
@@ -1334,15 +1334,15 @@ function SimpleFormDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="max-w-[95vw] sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
         </DialogHeader>
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           {fields.map((f) => (
             <div
               key={f.key}
-              className={cn("space-y-1.5", f.textarea && "col-span-2")}
+              className={cn("space-y-1.5", f.textarea && "sm:col-span-2")}
             >
               <Label>{f.label}</Label>
               {f.textarea ? (

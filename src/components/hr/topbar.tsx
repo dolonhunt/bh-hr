@@ -23,10 +23,12 @@ import {
   User as UserIcon,
   Command,
   ChevronDown,
+  Keyboard,
 } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { useEffect, useState } from "react";
+import { ThemeToggle } from "./theme-toggle";
 
 export function Topbar() {
   const authUser = useApp((s) => s.authUser);
@@ -36,6 +38,7 @@ export function Topbar() {
   const setCommandOpen = useApp((s) => s.setCommandOpen);
   const setQuickAction = useApp((s) => s.setQuickAction);
   const setModule = useApp((s) => s.setModule);
+  const setShortcutsHelpOpen = useApp((s) => s.setShortcutsHelpOpen);
   const [pendingCount, setPendingCount] = useState(0);
 
   const current = NAV_ITEMS.find((n) => n.key === activeModule);
@@ -105,9 +108,10 @@ export function Topbar() {
         {/* Quick Add */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button size="sm" className="hidden sm:inline-flex gap-1.5">
-              <Plus className="size-4" /> Quick Add
-              <ChevronDown className="size-3.5 opacity-70" />
+            <Button size="sm" className="gap-1.5">
+              <Plus className="size-4" />
+              <span className="hidden sm:inline">Quick Add</span>
+              <ChevronDown className="size-3.5 opacity-70 hidden sm:inline" />
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-56">
@@ -133,6 +137,20 @@ export function Topbar() {
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
+
+        {/* Theme toggle */}
+        <ThemeToggle />
+
+        {/* Keyboard shortcuts help */}
+        <Button
+          variant="ghost"
+          size="icon"
+          className="size-9 hidden sm:flex"
+          aria-label="Keyboard shortcuts"
+          onClick={() => setShortcutsHelpOpen(true)}
+        >
+          <Keyboard className="size-5" />
+        </Button>
 
         {/* Notifications */}
         <DropdownMenu>

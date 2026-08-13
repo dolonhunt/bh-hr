@@ -81,27 +81,30 @@ export function EmployeeProfile({ id }: { id: string }) {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <Button
           variant="ghost"
           size="sm"
           onClick={() => setEmployeeView("list")}
+          className="self-start"
         >
           <ArrowLeft className="size-4 mr-1.5" /> Back to Employees
         </Button>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
           <Button variant="outline" size="sm" onClick={() => setEditOpen(true)}>
-            <Pencil className="size-4 mr-1.5" /> Edit
+            <Pencil className="size-4 mr-1.5" /> <span className="hidden sm:inline">Edit</span>
           </Button>
           <Button
             variant="outline"
             size="sm"
             onClick={() => setQuickAction("generate-document")}
           >
-            <FileText className="size-4 mr-1.5" /> Generate Document
+            <FileText className="size-4 mr-1.5" /> <span className="hidden sm:inline">Generate Document</span>
+            <span className="sm:hidden">Document</span>
           </Button>
           <Button size="sm" onClick={() => setQuickAction("create-payslip")}>
-            <Wallet className="size-4 mr-1.5" /> Create Payslip
+            <Wallet className="size-4 mr-1.5" /> <span className="hidden sm:inline">Create Payslip</span>
+            <span className="sm:hidden">Payslip</span>
           </Button>
         </div>
       </div>
@@ -114,7 +117,7 @@ export function EmployeeProfile({ id }: { id: string }) {
             background: `linear-gradient(135deg, ${emp.department?.color ?? "#10b981"}, ${emp.department?.color ?? "#10b981"}80)`,
           }}
         />
-        <CardContent className="p-6 -mt-12">
+        <CardContent className="p-4 sm:p-6 -mt-12">
           <div className="flex flex-col md:flex-row md:items-end gap-4">
             <AvatarBadge
               name={emp.fullName}
@@ -159,20 +162,22 @@ export function EmployeeProfile({ id }: { id: string }) {
 
       {/* Tabs */}
       <Tabs defaultValue="overview">
-        <TabsList className="grid w-full grid-cols-3 md:grid-cols-8 h-auto">
-          <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="personal">Personal</TabsTrigger>
-          <TabsTrigger value="employment">Employment</TabsTrigger>
-          <TabsTrigger value="attendance">Attendance</TabsTrigger>
-          <TabsTrigger value="leave">Leave</TabsTrigger>
-          <TabsTrigger value="payroll">Payroll</TabsTrigger>
-          <TabsTrigger value="documents">Documents</TabsTrigger>
-          <TabsTrigger value="activity">Activity</TabsTrigger>
-        </TabsList>
+        <div className="overflow-x-auto pb-1 -mx-1 px-1">
+          <TabsList className="flex w-max">
+            <TabsTrigger value="overview">Overview</TabsTrigger>
+            <TabsTrigger value="personal">Personal</TabsTrigger>
+            <TabsTrigger value="employment">Employment</TabsTrigger>
+            <TabsTrigger value="attendance">Attendance</TabsTrigger>
+            <TabsTrigger value="leave">Leave</TabsTrigger>
+            <TabsTrigger value="payroll">Payroll</TabsTrigger>
+            <TabsTrigger value="documents">Documents</TabsTrigger>
+            <TabsTrigger value="activity">Activity</TabsTrigger>
+          </TabsList>
+        </div>
 
         {/* Overview */}
         <TabsContent value="overview" className="space-y-4 mt-4">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
             <StatCard
               icon={CalendarCheck}
               label="Attendance Rate"

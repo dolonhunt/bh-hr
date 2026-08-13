@@ -864,7 +864,7 @@ function GenerateDialog({
 
   return (
     <Dialog open onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-[95vw] sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Generate {report.title}</DialogTitle>
           <DialogDescription>

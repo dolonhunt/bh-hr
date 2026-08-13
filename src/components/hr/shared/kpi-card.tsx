@@ -27,7 +27,7 @@ export function KpiCard({
   return (
     <Card
       className={cn(
-        "relative p-5 gap-0 overflow-hidden border-border/60 shadow-soft transition-all group",
+        "relative p-3 sm:p-5 gap-0 overflow-hidden border-border/60 shadow-soft transition-all group",
         onClick && "cursor-pointer hover:shadow-card-hover hover:-translate-y-0.5 hover:border-border"
       )}
       onClick={onClick}
@@ -45,12 +45,12 @@ export function KpiCard({
           !iconClass && "bg-primary"
         )}
       />
-      <div className="flex items-start justify-between gap-3">
+      <div className="flex items-start justify-between gap-2 sm:gap-3">
         <div className="min-w-0 flex-1">
-          <div className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider leading-tight">
+          <div className="text-[10px] sm:text-[11px] font-semibold text-muted-foreground uppercase tracking-wider leading-tight truncate">
             {label}
           </div>
-          <div className="mt-2.5 text-[26px] leading-none font-bold tracking-tight tabular-nums">
+          <div className="mt-2 sm:mt-2.5 text-lg sm:text-[26px] leading-none font-bold tracking-tight tabular-nums truncate">
             {value}
           </div>
           {delta && (
@@ -75,11 +75,11 @@ export function KpiCard({
         </div>
         <div
           className={cn(
-            "flex-shrink-0 size-11 rounded-xl flex items-center justify-center transition-transform group-hover:scale-105",
+            "flex-shrink-0 size-9 sm:size-11 rounded-xl flex items-center justify-center transition-transform group-hover:scale-105",
             iconClass ?? "bg-primary/10 text-primary"
           )}
         >
-          <Icon className="size-5" />
+          <Icon className="size-4 sm:size-5" />
         </div>
       </div>
     </Card>

@@ -1,0 +1,940 @@
+     1→"use client";
+     2→
+     3→import { useState } from "react";
+     4→import { useQuery } from "@tanstack/react-query";
+     5→import { toast } from "sonner";
+     6→import {
+     7→  Bar,
+     8→  BarChart,
+     9→  CartesianGrid,
+    10→  Cell,
+    11→  Line,
+    12→  LineChart,
+    13→  Pie,
+    14→  PieChart,
+    15→  ResponsiveContainer,
+    16→  Tooltip,
+    17→  XAxis,
+    18→  YAxis,
+    19→  Area,
+    20→  AreaChart,
+    21→  Legend,
+    22→} from "recharts";
+    23→import {
+    24→  Users,
+    25→  CalendarCheck,
+    26→  CalendarDays,
+    27→  Wallet,
+    28→  FileText,
+    29→  Download,
+    30→  BarChart3,
+    31→  Loader2,
+    32→  TrendingUp,
+    33→  Filter,
+    34→} from "lucide-react";
+    35→
+    36→import { PageHeader } from "../shared/page-header";
+    37→import { KpiCard } from "../shared/kpi-card";
+    38→import { Button } from "@/components/ui/button";
+    39→import { Input } from "@/components/ui/input";
+    40→import { Label } from "@/components/ui/label";
+    41→import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+    42→import {
+    43→  Select,
+    44→  SelectContent,
+    45→  SelectItem,
+    46→  SelectTrigger,
+    47→  SelectValue,
+    48→} from "@/components/ui/select";
+    49→import {
+    50→  Dialog,
+    51→  DialogContent,
+    52→  DialogDescription,
+    53→  DialogFooter,
+    54→  DialogHeader,
+    55→  DialogTitle,
+    56→} from "@/components/ui/dialog";
+    57→import { Skeleton } from "@/components/ui/skeleton";
+    58→import { cn, formatCurrency } from "@/lib/utils";
+    59→
+    60→// ============================================================
+    61→// Color palette for chart series — emerald primary, with the
+    62→// requested accents. No indigo/blue.
+    63→// ============================================================
+    64→const CHART_COLORS = [
+    65→  "#10b981", // emerald
+    66→  "#f59e0b", // amber
+    67→  "#ef4444", // rose
+    68→  "#14b8a6", // teal
+    69→  "#a855f7", // violet
+    70→  "#f97316", // orange
+    71→  "#ec4899", // fuchsia
+    72→];
+    73→
+    74→// ============================================================
+    75→// Types for the analytics payload (mirrors the API route).
+    76→// ============================================================
+    77→interface AnalyticsPayload {
+    78→  kpis: {
+    79→    totalEmployees: number;
+    80→    avgAttendanceRate: number;
+    81→    totalPayrollThisMonth: number;
+    82→    docsGeneratedThisMonth: number;
+    83→  };
+    84→  employeeGrowth: { month: string; hires: number; cumulative: number }[];
+    85→  attendanceTrend: {
+    86→    date: string;
+    87→    rate: number;
+    88→    present: number;
+    89→    total: number;
+    90→  }[];
+    91→  leaveUtilization: {
+    92→    name: string;
+    93→    value: number;
+    94→    count: number;
+    95→    color: string;
+    96→  }[];
+    97→  payrollByDepartment: { name: string; netSalary: number }[];
+    98→  documentTrend: {
+    99→    data: Record<string, any>[];
+   100→    types: string[];
+   101→  };
+   102→  performanceDistribution: { range: string; count: number }[];
+   103→  recruitmentFunnel: {
+   104→    stage: string;
+   105→    count: number;
+   106→    atStage: number;
+   107→  }[];
+   108→}
+   109→
+   110→// ============================================================
+   111→// Report type cards (preserved from previous reports module).
+   112→// ============================================================
+   113→interface ReportType {
+   114→  key: string;
+   115→  title: string;
+   116→  description: string;
+   117→  icon: any;
+   118→  color: string;
+   119→}
+   120→
+   121→const REPORT_TYPES: ReportType[] = [
+   122→  {
+   123→    key: "employee",
+   124→    title: "Employee Report",
+   125→    description:
+   126→      "Complete directory with department, role, designation, salary, and joining info.",
+   127→    icon: Users,
+   128→    color: "bg-primary/10 text-primary",
+   129→  },
+   130→  {
+   131→    key: "attendance",
+   132→    title: "Attendance Report",
+   133→    description:
+   134→      "Daily check-in/out, working hours, late marks, and overtime for the selected period.",
+   135→    icon: CalendarCheck,
+   136→    color: "bg-emerald-500/10 text-emerald-600",
+   137→  },
+   138→  {
+   139→    key: "leave",
+   140→    title: "Leave Report",
+   141→    description: "All leave requests with type, days, status, and reasons.",
+   142→    icon: CalendarDays,
+   143→    color: "bg-amber-500/10 text-amber-600",
+   144→  },
+   145→  {
+   146→    key: "payroll",
+   147→    title: "Payroll Report",
+   148→    description:
+   149→      "Monthly payroll breakdown with basic, allowances, deductions, tax, and net pay.",
+   150→    icon: Wallet,
+   151→    color: "bg-teal-500/10 text-teal-600",
+   152→  },
+   153→  {
+   154→    key: "document",
+   155→    title: "Document Report",
+   156→    description:
+   157→      "All generated HR documents with status, template, and recipient details.",
+   158→    icon: FileText,
+   159→    color: "bg-violet-500/10 text-violet-600",
+   160→  },
+   161→];
+   162→
+   163→const FORMATS = [
+   164→  { value: "csv", label: "CSV" },
+   165→  { value: "excel", label: "Excel (.xls)" },
+   166→  { value: "pdf", label: "PDF" },
+   167→];
+   168→
+   169→// ============================================================
+   170→// Main ReportsModule component.
+   171→// ============================================================
+   172→export function ReportsModule() {
+   173→  const { data, isLoading, isError } = useQuery<AnalyticsPayload>({
+   174→    queryKey: ["reports", "analytics"],
+   175→    queryFn: async () => {
+   176→      const r = await fetch("/api/reports/analytics");
+   177→      if (!r.ok) throw new Error("Failed to load analytics");
+   178→      return r.json();
+   179→    },
+   180→    staleTime: 60 * 1000,
+   181→  });
+   182→
+   183→  const [active, setActive] = useState<ReportType | null>(null);
+   184→
+   185→  return (
+   186→    <div className="space-y-6">
+   187→      <PageHeader
+   188→        title="Reports & Analytics"
+   189→        description="Live analytics dashboard plus on-demand report exports across your organization"
+   190→        icon={<BarChart3 className="size-5" />}
+   191→      />
+   192→
+   193→      {/* Top KPI cards */}
+   194→      <KpiRow data={data} loading={isLoading} />
+   195→
+   196→      {/* Analytics dashboard — 6 charts in a responsive grid */}
+   197→      <section className="space-y-3">
+   198→        <div className="flex items-center gap-2">
+   199→          <TrendingUp className="size-4 text-primary" />
+   200→          <h2 className="text-sm font-semibold">Analytics Dashboard</h2>
+   201→        </div>
+   202→
+   203→        {isError && (
+   204→          <Card className="border-rose-500/30">
+   205→            <CardContent className="p-6 text-sm text-rose-700">
+   206→              Failed to load analytics data. Please refresh the page to retry.
+   207→            </CardContent>
+   208→          </Card>
+   209→        )}
+   210→
+   211→        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+   212→          <ChartCard
+   213→            title="Employee Growth"
+   214→            subtitle="Monthly hires & cumulative headcount (last 12 months)"
+   215→            loading={isLoading}
+   216→          >
+   217→            <EmployeeGrowthChart data={data?.employeeGrowth ?? []} />
+   218→          </ChartCard>
+   219→
+   220→          <ChartCard
+   221→            title="Attendance Rate Trend"
+   222→            subtitle="% present (PRESENT + LATE) — last 30 days"
+   223→            loading={isLoading}
+   224→          >
+   225→            <AttendanceTrendChart data={data?.attendanceTrend ?? []} />
+   226→          </ChartCard>
+   227→
+   228→          <ChartCard
+   229→            title="Leave Utilization by Type"
+   230→            subtitle="Total leave days consumed, by leave type"
+   231→            loading={isLoading}
+   232→          >
+   233→            <LeaveUtilizationChart data={data?.leaveUtilization ?? []} />
+   234→          </ChartCard>
+   235→
+   236→          <ChartCard
+   237→            title="Payroll by Department"
+   238→            subtitle="Net salary distribution this month"
+   239→            loading={isLoading}
+   240→          >
+   241→            <PayrollByDeptChart data={data?.payrollByDepartment ?? []} />
+   242→          </ChartCard>
+   243→
+   244→          <ChartCard
+   245→            title="Document Generation Trend"
+   246→            subtitle="Documents generated by type (last 6 months)"
+   247→            loading={isLoading}
+   248→          >
+   249→            <DocumentTrendChart
+   250→              data={data?.documentTrend?.data ?? []}
+   251→              types={data?.documentTrend?.types ?? []}
+   252→            />
+   253→          </ChartCard>
+   254→
+   255→          <ChartCard
+   256→            title="Performance Score Distribution"
+   257→            subtitle="Employee count per overall-score bucket"
+   258→            loading={isLoading}
+   259→          >
+   260→            <PerformanceDistChart
+   261→              data={data?.performanceDistribution ?? []}
+   262→            />
+   263→          </ChartCard>
+   264→        </div>
+   265→      </section>
+   266→
+   267→      {/* Recruitment funnel */}
+   268→      <RecruitmentFunnelSection
+   269→        data={data?.recruitmentFunnel ?? []}
+   270→        loading={isLoading}
+   271→      />
+   272→
+   273→      {/* Export reports */}
+   274→      <section className="space-y-3">
+   275→        <div className="flex items-center gap-2">
+   276→          <Download className="size-4 text-primary" />
+   277→          <h2 className="text-sm font-semibold">Export Reports</h2>
+   278→        </div>
+   279→        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+   280→          {REPORT_TYPES.map((r) => {
+   281→            const Icon = r.icon;
+   282→            return (
+   283→              <Card
+   284→                key={r.key}
+   285→                className="border-border/60 shadow-soft hover:shadow-card-hover transition-all flex flex-col"
+   286→              >
+   287→                <CardContent className="p-5 flex flex-col flex-1">
+   288→                  <div
+   289→                    className={cn(
+   290→                      "size-11 rounded-xl flex items-center justify-center mb-3",
+   291→                      r.color
+   292→                    )}
+   293→                  >
+   294→                    <Icon className="size-5" />
+   295→                  </div>
+   296→                  <div className="font-semibold">{r.title}</div>
+   297→                  <p className="text-sm text-muted-foreground mt-1 flex-1">
+   298→                    {r.description}
+   299→                  </p>
+   300→                  <Button
+   301→                    size="sm"
+   302→                    className="mt-4 w-full"
+   303→                    onClick={() => setActive(r)}
+   304→                  >
+   305→                    <Download className="size-4 mr-1.5" /> Generate
+   306→                  </Button>
+   307→                </CardContent>
+   308→              </Card>
+   309→            );
+   310→          })}
+   311→        </div>
+   312→      </section>
+   313→
+   314→      {active && (
+   315→        <GenerateDialog report={active} onClose={() => setActive(null)} />
+   316→      )}
+   317→    </div>
+   318→  );
+   319→}
+   320→
+   321→// ============================================================
+   322→// KPI row
+   323→// ============================================================
+   324→function KpiRow({
+   325→  data,
+   326→  loading,
+   327→}: {
+   328→  data?: AnalyticsPayload;
+   329→  loading: boolean;
+   330→}) {
+   331→  if (loading || !data) {
+   332→    return (
+   333→      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+   334→        {Array.from({ length: 4 }).map((_, i) => (
+   335→          <Skeleton key={i} className="h-28 rounded-xl" />
+   336→        ))}
+   337→      </div>
+   338→    );
+   339→  }
+   340→
+   341→  return (
+   342→    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+   343→      <KpiCard
+   344→        label="Total Employees"
+   345→        value={data.kpis.totalEmployees}
+   346→        icon={Users}
+   347→        iconClass="bg-primary/10 text-primary"
+   348→      />
+   349→      <KpiCard
+   350→        label="Avg Attendance (30d)"
+   351→        value={`${data.kpis.avgAttendanceRate}%`}
+   352→        icon={CalendarCheck}
+   353→        iconClass="bg-emerald-500/10 text-emerald-600"
+   354→      />
+   355→      <KpiCard
+   356→        label="Payroll This Month"
+   357→        value={formatCurrency(data.kpis.totalPayrollThisMonth)}
+   358→        icon={Wallet}
+   359→        iconClass="bg-teal-500/10 text-teal-600"
+   360→      />
+   361→      <KpiCard
+   362→        label="Docs This Month"
+   363→        value={data.kpis.docsGeneratedThisMonth}
+   364→        icon={FileText}
+   365→        iconClass="bg-violet-500/10 text-violet-600"
+   366→      />
+   367→    </div>
+   368→  );
+   369→}
+   370→
+   371→// ============================================================
+   372→// Chart card wrapper
+   373→// ============================================================
+   374→function ChartCard({
+   375→  title,
+   376→  subtitle,
+   377→  loading,
+   378→  children,
+   379→}: {
+   380→  title: string;
+   381→  subtitle?: string;
+   382→  loading?: boolean;
+   383→  children: React.ReactNode;
+   384→}) {
+   385→  return (
+   386→    <Card className="border-border/60 shadow-soft overflow-hidden">
+   387→      <CardHeader className="pb-2 pt-4 px-5">
+   388→        <CardTitle className="text-sm font-semibold flex items-center gap-2">
+   389→          {title}
+   390→        </CardTitle>
+   391→        {subtitle && (
+   392→          <p className="text-[11px] text-muted-foreground">{subtitle}</p>
+   393→        )}
+   394→      </CardHeader>
+   395→      <CardContent className="px-2 pb-3">
+   396→        {loading ? (
+   397→          <Skeleton className="h-64 w-full" />
+   398→        ) : (
+   399→          <div className="h-64 w-full">{children}</div>
+   400→        )}
+   401→      </CardContent>
+   402→    </Card>
+   403→  );
+   404→}
+   405→
+   406→// ============================================================
+   407→// 1. Employee Growth — LineChart (hires + cumulative)
+   408→// ============================================================
+   409→function EmployeeGrowthChart({
+   410→  data,
+   411→}: {
+   412→  data: { month: string; hires: number; cumulative: number }[];
+   413→}) {
+   414→  if (data.length === 0) return <ChartEmpty />;
+   415→  return (
+   416→    <ResponsiveContainer width="100%" height="100%">
+   417→      <LineChart data={data} margin={{ top: 8, right: 16, left: -10, bottom: 0 }}>
+   418→        <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" opacity={0.4} />
+   419→        <XAxis
+   420→          dataKey="month"
+   421→          tick={{ fontSize: 11, fill: "#6b7280" }}
+   422→          tickLine={false}
+   423→          axisLine={false}
+   424→        />
+   425→        <YAxis
+   426→          tick={{ fontSize: 11, fill: "#6b7280" }}
+   427→          tickLine={false}
+   428→          axisLine={false}
+   429→        />
+   430→        <Tooltip
+   431→          contentStyle={tooltipStyle}
+   432→          formatter={(v: any, n: string) => [
+   433→            n === "cumulative" ? `${v} employees` : `${v} hires`,
+   434→            n === "cumulative" ? "Cumulative" : "Hires",
+   435→          ]}
+   436→        />
+   437→        <Legend wrapperStyle={{ fontSize: 11 }} />
+   438→        <Line
+   439→          type="monotone"
+   440→          dataKey="hires"
+   441→          stroke={CHART_COLORS[0]}
+   442→          strokeWidth={2}
+   443→          dot={{ r: 3, fill: CHART_COLORS[0] }}
+   444→          name="Hires"
+   445→        />
+   446→        <Line
+   447→          type="monotone"
+   448→          dataKey="cumulative"
+   449→          stroke={CHART_COLORS[1]}
+   450→          strokeWidth={2}
+   451→          strokeDasharray="4 3"
+   452→          dot={false}
+   453→          name="Cumulative"
+   454→        />
+   455→      </LineChart>
+   456→    </ResponsiveContainer>
+   457→  );
+   458→}
+   459→
+   460→// ============================================================
+   461→// 2. Attendance Rate Trend — AreaChart (30 days)
+   462→// ============================================================
+   463→function AttendanceTrendChart({
+   464→  data,
+   465→}: {
+   466→  data: { date: string; rate: number; present: number; total: number }[];
+   467→}) {
+   468→  if (data.length === 0) return <ChartEmpty />;
+   469→  return (
+   470→    <ResponsiveContainer width="100%" height="100%">
+   471→      <AreaChart data={data} margin={{ top: 8, right: 16, left: -10, bottom: 0 }}>
+   472→        <defs>
+   473→          <linearGradient id="attGrad" x1="0" y1="0" x2="0" y2="1">
+   474→            <stop offset="0%" stopColor={CHART_COLORS[0]} stopOpacity={0.4} />
+   475→            <stop offset="100%" stopColor={CHART_COLORS[0]} stopOpacity={0} />
+   476→          </linearGradient>
+   477→        </defs>
+   478→        <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" opacity={0.4} />
+   479→        <XAxis
+   480→          dataKey="date"
+   481→          tick={{ fontSize: 10, fill: "#6b7280" }}
+   482→          tickLine={false}
+   483→          axisLine={false}
+   484→          interval={4}
+   485→        />
+   486→        <YAxis
+   487→          domain={[0, 100]}
+   488→          tick={{ fontSize: 11, fill: "#6b7280" }}
+   489→          tickLine={false}
+   490→          axisLine={false}
+   491→          unit="%"
+   492→        />
+   493→        <Tooltip
+   494→          contentStyle={tooltipStyle}
+   495→          formatter={(v: any, n: string) => [
+   496→            n === "rate" ? `${v}%` : v,
+   497→            n === "rate" ? "Attendance Rate" : n,
+   498→          ]}
+   499→        />
+   500→        <Area
+   501→          type="monotone"
+   502→          dataKey="rate"
+   503→          stroke={CHART_COLORS[0]}
+   504→          strokeWidth={2}
+   505→          fill="url(#attGrad)"
+   506→          name="Attendance Rate"
+   507→        />
+   508→      </AreaChart>
+   509→    </ResponsiveContainer>
+   510→  );
+   511→}
+   512→
+   513→// ============================================================
+   514→// 3. Leave Utilization by Type — Donut chart
+   515→// ============================================================
+   516→function LeaveUtilizationChart({
+   517→  data,
+   518→}: {
+   519→  data: { name: string; value: number; count: number; color: string }[];
+   520→}) {
+   521→  if (data.length === 0) return <ChartEmpty />;
+   522→  return (
+   523→    <ResponsiveContainer width="100%" height="100%">
+   524→      <PieChart>
+   525→        <Pie
+   526→          data={data}
+   527→          dataKey="value"
+   528→          nameKey="name"
+   529→          cx="50%"
+   530→          cy="50%"
+   531→          innerRadius={50}
+   532→          outerRadius={85}
+   533→          paddingAngle={2}
+   534→        >
+   535→          {data.map((entry, idx) => (
+   536→            <Cell
+   537→              key={`cell-${idx}`}
+   538→              fill={entry.color || CHART_COLORS[idx % CHART_COLORS.length]}
+   539→              stroke="#ffffff"
+   540→              strokeWidth={2}
+   541→            />
+   542→          ))}
+   543→        </Pie>
+   544→        <Tooltip
+   545→          contentStyle={tooltipStyle}
+   546→          formatter={(v: any, _n: string, p: any) => [
+   547→            `${v} days (${p.payload.count} requests)`,
+   548→            p.payload.name,
+   549→          ]}
+   550→        />
+   551→        <Legend
+   552→          wrapperStyle={{ fontSize: 11 }}
+   553→          layout="horizontal"
+   554→          align="center"
+   555→          verticalAlign="bottom"
+   556→        />
+   557→      </PieChart>
+   558→    </ResponsiveContainer>
+   559→  );
+   560→}
+   561→
+   562→// ============================================================
+   563→// 4. Payroll by Department — Horizontal BarChart
+   564→// ============================================================
+   565→function PayrollByDeptChart({
+   566→  data,
+   567→}: {
+   568→  data: { name: string; netSalary: number }[];
+   569→}) {
+   570→  if (data.length === 0) return <ChartEmpty />;
+   571→  // Reverse so the largest bar appears at the top of the chart.
+   572→  const rows = [...data].reverse();
+   573→  return (
+   574→    <ResponsiveContainer width="100%" height="100%">
+   575→      <BarChart
+   576→        layout="vertical"
+   577→        data={rows}
+   578→        margin={{ top: 8, right: 16, left: 10, bottom: 0 }}
+   579→      >
+   580→        <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" opacity={0.4} horizontal={false} />
+   581→        <XAxis
+   582→          type="number"
+   583→          tick={{ fontSize: 11, fill: "#6b7280" }}
+   584→          tickLine={false}
+   585→          axisLine={false}
+   586→          tickFormatter={(v) => `${Math.round(v / 1000)}k`}
+   587→        />
+   588→        <YAxis
+   589→          type="category"
+   590→          dataKey="name"
+   591→          tick={{ fontSize: 11, fill: "#6b7280" }}
+   592→          tickLine={false}
+   593→          axisLine={false}
+   594→          width={100}
+   595→        />
+   596→        <Tooltip
+   597→          contentStyle={tooltipStyle}
+   598→          formatter={(v: any) => [formatCurrency(v), "Net Payroll"]}
+   599→        />
+   600→        <Bar dataKey="netSalary" radius={[0, 4, 4, 0]} barSize={18}>
+   601→          {rows.map((_, idx) => (
+   602→            <Cell key={`pc-${idx}`} fill={CHART_COLORS[idx % CHART_COLORS.length]} />
+   603→          ))}
+   604→        </Bar>
+   605→      </BarChart>
+   606→    </ResponsiveContainer>
+   607→  );
+   608→}
+   609→
+   610→// ============================================================
+   611→// 5. Document Generation Trend — Stacked BarChart by type
+   612→// ============================================================
+   613→function DocumentTrendChart({
+   614→  data,
+   615→  types,
+   616→}: {
+   617→  data: Record<string, any>[];
+   618→  types: string[];
+   619→}) {
+   620→  if (data.length === 0) return <ChartEmpty />;
+   621→  const seriesKeys = [...types, "Other"].filter(Boolean);
+   622→  return (
+   623→    <ResponsiveContainer width="100%" height="100%">
+   624→      <BarChart data={data} margin={{ top: 8, right: 16, left: -10, bottom: 0 }}>
+   625→        <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" opacity={0.4} />
+   626→        <XAxis
+   627→          dataKey="month"
+   628→          tick={{ fontSize: 11, fill: "#6b7280" }}
+   629→          tickLine={false}
+   630→          axisLine={false}
+   631→        />
+   632→        <YAxis
+   633→          tick={{ fontSize: 11, fill: "#6b7280" }}
+   634→          tickLine={false}
+   635→          axisLine={false}
+   636→          allowDecimals={false}
+   637→        />
+   638→        <Tooltip contentStyle={tooltipStyle} />
+   639→        <Legend wrapperStyle={{ fontSize: 11 }} />
+   640→        {seriesKeys.map((key, idx) => (
+   641→          <Bar
+   642→            key={key}
+   643→            dataKey={key}
+   644→            stackId="docs"
+   645→            fill={CHART_COLORS[idx % CHART_COLORS.length]}
+   646→            name={key.replace(/_/g, " ")}
+   647→            barSize={28}
+   648→            radius={idx === seriesKeys.length - 1 ? [4, 4, 0, 0] : [0, 0, 0, 0]}
+   649→          />
+   650→        ))}
+   651→      </BarChart>
+   652→    </ResponsiveContainer>
+   653→  );
+   654→}
+   655→
+   656→// ============================================================
+   657→// 6. Performance Score Distribution — Histogram BarChart
+   658→// ============================================================
+   659→function PerformanceDistChart({
+   660→  data,
+   661→}: {
+   662→  data: { range: string; count: number }[];
+   663→}) {
+   664→  if (data.length === 0) return <ChartEmpty />;
+   665→  return (
+   666→    <ResponsiveContainer width="100%" height="100%">
+   667→      <BarChart data={data} margin={{ top: 8, right: 16, left: -10, bottom: 0 }}>
+   668→        <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" opacity={0.4} />
+   669→        <XAxis
+   670→          dataKey="range"
+   671→          tick={{ fontSize: 11, fill: "#6b7280" }}
+   672→          tickLine={false}
+   673→          axisLine={false}
+   674→        />
+   675→        <YAxis
+   676→          tick={{ fontSize: 11, fill: "#6b7280" }}
+   677→          tickLine={false}
+   678→          axisLine={false}
+   679→          allowDecimals={false}
+   680→        />
+   681→        <Tooltip contentStyle={tooltipStyle} formatter={(v: any) => [v, "Employees"]} />
+   682→        <Bar dataKey="count" radius={[4, 4, 0, 0]} barSize={36}>
+   683→          {data.map((_, idx) => (
+   684→            <Cell key={`pd-${idx}`} fill={CHART_COLORS[idx % CHART_COLORS.length]} />
+   685→          ))}
+   686→        </Bar>
+   687→      </BarChart>
+   688→    </ResponsiveContainer>
+   689→  );
+   690→}
+   691→
+   692→// ============================================================
+   693→// Recruitment Funnel — custom horizontal funnel
+   694→// ============================================================
+   695→function RecruitmentFunnelSection({
+   696→  data,
+   697→  loading,
+   698→}: {
+   699→  data: { stage: string; count: number; atStage: number }[];
+   700→  loading: boolean;
+   701→}) {
+   702→  return (
+   703→    <section className="space-y-3">
+   704→      <div className="flex items-center gap-2">
+   705→        <Filter className="size-4 text-primary" />
+   706→        <h2 className="text-sm font-semibold">Recruitment Funnel</h2>
+   707→        <span className="text-xs text-muted-foreground">
+   708→          Cumulative candidates reaching each pipeline stage
+   709→        </span>
+   710→      </div>
+   711→      <Card className="border-border/60 shadow-soft">
+   712→        <CardContent className="p-5">
+   713→          {loading ? (
+   714→            <div className="space-y-2">
+   715→              {Array.from({ length: 7 }).map((_, i) => (
+   716→                <Skeleton key={i} className="h-10 w-full" />
+   717→              ))}
+   718→            </div>
+   719→          ) : data.length === 0 ? (
+   720→            <div className="text-sm text-muted-foreground py-6 text-center">
+   721→              No recruitment data yet.
+   722→            </div>
+   723→          ) : (
+   724→            <FunnelBars data={data} />
+   725→          )}
+   726→        </CardContent>
+   727→      </Card>
+   728→    </section>
+   729→  );
+   730→}
+   731→
+   732→function FunnelBars({
+   733→  data,
+   734→}: {
+   735→  data: { stage: string; count: number; atStage: number }[];
+   736→}) {
+   737→  const max = Math.max(...data.map((d) => d.count), 1);
+   738→  return (
+   739→    <div className="space-y-2">
+   740→      {data.map((d, idx) => {
+   741→        const widthPct = (d.count / max) * 100;
+   742→        const prevCount = idx > 0 ? data[idx - 1].count : null;
+   743→        const conversion =
+   744→          prevCount && prevCount > 0
+   745→            ? Math.round((d.count / prevCount) * 100)
+   746→            : null;
+   747→        const color = CHART_COLORS[idx % CHART_COLORS.length];
+   748→        return (
+   749→          <div key={d.stage} className="space-y-1">
+   750→            <div className="flex items-center justify-between text-xs">
+   751→              <div className="flex items-center gap-2">
+   752→                <span
+   753→                  className="inline-block size-2.5 rounded-sm"
+   754→                  style={{ backgroundColor: color }}
+   755→                />
+   756→                <span className="font-medium capitalize">
+   757→                  {d.stage.replace(/_/g, " ").toLowerCase()}
+   758→                </span>
+   759→                {conversion !== null && (
+   760→                  <span className="text-[10px] text-muted-foreground">
+   761→                    · {conversion}% conversion
+   762→                  </span>
+   763→                )}
+   764→              </div>
+   765→              <div className="flex items-center gap-3">
+   766→                <span className="font-semibold tabular-nums">{d.count}</span>
+   767→                <span className="text-[10px] text-muted-foreground">
+   768→                  ({d.atStage} at stage)
+   769→                </span>
+   770→              </div>
+   771→            </div>
+   772→            <div className="h-7 w-full rounded-md bg-muted/40 overflow-hidden">
+   773→              <div
+   774→                className="h-full rounded-md transition-all flex items-center justify-end px-2"
+   775→                style={{
+   776→                  width: `${widthPct}%`,
+   777→                  backgroundColor: color,
+   778→                  minWidth: d.count > 0 ? "8px" : "0",
+   779→                }}
+   780→              />
+   781→            </div>
+   782→          </div>
+   783→        );
+   784→      })}
+   785→    </div>
+   786→  );
+   787→}
+   788→
+   789→// ============================================================
+   790→// Helpers
+   791→// ============================================================
+   792→const tooltipStyle = {
+   793→  backgroundColor: "#ffffff",
+   794→  border: "1px solid oklch(0.9 0 0)",
+   795→  borderRadius: "10px",
+   796→  fontSize: "12px",
+   797→  color: "#1a1a1a",
+   798→  boxShadow: "0 4px 12px oklch(0 0 0 / 0.08)",
+   799→} as const;
+   800→
+   801→function ChartEmpty() {
+   802→  return (
+   803→    <div className="h-full w-full flex flex-col items-center justify-center text-muted-foreground text-xs">
+   804→      <BarChart3 className="size-7 mb-1 opacity-40" />
+   805→      No data available
+   806→    </div>
+   807→  );
+   808→}
+   809→
+   810→// ============================================================
+   811→// Generate report dialog (preserved from previous module)
+   812→// ============================================================
+   813→function GenerateDialog({
+   814→  report,
+   815→  onClose,
+   816→}: {
+   817→  report: ReportType;
+   818→  onClose: () => void;
+   819→}) {
+   820→  const today = new Date();
+   821→  const monthStart = new Date(today.getFullYear(), today.getMonth(), 1)
+   822→    .toISOString()
+   823→    .slice(0, 10);
+   824→  const monthEnd = today.toISOString().slice(0, 10);
+   825→  const [from, setFrom] = useState(monthStart);
+   826→  const [to, setTo] = useState(monthEnd);
+   827→  const [format, setFormat] = useState("csv");
+   828→  const [downloading, setDownloading] = useState(false);
+   829→
+   830→  async function download() {
+   831→    setDownloading(true);
+   832→    try {
+   833→      const params = new URLSearchParams({
+   834→        type: report.key,
+   835→        format,
+   836→      });
+   837→      if (from) params.set("from", from);
+   838→      if (to) params.set("to", to);
+   839→
+   840→      const res = await fetch(`/api/reports/generate?${params.toString()}`);
+   841→      if (!res.ok) {
+   842→        const err = await res.json().catch(() => ({}));
+   843→        throw new Error(err.error || "Failed");
+   844→      }
+   845→      const blob = await res.blob();
+   846→      const ext = format === "pdf" ? "pdf" : format === "excel" ? "xls" : "csv";
+   847→      const filename = `${report.key}-report-${new Date().toISOString().split("T")[0]}.${ext}`;
+   848→      const url = URL.createObjectURL(blob);
+   849→      const a = document.createElement("a");
+   850→      a.href = url;
+   851→      a.download = filename;
+   852→      document.body.appendChild(a);
+   853→      a.click();
+   854→      document.body.removeChild(a);
+   855→      URL.revokeObjectURL(url);
+   856→      toast.success(`Report downloaded (${filename})`);
+   857→      onClose();
+   858→    } catch (e: any) {
+   859→      toast.error(e.message || "Failed to generate report");
+   860→    } finally {
+   861→      setDownloading(false);
+   862→    }
+   863→  }
+   864→
+   865→  return (
+   866→    <Dialog open onOpenChange={(v) => !v && onClose()}>
+   867→      <DialogContent className="max-w-md">
+   868→        <DialogHeader>
+   869→          <DialogTitle>Generate {report.title}</DialogTitle>
+   870→          <DialogDescription>
+   871→            Choose a date range and format. Click download to generate.
+   872→          </DialogDescription>
+   873→        </DialogHeader>
+   874→
+   875→        <div className="space-y-4">
+   876→          <div className="grid grid-cols-2 gap-3">
+   877→            <div className="space-y-2">
+   878→              <Label>From</Label>
+   879→              <Input
+   880→                type="date"
+   881→                value={from}
+   882→                onChange={(e) => setFrom(e.target.value)}
+   883→              />
+   884→            </div>
+   885→            <div className="space-y-2">
+   886→              <Label>To</Label>
+   887→              <Input
+   888→                type="date"
+   889→                value={to}
+   890→                onChange={(e) => setTo(e.target.value)}
+   891→              />
+   892→            </div>
+   893→          </div>
+   894→
+   895→          <div className="space-y-2">
+   896→            <Label>Format</Label>
+   897→            <Select value={format} onValueChange={setFormat}>
+   898→              <SelectTrigger>
+   899→                <SelectValue />
+   900→              </SelectTrigger>
+   901→              <SelectContent>
+   902→                {FORMATS.map((f) => (
+   903→                  <SelectItem key={f.value} value={f.value}>
+   904→                    {f.label}
+   905→                  </SelectItem>
+   906→                ))}
+   907→              </SelectContent>
+   908→            </Select>
+   909→            <p className="text-xs text-muted-foreground">
+   910→              {format === "excel" &&
+   911→                "Excel exports as CSV with .xls extension for MVP."}
+   912→              {format === "pdf" &&
+   913→                "PDF generated using a minimal multi-page PDF writer."}
+   914→              {format === "csv" &&
+   915→                "Comma-separated values, opens in Excel/Sheets."}
+   916→            </p>
+   917→          </div>
+   918→        </div>
+   919→
+   920→        <DialogFooter>
+   921→          <Button variant="outline" onClick={onClose}>
+   922→            Cancel
+   923→          </Button>
+   924→          <Button onClick={download} disabled={downloading}>
+   925→            {downloading ? (
+   926→              <>
+   927→                <Loader2 className="size-4 mr-1.5 animate-spin" /> Generating…
+   928→              </>
+   929→            ) : (
+   930→              <>
+   931→                <Download className="size-4 mr-1.5" /> Download
+   932→              </>
+   933→            )}
+   934→          </Button>
+   935→        </DialogFooter>
+   936→      </DialogContent>
+   937→    </Dialog>
+   938→  );
+   939→}
+   940→

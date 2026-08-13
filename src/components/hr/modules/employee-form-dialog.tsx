@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Dialog,
   DialogContent,
@@ -23,7 +23,8 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { toast } from "sonner";
-import { Loader2, UserPlus } from "lucide-react";
+import { Loader2, UserPlus, Upload, X } from "lucide-react";
+import { AvatarBadge } from "../shared/avatar-badge";
 
 interface Props {
   open: boolean;
@@ -31,6 +32,8 @@ interface Props {
   employee?: { id: string } | null;
   onSaved?: (emp: any) => void;
 }
+
+const MAX_PHOTO_BYTES = 500 * 1024; // 500 KB
 
 export function EmployeeFormDialog({ open, onOpenChange, employee, onSaved }: Props) {
   const isEdit = !!employee;
@@ -69,7 +72,9 @@ export function EmployeeFormDialog({ open, onOpenChange, employee, onSaved }: Pr
     bankAccount: "",
     bankIfsc: "",
     paymentMethod: "BANK_TRANSFER",
+    photo: "",
   });
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -135,12 +140,43 @@ export function EmployeeFormDialog({ open, onOpenChange, employee, onSaved }: Pr
         bankAccount: "",
         bankIfsc: "",
         paymentMethod: "BANK_TRANSFER",
+        photo: "",
       });
     }
   }, [open, employee]);
 
   function set(key: string, value: any) {
     setForm((f: any) => ({ ...f, [key]: value }));
+  }
+
+  function handlePhotoSelect(file: File | undefined) {
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      toast.error("Please select an image file.");
+      return;
+    }
+    if (file.size > MAX_PHOTO_BYTES) {
+      toast.error(
+        `Image is too large (${(file.size / 1024).toFixed(0)} KB). Max allowed is 500 KB.`
+      );
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUrl = reader.result;
+      if (typeof dataUrl === "string") {
+        set("photo", dataUrl);
+      }
+    };
+    reader.onerror = () => toast.error("Failed to read file.");
+    reader.readAsDataURL(file);
+  }
+
+  function clearPhoto() {
+    set("photo", "");
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
   }
 
   async function handleSubmit() {
@@ -174,8 +210,8 @@ export function EmployeeFormDialog({ open, onOpenChange, employee, onSaved }: Pr
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl max-h-[90vh] p-0 gap-0">
-        <DialogHeader className="px-6 py-4 border-b border-border">
+      <DialogContent className="max-w-[95vw] sm:max-w-3xl max-h-[90vh] p-0 gap-0">
+        <DialogHeader className="px-4 sm:px-6 py-4 border-b border-border">
           <DialogTitle className="flex items-center gap-2">
             <UserPlus className="size-5 text-primary" />
             {isEdit ? "Edit Employee" : "Add New Employee"}
@@ -188,7 +224,7 @@ export function EmployeeFormDialog({ open, onOpenChange, employee, onSaved }: Pr
         </DialogHeader>
 
         <ScrollArea className="max-h-[60vh]">
-          <div className="px-6 py-4">
+          <div className="px-4 sm:px-6 py-4">
             <Tabs defaultValue="personal">
               <TabsList className="grid w-full grid-cols-3">
                 <TabsTrigger value="personal">Personal</TabsTrigger>
@@ -197,6 +233,56 @@ export function EmployeeFormDialog({ open, onOpenChange, employee, onSaved }: Pr
               </TabsList>
 
               <TabsContent value="personal" className="space-y-4 mt-4">
+                {/* Photo upload */}
+                <div className="rounded-xl border border-border bg-muted/30 p-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+                    <AvatarBadge
+                      name={form.fullName || "New Employee"}
+                      photo={form.photo}
+                      size="xl"
+                      className="flex-shrink-0"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-medium">Profile Photo</div>
+                      <div className="text-xs text-muted-foreground mb-2">
+                        JPG, PNG, or GIF. Max 500 KB.
+                      </div>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <input
+                          ref={fileInputRef}
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={(e) =>
+                            handlePhotoSelect(e.target.files?.[0])
+                          }
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => fileInputRef.current?.click()}
+                        >
+                          <Upload className="size-4 mr-1.5" />
+                          {form.photo ? "Change Photo" : "Upload Photo"}
+                        </Button>
+                        {form.photo && (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={clearPhoto}
+                            className="text-rose-600 hover:text-rose-700 hover:bg-rose-500/10"
+                          >
+                            <X className="size-4 mr-1.5" />
+                            Remove
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <Field label="Full Name *">
                     <Input
@@ -509,7 +595,7 @@ export function EmployeeFormDialog({ open, onOpenChange, employee, onSaved }: Pr
           </div>
         </ScrollArea>
 
-        <DialogFooter className="px-6 py-4 border-t border-border">
+        <DialogFooter className="px-4 sm:px-6 py-4 border-t border-border">
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>

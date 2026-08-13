@@ -46,6 +46,7 @@ import {
 import { formatDate } from "@/lib/utils";
 import { toast } from "sonner";
 import { AttendanceEntryDialog } from "./attendance-entry-dialog";
+import { ExportButton } from "../shared/export-button";
 
 export function AttendanceModule() {
   const qc = useQueryClient();
@@ -119,14 +120,21 @@ export function AttendanceModule() {
         description="Track daily check-in / check-out, late arrivals, and overtime"
         icon={<CalendarCheck className="size-5" />}
         actions={
-          <Button size="sm" onClick={addNew}>
-            <Plus className="size-4 mr-1.5" /> Add Attendance
-          </Button>
+          <>
+            <ExportButton
+              module="attendance"
+              filters={{ date, departmentId, status, search }}
+            />
+            <Button size="sm" onClick={addNew}>
+              <Plus className="size-4 mr-1.5" /> <span className="hidden sm:inline">Add Attendance</span>
+              <span className="sm:hidden">Add</span>
+            </Button>
+          </>
         }
       />
 
       {/* KPIs */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
         <KpiCard
           label="Present"
           value={presentToday}
@@ -255,13 +263,13 @@ export function AttendanceModule() {
             <Table>
               <TableHeader>
                 <TableRow className="bg-muted/40 hover:bg-muted/40">
-                  <TableHead className="min-w-[220px]">Employee</TableHead>
-                  <TableHead>Date</TableHead>
+                  <TableHead className="min-w-[200px]">Employee</TableHead>
+                  <TableHead className="hidden sm:table-cell">Date</TableHead>
                   <TableHead>Check In</TableHead>
-                  <TableHead>Check Out</TableHead>
-                  <TableHead>Hours</TableHead>
-                  <TableHead>Late</TableHead>
-                  <TableHead>Overtime</TableHead>
+                  <TableHead className="hidden sm:table-cell">Check Out</TableHead>
+                  <TableHead className="hidden md:table-cell">Hours</TableHead>
+                  <TableHead className="hidden md:table-cell">Late</TableHead>
+                  <TableHead className="hidden lg:table-cell">Overtime</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
@@ -283,10 +291,13 @@ export function AttendanceModule() {
                           <div className="text-xs text-muted-foreground font-mono">
                             {a.employee?.employeeId}
                           </div>
+                          <div className="sm:hidden text-[11px] text-muted-foreground mt-0.5">
+                            {formatDate(a.date)}
+                          </div>
                         </div>
                       </div>
                     </TableCell>
-                    <TableCell className="text-xs">
+                    <TableCell className="text-xs hidden sm:table-cell">
                       {formatDate(a.date)}
                     </TableCell>
                     <TableCell className="text-xs tabular-nums">
@@ -297,7 +308,7 @@ export function AttendanceModule() {
                           })
                         : "—"}
                     </TableCell>
-                    <TableCell className="text-xs tabular-nums">
+                    <TableCell className="text-xs tabular-nums hidden sm:table-cell">
                       {a.checkOut
                         ? new Date(a.checkOut).toLocaleTimeString("en-GB", {
                             hour: "2-digit",
@@ -305,10 +316,10 @@ export function AttendanceModule() {
                           })
                         : "—"}
                     </TableCell>
-                    <TableCell className="text-xs tabular-nums">
+                    <TableCell className="text-xs tabular-nums hidden md:table-cell">
                       {a.workingHours ? `${a.workingHours}h` : "—"}
                     </TableCell>
-                    <TableCell className="text-xs">
+                    <TableCell className="text-xs hidden md:table-cell">
                       {a.late ? (
                         <span className="text-amber-600 font-medium">
                           {a.lateMinutes}m
@@ -317,7 +328,7 @@ export function AttendanceModule() {
                         "—"
                       )}
                     </TableCell>
-                    <TableCell className="text-xs tabular-nums">
+                    <TableCell className="text-xs tabular-nums hidden lg:table-cell">
                       {a.overtime ? `${a.overtime}h` : "—"}
                     </TableCell>
                     <TableCell>

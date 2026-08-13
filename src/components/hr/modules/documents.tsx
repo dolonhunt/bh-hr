@@ -70,12 +70,15 @@ import {
   X,
   Stamp,
   ChevronRight,
+  Printer,
 } from "lucide-react";
 import { formatDate, relativeTime, cn } from "@/lib/utils";
+import { printDocument } from "@/lib/print";
 import { TemplateFormDialog } from "./template-form-dialog";
 import { GenerateDocumentDialog } from "./generate-document-dialog";
 import { BulkGenerateDialog } from "./bulk-generate-dialog";
 import { ApprovalQueue } from "./approval-queue";
+import { ExportButton } from "../shared/export-button";
 
 const DOC_TYPES = [
   "OFFER",
@@ -155,19 +158,19 @@ export function DocumentsModule() {
         onValueChange={(v) => setDocumentsTab(v as any)}
       >
         <TabsList className="grid w-full grid-cols-2 md:grid-cols-5 h-auto">
-          <TabsTrigger value="all" className="py-1.5">
+          <TabsTrigger value="all" className="py-1.5 text-xs sm:text-sm">
             All Documents
           </TabsTrigger>
-          <TabsTrigger value="templates" className="py-1.5">
+          <TabsTrigger value="templates" className="py-1.5 text-xs sm:text-sm">
             Templates
           </TabsTrigger>
-          <TabsTrigger value="generated" className="py-1.5">
+          <TabsTrigger value="generated" className="py-1.5 text-xs sm:text-sm">
             Generated
           </TabsTrigger>
-          <TabsTrigger value="email-history" className="py-1.5">
+          <TabsTrigger value="email-history" className="py-1.5 text-xs sm:text-sm">
             Email History
           </TabsTrigger>
-          <TabsTrigger value="approval-queue" className="py-1.5">
+          <TabsTrigger value="approval-queue" className="py-1.5 text-xs sm:text-sm col-span-2 md:col-span-1">
             Approval Queue
           </TabsTrigger>
         </TabsList>
@@ -274,7 +277,7 @@ function AllDocumentsTab({
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-3">
         <KpiCard label="Total" value={total} icon={FileStack} iconClass="bg-primary/10 text-primary" />
         <KpiCard label="Generated Today" value={generatedToday} icon={FilePlus} iconClass="bg-violet-500/10 text-violet-600" />
         <KpiCard label="Sent Today" value={sentToday} icon={MailCheck} iconClass="bg-teal-500/10 text-teal-600" />
@@ -631,6 +634,10 @@ function GeneratedTab({
             ))}
           </SelectContent>
         </Select>
+        <ExportButton
+          module="documents"
+          filters={{ search, type, status }}
+        />
       </div>
 
       <div className="text-sm text-muted-foreground">
@@ -750,6 +757,10 @@ function EmailHistoryTab() {
             <SelectItem value="QUEUED">Queued</SelectItem>
           </SelectContent>
         </Select>
+        <ExportButton
+          module="email-logs"
+          filters={{ search, status }}
+        />
       </div>
 
       <div className="text-sm text-muted-foreground">
@@ -1300,24 +1311,46 @@ function DocumentPreviewDialog({
 
   return (
     <Dialog open={!!doc} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-w-4xl max-h-[92vh] p-0 gap-0">
-        <DialogHeader className="px-6 py-4 border-b border-border">
-          <DialogTitle className="flex items-center gap-2">
-            <Eye className="size-5 text-primary" />
-            {preview?.title ?? doc?.documentNumber ?? "Preview"}
-          </DialogTitle>
-          {preview && (
-            <div className="text-xs text-muted-foreground flex items-center gap-2 mt-1">
-              <span className="font-mono">{preview.documentNumber}</span>
-              <span>·</span>
-              <span>{preview.employee?.fullName}</span>
-              <span>·</span>
-              <StatusBadge status={preview.status} />
+      <DialogContent className="max-w-[95vw] sm:max-w-4xl max-h-[92vh] p-0 gap-0">
+        <DialogHeader className="px-4 sm:px-6 py-4 border-b border-border">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0 flex-1">
+              <DialogTitle className="flex items-center gap-2">
+                <Eye className="size-5 text-primary flex-shrink-0" />
+                <span className="truncate">
+                  {preview?.title ?? doc?.documentNumber ?? "Preview"}
+                </span>
+              </DialogTitle>
+              {preview && (
+                <div className="text-xs text-muted-foreground flex items-center gap-2 mt-1 flex-wrap">
+                  <span className="font-mono">{preview.documentNumber}</span>
+                  <span>·</span>
+                  <span>{preview.employee?.fullName}</span>
+                  <span>·</span>
+                  <StatusBadge status={preview.status} />
+                </div>
+              )}
             </div>
-          )}
+            {preview && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="flex-shrink-0"
+                onClick={() =>
+                  printDocument({
+                    title: preview.title ?? preview.documentNumber ?? "Document",
+                    html: preview.content ?? "",
+                    docNumber: preview.documentNumber,
+                  })
+                }
+              >
+                <Printer className="size-4 mr-1.5" /> Print
+              </Button>
+            )}
+          </div>
         </DialogHeader>
         <ScrollArea className="max-h-[70vh]">
-          <div className="px-6 py-5">
+          <div className="px-4 sm:px-6 py-5">
             {loading && (
               <div className="p-12 flex flex-col items-center text-muted-foreground">
                 <div className="size-8 border-2 border-primary border-t-transparent rounded-full animate-spin mb-3" />
@@ -1325,7 +1358,7 @@ function DocumentPreviewDialog({
               </div>
             )}
             {!loading && preview && (
-              <div className="rounded-lg border border-border bg-white p-8">
+              <div className="rounded-lg border border-border bg-white p-4 sm:p-8">
                 <div
                   className="prose prose-sm max-w-none"
                   dangerouslySetInnerHTML={{ __html: preview.content }}
@@ -1352,25 +1385,47 @@ function TemplatePreviewDialog({
 }) {
   return (
     <Dialog open={!!template} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-w-4xl max-h-[92vh] p-0 gap-0">
-        <DialogHeader className="px-6 py-4 border-b border-border">
-          <DialogTitle className="flex items-center gap-2">
-            <FileText className="size-5 text-primary" />
-            {template?.name ?? "Template"}
-          </DialogTitle>
-          {template && (
-            <div className="text-xs text-muted-foreground flex items-center gap-2 mt-1">
-              <Badge variant="outline" className="font-mono text-[10px]">
-                {template.code}
-              </Badge>
-              <span>{template.type?.replace(/_/g, " ")}</span>
-              <span>·</span>
-              <span>v{template.version}</span>
+      <DialogContent className="max-w-[95vw] sm:max-w-4xl max-h-[92vh] p-0 gap-0">
+        <DialogHeader className="px-4 sm:px-6 py-4 border-b border-border">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0 flex-1">
+              <DialogTitle className="flex items-center gap-2">
+                <FileText className="size-5 text-primary flex-shrink-0" />
+                <span className="truncate">
+                  {template?.name ?? "Template"}
+                </span>
+              </DialogTitle>
+              {template && (
+                <div className="text-xs text-muted-foreground flex items-center gap-2 mt-1 flex-wrap">
+                  <Badge variant="outline" className="font-mono text-[10px]">
+                    {template.code}
+                  </Badge>
+                  <span>{template.type?.replace(/_/g, " ")}</span>
+                  <span>·</span>
+                  <span>v{template.version}</span>
+                </div>
+              )}
             </div>
-          )}
+            {template?.content && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="flex-shrink-0"
+                onClick={() =>
+                  printDocument({
+                    title: template.name ?? "Template",
+                    html: template.content ?? "",
+                    docNumber: template.code,
+                  })
+                }
+              >
+                <Printer className="size-4 mr-1.5" /> Print
+              </Button>
+            )}
+          </div>
         </DialogHeader>
         <ScrollArea className="max-h-[70vh]">
-          <div className="px-6 py-5 space-y-4">
+          <div className="px-4 sm:px-6 py-5 space-y-4">
             {template?.emailSubject && (
               <div className="rounded-lg bg-muted/40 p-3 text-xs">
                 <div className="font-medium text-muted-foreground mb-1">
@@ -1380,7 +1435,7 @@ function TemplatePreviewDialog({
               </div>
             )}
             {template?.content && (
-              <div className="rounded-lg border border-border bg-white p-6">
+              <div className="rounded-lg border border-border bg-white p-4 sm:p-6">
                 <div
                   className="prose prose-sm max-w-none"
                   dangerouslySetInnerHTML={{ __html: template.content }}
@@ -1471,7 +1526,7 @@ function DirectSendEmailDialog({
 
   return (
     <Dialog open={!!doc} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="max-w-[95vw] sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Mail className="size-5 text-primary" />

@@ -38,9 +38,11 @@ import {
   CheckCircle2,
   Paperclip,
   Send,
+  Printer,
 } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { formatDate, formatCurrency } from "@/lib/utils";
+import { printDocument } from "@/lib/print";
 
 const TEMPLATE_TYPES = [
   "OFFER",
@@ -298,10 +300,10 @@ export function GenerateDocumentDialog({
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-4xl max-h-[92vh] p-0 gap-0">
-          <DialogHeader className="px-6 py-4 border-b border-border">
+        <DialogContent className="max-w-[95vw] sm:max-w-4xl max-h-[92vh] p-0 gap-0">
+          <DialogHeader className="px-4 sm:px-6 py-4 border-b border-border">
             <DialogTitle className="flex items-center gap-2">
-              <FileText className="size-5 text-primary" />
+              <FileText className="size-5 text-primary flex-shrink-0" />
               Generate Document
             </DialogTitle>
             <DialogDescription>
@@ -311,8 +313,8 @@ export function GenerateDocumentDialog({
           </DialogHeader>
 
           {/* Stepper */}
-          <div className="px-6 py-3 border-b border-border bg-muted/30">
-            <div className="flex items-center gap-1 overflow-x-auto">
+          <div className="px-4 sm:px-6 py-3 border-b border-border bg-muted/30">
+            <div className="flex items-center gap-1 overflow-x-auto pb-1">
               {STEPS.map((s, idx) => {
                 const isDone = idx < step;
                 const isActive = idx === step;
@@ -357,7 +359,7 @@ export function GenerateDocumentDialog({
           </div>
 
           <ScrollArea className="max-h-[58vh]">
-            <div className="px-6 py-5">
+            <div className="px-4 sm:px-6 py-5">
               {/* STEP 0: Select employee */}
               {step === 0 && (
                 <div className="space-y-4">
@@ -681,19 +683,36 @@ export function GenerateDocumentDialog({
               {/* STEP 4: Preview */}
               {step === 4 && (
                 <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <div className="text-sm text-muted-foreground">
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <div className="text-sm text-muted-foreground flex-1 min-w-0">
                       Preview of the rendered document. Variables have been
                       resolved from the data above.
                     </div>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={refreshPreview}
-                      disabled={previewLoading}
-                    >
-                      <Eye className="size-3.5 mr-1.5" /> Refresh
-                    </Button>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() =>
+                          previewData &&
+                          printDocument({
+                            title: previewData.title || previewData.documentNumber || "Document",
+                            html: previewData.content,
+                            docNumber: previewData.documentNumber,
+                          })
+                        }
+                        disabled={previewLoading || !previewData}
+                      >
+                        <Printer className="size-3.5 mr-1.5" /> Print
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={refreshPreview}
+                        disabled={previewLoading}
+                      >
+                        <Eye className="size-3.5 mr-1.5" /> Refresh
+                      </Button>
+                    </div>
                   </div>
                   {previewLoading && (
                     <div className="rounded-lg border border-border p-8 flex flex-col items-center justify-center text-muted-foreground">
@@ -740,7 +759,7 @@ export function GenerateDocumentDialog({
                       {generatedDoc.documentNumber} · {generatedDoc.title}
                     </div>
                   </div>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
                     <Button
                       variant="outline"
                       onClick={() =>
@@ -751,6 +770,18 @@ export function GenerateDocumentDialog({
                       }
                     >
                       <Eye className="size-4 mr-1.5" /> Preview
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={() =>
+                        printDocument({
+                          title: generatedDoc.title || generatedDoc.documentNumber || "Document",
+                          html: generatedDoc.content ?? "",
+                          docNumber: generatedDoc.documentNumber,
+                        })
+                      }
+                    >
+                      <Printer className="size-4 mr-1.5" /> Print
                     </Button>
                     <Button
                       variant="outline"
@@ -776,7 +807,7 @@ export function GenerateDocumentDialog({
             </div>
           </ScrollArea>
 
-          <DialogFooter className="px-6 py-4 border-t border-border justify-between">
+          <DialogFooter className="px-4 sm:px-6 py-4 border-t border-border justify-between gap-2 flex-wrap">
             <Button
               variant="ghost"
               onClick={() => onOpenChange(false)}

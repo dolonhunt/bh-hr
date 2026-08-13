@@ -61,6 +61,10 @@ export interface AppState {
   // Global quick action dialog
   quickAction: string | null;
   setQuickAction: (action: string | null) => void;
+
+  // Keyboard shortcuts help dialog
+  shortcutsHelpOpen: boolean;
+  setShortcutsHelpOpen: (v: boolean) => void;
 }
 
 export const useApp = create<AppState>()(
@@ -106,6 +110,9 @@ export const useApp = create<AppState>()(
 
       quickAction: null,
       setQuickAction: (action) => set({ quickAction: action }),
+
+      shortcutsHelpOpen: false,
+      setShortcutsHelpOpen: (v) => set({ shortcutsHelpOpen: v }),
     }),
     {
       name: "teamhub-hr-store",
