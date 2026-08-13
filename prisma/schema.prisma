@@ -1,0 +1,462 @@
+// HR Management System - Prisma Schema
+// SQLite-backed persistence for all HR modules
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================
+// AUTH / USERS
+// ============================================================
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String
+  password  String
+  role      String   @default("HR_ADMIN") // HR_ADMIN | HR_EXECUTIVE
+  avatar    String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  auditLogs AuditLog[]
+  sentEmails EmailLog[] @relation("EmailSender")
+  generatedDocuments GeneratedDocument[] @relation("DocGenerator")
+}
+
+// ============================================================
+// ORGANIZATION
+// ============================================================
+
+model Company {
+  id        String   @id @default(cuid())
+  name      String
+  legalName String?
+  address   String?
+  city      String?
+  state     String?
+  country   String?
+  zipCode   String?
+  email     String?
+  phone     String?
+  website   String?
+  logo      String?
+  taxId     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Department {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  description String?
+  headId      String? // Employee id of department head
+  status      String   @default("ACTIVE") // ACTIVE | ARCHIVED
+  color       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  employees Employee[]
+  jobs      Job[]
+}
+
+model Role {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  description String?
+  status      String   @default("ACTIVE") // ACTIVE | ARCHIVED
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  employees Employee[]
+}
+
+model Designation {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  description String?
+  departmentId String?
+  status      String   @default("ACTIVE")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  employees Employee[]
+}
+
+model LeaveType {
+  id          String   @id @default(cuid())
+  name        String   @unique // Annual, Casual, Sick, Maternity, Paternity, Unpaid, Other
+  code        String   @unique
+  defaultDays Int      @default(0)
+  paid        Boolean  @default(true)
+  color       String?
+  status      String   @default("ACTIVE")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  leaveRequests LeaveRequest[]
+}
+
+// ============================================================
+// EMPLOYEE
+// ============================================================
+
+model Employee {
+  id              String   @id @default(cuid())
+  employeeId      String   @unique // e.g. EMP001
+  fullName        String
+  firstName       String?
+  lastName        String?
+  photo           String?
+  dateOfBirth     DateTime?
+  gender          String? // MALE | FEMALE | OTHER
+  bloodGroup      String?
+  maritalStatus   String?
+  phone           String?
+  personalEmail   String?
+  officialEmail   String?
+  address         String?
+  city            String?
+  state           String?
+  country         String?
+  zipCode         String?
+  emergencyContactName  String?
+  emergencyContactPhone  String?
+  emergencyRelation      String?
+
+  // Employment
+  departmentId    String?
+  department      Department? @relation(fields: [departmentId], references: [id])
+  roleId          String?
+  role            Role?       @relation(fields: [roleId], references: [id])
+  designationId   String?
+  designation     Designation? @relation(fields: [designationId], references: [id])
+  employmentType  String   @default("FULL_TIME") // FULL_TIME | PART_TIME | CONTRACT | INTERN | PROBATION
+  joiningDate     DateTime?
+  confirmationDate DateTime?
+  reportingManagerId String? // Employee id
+  employmentStatus String  @default("ACTIVE") // ACTIVE | ON_LEAVE | RESIGNED | TERMINATED | PROBATION
+  workLocation    String?
+  shift           String?
+
+  // Payroll
+  basicSalary     Float    @default(0)
+  allowances      Float    @default(0)
+  deductions      Float    @default(0)
+  tax             Float    @default(0)
+  bankName        String?
+  bankAccount     String?
+  bankIfsc        String?
+  paymentMethod   String? // BANK_TRANSFER | CHEQUE | CASH
+
+  // Status
+  status          String   @default("ACTIVE")
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  attendance      Attendance[]
+  leaveRequests   LeaveRequest[]
+  payrolls        Payroll[]
+  documents       GeneratedDocument[]
+  performances    Performance[]
+  activities      Activity[]
+  jobsApplied     Candidate[]
+
+  // Self-relation for reporting manager
+  subordinates    Employee[] @relation("ReportingManager")
+  manager         Employee?  @relation("ReportingManager", fields: [reportingManagerId], references: [id])
+}
+
+// ============================================================
+// ATTENDANCE
+// ============================================================
+
+model Attendance {
+  id           String   @id @default(cuid())
+  employeeId   String
+  employee     Employee @relation(fields: [employeeId], references: [id])
+  date         DateTime
+  checkIn      DateTime?
+  checkOut     DateTime?
+  workingHours Float?
+  late         Boolean  @default(false)
+  lateMinutes  Int      @default(0)
+  overtime     Float    @default(0)
+  status       String   @default("PRESENT") // PRESENT | ABSENT | LATE | LEAVE | HALF_DAY | REMOTE | HOLIDAY
+  note         String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([employeeId, date])
+  @@index([date])
+}
+
+// ============================================================
+// LEAVE
+// ============================================================
+
+model LeaveRequest {
+  id           String   @id @default(cuid())
+  employeeId   String
+  employee     Employee @relation(fields: [employeeId], references: [id])
+  leaveTypeId  String
+  leaveType    LeaveType @relation(fields: [leaveTypeId], references: [id])
+  startDate    DateTime
+  endDate      DateTime
+  days         Float
+  reason       String
+  attachment   String?
+  status       String   @default("PENDING") // PENDING | APPROVED | REJECTED | CANCELLED
+  approverId   String?
+  approverNote String?
+  appliedAt    DateTime @default(now())
+  decidedAt    DateTime?
+
+  @@index([employeeId])
+  @@index([status])
+}
+
+// ============================================================
+// PAYROLL
+// ============================================================
+
+model Payroll {
+  id            String   @id @default(cuid())
+  employeeId    String
+  employee      Employee @relation(fields: [employeeId], references: [id])
+  payrollMonth  String   // "2025-08"
+  basicSalary   Float
+  allowances    Float
+  deductions    Float
+  tax           Float
+  netSalary     Float
+  paymentDate   DateTime?
+  status        String   @default("DRAFT") // DRAFT | APPROVED | PAID | CANCELLED
+  payslipDocId  String?  // Generated document id of payslip
+  note          String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([employeeId])
+  @@index([payrollMonth])
+}
+
+// ============================================================
+// DOCUMENTS
+// ============================================================
+
+model DocumentTemplate {
+  id            String   @id @default(cuid())
+  name          String
+  code          String   @unique
+  type          String   // OFFER | APPOINTMENT | CONTRACT | JOINING | CONFIRMATION | PAYSLIP | SALARY_CERT | INCREMENT | SALARY_REVISION | PROMOTION | TRANSFER | WARNING | SHOW_CAUSE | EXPERIENCE | EMPLOYMENT_CERT | NOC | LEAVE_APPROVAL | LEAVE_CANCELLATION | RESIGN_ACCEPT | RELIEVING | FINAL_SETTLEMENT | CUSTOM
+  category      String   @default("EMPLOYMENT") // EMPLOYMENT | SALARY | HR | LEAVE | SEPARATION
+  description   String?
+  subject       String?
+  content       String   // HTML/Markdown body with {{variables}}
+  emailSubject  String?
+  emailBody     String?
+  version       String   @default("1.0")
+  effectiveDate DateTime?
+  status        String   @default("ACTIVE") // ACTIVE | DRAFT | ARCHIVED
+  createdBy     String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  generatedDocuments GeneratedDocument[]
+}
+
+model GeneratedDocument {
+  id              String   @id @default(cuid())
+  documentNumber  String   @unique
+  employeeId      String
+  employee        Employee @relation(fields: [employeeId], references: [id])
+  templateId      String
+  template        DocumentTemplate @relation(fields: [templateId], references: [id])
+  type            String
+  title           String
+  content         String   // Final rendered content
+  dataJson        String   // JSON snapshot of variables used
+  month           String?  // For payslips: "2025-08"
+  version         String   @default("1.0")
+  status          String   @default("GENERATED") // DRAFT | GENERATED | PENDING_APPROVAL | APPROVED | ISSUED | SENT | ARCHIVED
+  filePath        String?  // relative path to docx
+  pdfPath         String?  // relative path to pdf
+  generatedById   String?
+  generatedBy     User?    @relation("DocGenerator", fields: [generatedById], references: [id])
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  emailLogs       EmailLog[]
+
+  @@index([employeeId])
+  @@index([type])
+  @@index([status])
+}
+
+model EmailLog {
+  id           String   @id @default(cuid())
+  documentId   String?
+  document     GeneratedDocument? @relation(fields: [documentId], references: [id])
+  employeeId   String?
+  recipientTo  String
+  recipientCc  String?
+  recipientBcc String?
+  subject      String
+  body         String
+  attachmentName String?
+  status       String   @default("QUEUED") // QUEUED | SENT | DELIVERED | FAILED | BOUNCED
+  errorMessage String?
+  sentById     String?
+  sentBy       User?    @relation("EmailSender", fields: [sentById], references: [id])
+  sentAt       DateTime?
+  createdAt    DateTime @default(now())
+
+  @@index([documentId])
+  @@index([status])
+}
+
+// ============================================================
+// PERFORMANCE
+// ============================================================
+
+model Performance {
+  id              String   @id @default(cuid())
+  employeeId      String
+  employee        Employee @relation(fields: [employeeId], references: [id])
+  reviewPeriod    String   // "Q1 2025" or "2024 Annual"
+  reviewer        String?
+  goals           Float    @default(0) // 0-100
+  quality         Float    @default(0)
+  attendance      Float    @default(0)
+  teamwork        Float    @default(0)
+  communication   Float    @default(0)
+  overallScore    Float    @default(0)
+  comments        String?
+  status          String   @default("DRAFT") // DRAFT | SUBMITTED | REVIEWED | FINALIZED
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([employeeId])
+}
+
+// ============================================================
+// RECRUITMENT
+// ============================================================
+
+model Job {
+  id             String   @id @default(cuid())
+  title          String
+  departmentId   String?
+  department     Department? @relation(fields: [departmentId], references: [id])
+  employmentType String   @default("FULL_TIME")
+  location       String?
+  vacancy        Int      @default(1)
+  closingDate    DateTime?
+  description    String?
+  requirements   String?
+  salaryMin      Float?
+  salaryMax      Float?
+  status         String   @default("OPEN") // OPEN | CLOSED | ON_HOLD | FILLED
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  candidates     Candidate[]
+}
+
+model Candidate {
+  id            String   @id @default(cuid())
+  name          String
+  email         String
+  phone         String?
+  jobId         String?
+  job           Job?     @relation(fields: [jobId], references: [id])
+  employeeId    String? // If hired -> link to employee
+  employee      Employee? @relation(fields: [employeeId], references: [id])
+  cvPath        String?
+  experience    Float    @default(0)
+  skills        String?
+  interviewNotes String?
+  expectedSalary Float?
+  status        String   @default("APPLIED") // APPLIED | SCREENING | SHORTLISTED | INTERVIEW | SELECTED | OFFER | HIRED | REJECTED
+  appliedAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([jobId])
+  @@index([status])
+}
+
+// ============================================================
+// ACTIVITY / AUDIT
+// ============================================================
+
+model Activity {
+  id          String   @id @default(cuid())
+  employeeId  String?
+  employee    Employee? @relation(fields: [employeeId], references: [id])
+  type        String   // CREATED | UPDATED | DOCUMENT_GENERATED | EMAIL_SENT | LEAVE_APPROVED ...
+  title       String
+  description String?
+  metadata    String? // JSON
+  createdAt   DateTime @default(now())
+
+  @@index([employeeId])
+  @@index([createdAt])
+}
+
+model AuditLog {
+  id          String   @id @default(cuid())
+  userId      String?
+  user        User?    @relation(fields: [userId], references: [id])
+  action      String   // LOGIN | EMPLOYEE_CREATE | EMPLOYEE_UPDATE | DOCUMENT_GENERATE | DOCUMENT_SEND ...
+  entityType  String?
+  entityId    String?
+  description String?
+  ipAddress   String?
+  metadata    String?
+  createdAt   DateTime @default(now())
+
+  @@index([userId])
+  @@index([createdAt])
+}
+
+// ============================================================
+// SETTINGS
+// ============================================================
+
+model EmailSetting {
+  id          String   @id @default(cuid())
+  senderName  String
+  senderEmail String
+  smtpHost    String?
+  smtpPort    Int?
+  username    String?
+  password    String? // stored encrypted-in-transit; for demo plain
+  encryption  String? // NONE | SSL | TLS
+  isDefault   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model DocumentNumbering {
+  id           String   @id @default(cuid())
+  name         String   @unique
+  pattern      String   // {COMPANY}/{DEPARTMENT}/{DOCUMENT_TYPE}/{DATE}/{EMPLOYEE_ID}
+  prefix       String?
+  padding      Int      @default(4)
+  nextSeq      Int      @default(1)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model Setting {
+  id    String @id @default(cuid())
+  key   String @unique
+  value String
+}

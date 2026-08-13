@@ -1,0 +1,1647 @@
+     1→     1→# As Dev and HR app specialist you have to make-
+     2→     2→
+     3→     3→## **HR Management System**
+     4→     4→
+     5→     5→Build a production-ready **Basic HR Management Web Application**.
+     6→     6→
+     7→     7→The application is an **HR-only operations console**. Employees do not log into the system in the MVP.
+     8→     8→
+     9→     9→---
+    10→    10→
+    11→    11→# 1. DESIGN REFERENCE
+    12→    12→
+    13→    13→Use the TeamHub HR Management Dashboard UI by Peterdraw Studio as the primary visual and UX reference.
+    14→    14→
+    15→    15→The original reference is available here:
+    16→    16→
+    17→    17→[https://ui8.net/peterdraw-59d38a/products/teamhub--hr-management-dashboard-ui-figma-template?rel=timer](https://ui8.net/peterdraw-59d38a/products/teamhub--hr-management-dashboard-ui-figma-template?rel=timer)
+    18→    18→
+    19→    19→A local **TeamHub Extracted Images Gallery** has also been provided with this project.
+    20→    20→
+    21→    21→## IMPORTANT
+    22→    22→
+    23→    23→Before implementing the UI, inspect the provided TeamHub visual reference gallery and use it as the visual source of truth.
+    24→    24→
+    25→    25→The gallery contains:
+    26→    26→
+    27→    27→1. Hero Banner
+    28→    28→2. Main Dashboard
+    29→    29→3. Employees & Payroll
+    30→    30→4. Attendance & Leave
+    31→    31→5. Recruitment & Openings
+    32→    32→6. Performance Analytics
+    33→    33→7. Settings & Mobile UI
+    34→    34→8. Full Screen Preview 1
+    35→    35→9. Full Screen Preview 2
+    36→    36→
+    37→    37→The extracted gallery identifies the previews and their dimensions.
+    38→    38→
+    39→    39→---
+    40→    40→
+    41→    41→# 2. QUICK VISUAL REFERENCE
+    42→    42→
+    43→    43→## Reference 01 — Main Dashboard
+    44→    44→
+    45→    45→Study:
+    46→    46→
+    47→    47→- Sidebar
+    48→    48→- Dashboard cards
+    49→    49→- KPI layout
+    50→    50→- Charts
+    51→    51→- Data widgets
+    52→    52→- Quick actions
+    53→    53→- Header
+    54→    54→- User profile area
+    55→    55→- Spacing
+    56→    56→- Card radius
+    57→    57→- Typography
+    58→    58→- Status indicators
+    59→    59→
+    60→    60→Use this as the primary reference for the application shell and Dashboard.
+    61→    61→
+    62→    62→---
+    63→    63→
+    64→    64→## Reference 02 — Employees & Payroll
+    65→    65→
+    66→    66→Study:
+    67→    67→
+    68→    68→- Employee table
+    69→    69→- Employee cards
+    70→    70→- Search
+    71→    71→- Filters
+    72→    72→- Employee status
+    73→    73→- Payroll presentation
+    74→    74→- Table actions
+    75→    75→- Profile information hierarchy
+    76→    76→- Data density
+    77→    77→
+    78→    78→Use this as the primary reference for:
+    79→    79→
+    80→    80→```text
+    81→    81→Employees
+    82→    82→Employee List
+    83→    83→Employee Grid
+    84→    84→Employee Profile
+    85→    85→Payroll
+    86→    86→```
+    87→    87→
+    88→    88→---
+    89→    89→
+    90→    90→## Reference 03 — Attendance & Leave
+    91→    91→
+    92→    92→Study:
+    93→    93→
+    94→    94→- Attendance dashboard
+    95→    95→- Calendar
+    96→    96→- Attendance statistics
+    97→    97→- Leave cards
+    98→    98→- Leave status
+    99→    99→- Date controls
+   100→   100→- Tables
+   101→   101→- Filters
+   102→   102→- Status badges
+   103→   103→
+   104→   104→Use this as the primary reference for:
+   105→   105→
+   106→   106→```text
+   107→   107→Attendance
+   108→   108→Leave
+   109→   109→Calendar
+   110→   110→```
+   111→   111→
+   112→   112→---
+   113→   113→
+   114→   114→## Reference 04 — Recruitment & Openings
+   115→   115→
+   116→   116→Study:
+   117→   117→
+   118→   118→- Job cards
+   119→   119→- Recruitment pipeline
+   120→   120→- Candidate information
+   121→   121→- Job status
+   122→   122→- Recruitment statistics
+   123→   123→- Filters
+   124→   124→- Actions
+   125→   125→
+   126→   126→Use this as the primary reference for:
+   127→   127→
+   128→   128→```text
+   129→   129→Recruitment
+   130→   130→Jobs
+   131→   131→Candidates
+   132→   132→```
+   133→   133→
+   134→   134→---
+   135→   135→
+   136→   136→## Reference 05 — Performance Analytics
+   137→   137→
+   138→   138→Study:
+   139→   139→
+   140→   140→- Performance charts
+   141→   141→- Employee statistics
+   142→   142→- Analytics cards
+   143→   143→- Progress indicators
+   144→   144→- Performance status
+   145→   145→- Data visualization
+   146→   146→
+   147→   147→Use this as the primary reference for:
+   148→   148→
+   149→   149→```text
+   150→   150→Performance
+   151→   151→Reports
+   152→   152→Analytics
+   153→   153→```
+   154→   154→
+   155→   155→---
+   156→   156→
+   157→   157→## Reference 06 — Settings & Mobile UI
+   158→   158→
+   159→   159→Study:
+   160→   160→
+   161→   161→- Settings structure
+   162→   162→- Form layouts
+   163→   163→- Mobile responsive behavior
+   164→   164→- Navigation collapse
+   165→   165→- Mobile cards
+   166→   166→- Responsive tables
+   167→   167→- Mobile spacing
+   168→   168→
+   169→   169→Use this as the primary reference for:
+   170→   170→
+   171→   171→```text
+   172→   172→Settings
+   173→   173→Responsive Design
+   174→   174→Mobile UI
+   175→   175→```
+   176→   176→
+   177→   177→---
+   178→   178→
+   179→   179→## Reference 07–08 — Full Screen Previews
+   180→   180→
+   181→   181→Use the full-screen previews to understand:
+   182→   182→
+   183→   183→- Overall design consistency
+   184→   184→- Page-to-page transitions
+   185→   185→- Vertical spacing
+   186→   186→- Complete page composition
+   187→   187→- Sidebar behavior
+   188→   188→- Header behavior
+   189→   189→- Card relationships
+   190→   190→- Responsive design direction
+   191→   191→
+   192→   192→Do not design each page independently.
+   193→   193→
+   194→   194→The entire application should feel like **one unified HR SaaS product**.
+   195→   195→
+   196→   196→---
+   197→   197→
+   198→   198→# 3. VISUAL IMPLEMENTATION RULE
+   199→   199→
+   200→   200→Do not simply reproduce screenshots.
+   201→   201→
+   202→   202→Extract the underlying design system:
+   203→   203→
+   204→   204→### Layout
+   205→   205→
+   206→   206→- Sidebar
+   207→   207→- Top navigation
+   208→   208→- Content container
+   209→   209→- Cards
+   210→   210→- Tables
+   211→   211→- Modals
+   212→   212→- Drawers
+   213→   213→- Forms
+   214→   214→
+   215→   215→### Visual language
+   216→   216→
+   217→   217→- Clean SaaS interface
+   218→   218→- Light background
+   219→   219→- White content surfaces
+   220→   220→- Rounded cards
+   221→   221→- Soft borders
+   222→   222→- Subtle shadows
+   223→   223→- Professional typography
+   224→   224→- Compact but readable tables
+   225→   225→- Clear status badges
+   226→   226→- Modern charts
+   227→   227→- Consistent spacing
+   228→   228→
+   229→   229→### Interaction
+   230→   230→
+   231→   231→Use:
+   232→   232→
+   233→   233→- Hover states
+   234→   234→- Active navigation
+   235→   235→- Dropdowns
+   236→   236→- Search
+   237→   237→- Filters
+   238→   238→- Modals
+   239→   239→- Confirmation dialogs
+   240→   240→- Toast notifications
+   241→   241→- Loading states
+   242→   242→- Empty states
+   243→   243→- Error states
+   244→   244→
+   245→   245→---
+   246→   246→
+   247→   247→# 4. DO NOT COPY PROPRIETARY ASSETS
+   248→   248→
+   249→   249→The TeamHub design is a visual reference.
+   250→   250→
+   251→   251→Do not copy:
+   252→   252→
+   253→   253→- Proprietary source code
+   254→   254→- Figma components
+   255→   255→- Logos
+   256→   256→- Brand assets
+   257→   257→- Proprietary illustrations
+   258→   258→- Paid icon sets
+   259→   259→- Proprietary images
+   260→   260→
+   261→   261→Create an original implementation inspired by the reference.
+   262→   262→
+   263→   263→---
+   264→   264→
+   265→   265→# 5. PRIMARY USER
+   266→   266→
+   267→   267→MVP has only:
+   268→   268→
+   269→   269→**HR / HR Admin**
+   270→   270→
+   271→   271→HR has full access.
+   272→   272→
+   273→   273→No employee login.
+   274→   274→
+   275→   275→No employee dashboard.
+   276→   276→
+   277→   277→No employee permissions system is required in MVP.
+   278→   278→
+   279→   279→---
+   280→   280→
+   281→   281→# 6. CORE PRODUCT
+   282→   282→
+   283→   283→The application is an:
+   284→   284→
+   285→   285→> HR Operations Console
+   286→   286→
+   287→   287→The central workflow is:
+   288→   288→
+   289→   289→```text
+   290→   290→Employee
+   291→   291→   ↓
+   292→   292→Employee Profile
+   293→   293→   ↓
+   294→   294→Manage HR Data
+   295→   295→   ↓
+   296→   296→Generate Document
+   297→   297→   ↓
+   298→   298→Preview
+   299→   299→   ↓
+   300→   300→Generate PDF/DOCX
+   301→   301→   ↓
+   302→   302→Send Directly to Employee
+   303→   303→   ↓
+   304→   304→Track Email
+   305→   305→```
+   306→   306→
+   307→   307→The key differentiator is:
+   308→   308→
+   309→   309→**Fast HR document generation + direct employee email delivery.**
+   310→   310→
+   311→   311→---
+   312→   312→
+   313→   313→# 7. NAVIGATION
+   314→   314→
+   315→   315→Create the following sidebar:
+   316→   316→
+   317→   317→```text
+   318→   318→Dashboard
+   319→   319→
+   320→   320→Employees
+   321→   321→
+   322→   322→Attendance
+   323→   323→
+   324→   324→Leave
+   325→   325→
+   326→   326→Payroll
+   327→   327→
+   328→   328→Performance
+   329→   329→
+   330→   330→Recruitment
+   331→   331→
+   332→   332→Documents
+   333→   333→
+   334→   334→Settings
+   335→   335→```
+   336→   336→
+   337→   337→Keep navigation visually consistent with the TeamHub reference.
+   338→   338→
+   339→   339→---
+   340→   340→
+   341→   341→# 8. DASHBOARD
+   342→   342→
+   343→   343→Create a TeamHub-inspired HR dashboard.
+   344→   344→
+   345→   345→## KPI Cards
+   346→   346→
+   347→   347→- Total Employees
+   348→   348→- Present Today
+   349→   349→- On Leave
+   350→   350→- Late Today
+   351→   351→- Pending Leave
+   352→   352→- Documents Generated
+   353→   353→- Documents Sent
+   354→   354→- Failed Emails
+   355→   355→
+   356→   356→## Widgets
+   357→   357→
+   358→   358→- Attendance overview
+   359→   359→- Employee overview
+   360→   360→- Leave overview
+   361→   361→- Recent employees
+   362→   362→- Recent documents
+   363→   363→- Upcoming birthdays
+   364→   364→- Upcoming events
+   365→   365→- Pending HR actions
+   366→   366→
+   367→   367→## Quick Actions
+   368→   368→
+   369→   369→```text
+   370→   370→+ Add Employee
+   371→   371→+ Generate Document
+   372→   372→+ Create Payslip
+   373→   373→+ Add Attendance
+   374→   374→+ Add Leave
+   375→   375→```
+   376→   376→
+   377→   377→---
+   378→   378→
+   379→   379→# 9. EMPLOYEES
+   380→   380→
+   381→   381→Provide:
+   382→   382→
+   383→   383→```text
+   384→   384→Employee List
+   385→   385→Employee Grid
+   386→   386→Add Employee
+   387→   387→Employee Profile
+   388→   388→```
+   389→   389→
+   390→   390→Support:
+   391→   391→
+   392→   392→```text
+   393→   393→Table View
+   394→   394→Grid View
+   395→   395→```
+   396→   396→
+   397→   397→Employee table:
+   398→   398→
+   399→   399→```text
+   400→   400→Photo
+   401→   401→Name
+   402→   402→Employee ID
+   403→   403→Role
+   404→   404→Department
+   405→   405→Designation
+   406→   406→Joining Date
+   407→   407→Status
+   408→   408→Actions
+   409→   409→```
+   410→   410→
+   411→   411→Actions:
+   412→   412→
+   413→   413→```text
+   414→   414→View
+   415→   415→Edit
+   416→   416→Generate Document
+   417→   417→Send Document
+   418→   418→Upload Document
+   419→   419→```
+   420→   420→
+   421→   421→---
+   422→   422→
+   423→   423→# 10. EMPLOYEE PROFILE
+   424→   424→
+   425→   425→Create:
+   426→   426→
+   427→   427→```text
+   428→   428→Overview
+   429→   429→Personal Info
+   430→   430→Employment
+   431→   431→Attendance
+   432→   432→Leave
+   433→   433→Payroll
+   434→   434→Performance
+   435→   435→Documents
+   436→   436→Activity
+   437→   437→```
+   438→   438→
+   439→   439→Top actions:
+   440→   440→
+   441→   441→```text
+   442→   442→Edit Employee
+   443→   443→Generate Document
+   444→   444→Upload Document
+   445→   445→```
+   446→   446→
+   447→   447→The Employee Profile is the central HR workspace.
+   448→   448→
+   449→   449→HR should be able to perform most actions without leaving the profile.
+   450→   450→
+   451→   451→---
+   452→   452→
+   453→   453→# 11. EMPLOYEE INFORMATION
+   454→   454→
+   455→   455→## Personal
+   456→   456→
+   457→   457→- Full Name
+   458→   458→- Employee ID
+   459→   459→- Photo
+   460→   460→- Date of Birth
+   461→   461→- Gender
+   462→   462→- Phone
+   463→   463→- Personal Email
+   464→   464→- Official Email
+   465→   465→- Address
+   466→   466→- Emergency Contact
+   467→   467→
+   468→   468→## Employment
+   469→   469→
+   470→   470→- Department
+   471→   471→- Role
+   472→   472→- Designation
+   473→   473→- Employment Type
+   474→   474→- Joining Date
+   475→   475→- Confirmation Date
+   476→   476→- Reporting Manager
+   477→   477→- Employment Status
+   478→   478→- Work Location
+   479→   479→
+   480→   480→## Payroll
+   481→   481→
+   482→   482→- Basic Salary
+   483→   483→- Allowances
+   484→   484→- Deductions
+   485→   485→- Tax
+   486→   486→- Bank information
+   487→   487→- Payment method
+   488→   488→
+   489→   489→---
+   490→   490→
+   491→   491→# 12. ROLE MANAGEMENT
+   492→   492→
+   493→   493→Roles are employee HR attributes, NOT application permission roles.
+   494→   494→
+   495→   495→HR can:
+   496→   496→
+   497→   497→- Add Role
+   498→   498→- Edit Role
+   499→   499→- Archive Role
+   500→   500→- Assign Role
+   501→   501→
+   502→   502→Examples:
+   503→   503→
+   504→   504→```text
+   505→   505→Editor
+   506→   506→Senior Executive
+   507→   507→Executive
+   508→   508→IT Support
+   509→   509→Accountant
+   510→   510→HR Executive
+   511→   511→Custom Role
+   512→   512→```
+   513→   513→
+   514→   514→Document variable:
+   515→   515→
+   516→   516→```text
+   517→   517→{{employee.role}}
+   518→   518→```
+   519→   519→
+   520→   520→---
+   521→   521→
+   522→   522→# 13. DEPARTMENTS
+   523→   523→
+   524→   524→HR can:
+   525→   525→
+   526→   526→- Add
+   527→   527→- Edit
+   528→   528→- Archive
+   529→   529→
+   530→   530→Example:
+   531→   531→
+   532→   532→```text
+   533→   533→HR
+   534→   534→Editorial
+   535→   535→IT
+   536→   536→Accounts
+   537→   537→Marketing
+   538→   538→Sales
+   539→   539→Administration
+   540→   540→```
+   541→   541→
+   542→   542→---
+   543→   543→
+   544→   544→# 14. ATTENDANCE
+   545→   545→
+   546→   546→Build:
+   547→   547→
+   548→   548→```text
+   549→   549→Attendance Dashboard
+   550→   550→Attendance Table
+   551→   551→Attendance Entry
+   552→   552→Attendance Report
+   553→   553→```
+   554→   554→
+   555→   555→KPIs:
+   556→   556→
+   557→   557→- Present
+   558→   558→- Absent
+   559→   559→- Late
+   560→   560→- Leave
+   561→   561→
+   562→   562→Table:
+   563→   563→
+   564→   564→```text
+   565→   565→Employee
+   566→   566→Date
+   567→   567→Check In
+   568→   568→Check Out
+   569→   569→Working Hours
+   570→   570→Late
+   571→   571→Overtime
+   572→   572→Status
+   573→   573→```
+   574→   574→
+   575→   575→Filters:
+   576→   576→
+   577→   577→- Date
+   578→   578→- Employee
+   579→   579→- Department
+   580→   580→- Status
+   581→   581→
+   582→   582→---
+   583→   583→
+   584→   584→# 15. LEAVE
+   585→   585→
+   586→   586→KPIs:
+   587→   587→
+   588→   588→- Total Requests
+   589→   589→- Pending
+   590→   590→- Approved
+   591→   591→- Rejected
+   592→   592→
+   593→   593→Leave types:
+   594→   594→
+   595→   595→```text
+   596→   596→Annual
+   597→   597→Casual
+   598→   598→Sick
+   599→   599→Maternity
+   600→   600→Paternity
+   601→   601→Unpaid
+   602→   602→Other
+   603→   603→```
+   604→   604→
+   605→   605→Leave request:
+   606→   606→
+   607→   607→- Employee
+   608→   608→- Leave Type
+   609→   609→- Start Date
+   610→   610→- End Date
+   611→   611→- Days
+   612→   612→- Reason
+   613→   613→- Attachment
+   614→   614→
+   615→   615→Actions:
+   616→   616→
+   617→   617→```text
+   618→   618→Approve
+   619→   619→Reject
+   620→   620→Edit
+   621→   621→View
+   622→   622→```
+   623→   623→
+   624→   624→---
+   625→   625→
+   626→   626→# 16. PAYROLL
+   627→   627→
+   628→   628→Keep payroll simple for MVP.
+   629→   629→
+   630→   630→Dashboard:
+   631→   631→
+   632→   632→```text
+   633→   633→Total Payroll
+   634→   634→Basic Salary
+   635→   635→Allowances
+   636→   636→Deductions
+   637→   637→Net Payroll
+   638→   638→```
+   639→   639→
+   640→   640→Payroll record:
+   641→   641→
+   642→   642→```text
+   643→   643→Employee
+   644→   644→Payroll Month
+   645→   645→Basic Salary
+   646→   646→Allowances
+   647→   647→Deductions
+   648→   648→Tax
+   649→   649→Net Salary
+   650→   650→Payment Date
+   651→   651→Status
+   652→   652→```
+   653→   653→
+   654→   654→Actions:
+   655→   655→
+   656→   656→```text
+   657→   657→Create Payroll
+   658→   658→Edit
+   659→   659→Approve
+   660→   660→Generate Payslip
+   661→   661→```
+   662→   662→
+   663→   663→---
+   664→   664→
+   665→   665→# 17. PAYSLIP
+   666→   666→
+   667→   667→Workflow:
+   668→   668→
+   669→   669→```text
+   670→   670→Employee
+   671→   671→   ↓
+   672→   672→Select Month
+   673→   673→   ↓
+   674→   674→Generate Payslip
+   675→   675→   ↓
+   676→   676→Preview
+   677→   677→   ↓
+   678→   678→Generate PDF/DOCX
+   679→   679→```
+   680→   680→
+   681→   681→Automatically populate:
+   682→   682→
+   683→   683→- Company
+   684→   684→- Employee
+   685→   685→- Employee ID
+   686→   686→- Role
+   687→   687→- Department
+   688→   688→- Month
+   689→   689→- Basic salary
+   690→   690→- Allowances
+   691→   691→- Deductions
+   692→   692→- Tax
+   693→   693→- Net salary
+   694→   694→- Payment date
+   695→   695→- Document number
+   696→   696→
+   697→   697→---
+   698→   698→
+   699→   699→# 18. PERFORMANCE
+   700→   700→
+   701→   701→Create basic performance management.
+   702→   702→
+   703→   703→Fields:
+   704→   704→
+   705→   705→- Employee
+   706→   706→- Review Period
+   707→   707→- Reviewer
+   708→   708→- Goals
+   709→   709→- Quality
+   710→   710→- Attendance
+   711→   711→- Teamwork
+   712→   712→- Communication
+   713→   713→- Overall Score
+   714→   714→- Comments
+   715→   715→
+   716→   716→Actions:
+   717→   717→
+   718→   718→```text
+   719→   719→Create Review
+   720→   720→Edit
+   721→   721→Submit
+   722→   722→Generate Performance Document
+   723→   723→```
+   724→   724→
+   725→   725→Use the TeamHub Performance Analytics reference for visual direction.
+   726→   726→
+   727→   727→---
+   728→   728→
+   729→   729→# 19. RECRUITMENT
+   730→   730→
+   731→   731→## Jobs
+   732→   732→
+   733→   733→- Job Title
+   734→   734→- Department
+   735→   735→- Employment Type
+   736→   736→- Location
+   737→   737→- Vacancy
+   738→   738→- Closing Date
+   739→   739→- Status
+   740→   740→
+   741→   741→## Candidates
+   742→   742→
+   743→   743→- Name
+   744→   744→- Email
+   745→   745→- Phone
+   746→   746→- Position
+   747→   747→- CV
+   748→   748→- Experience
+   749→   749→- Skills
+   750→   750→- Interview Notes
+   751→   751→- Status
+   752→   752→
+   753→   753→Pipeline:
+   754→   754→
+   755→   755→```text
+   756→   756→Applied
+   757→   757→↓
+   758→   758→Screening
+   759→   759→↓
+   760→   760→Shortlisted
+   761→   761→↓
+   762→   762→Interview
+   763→   763→↓
+   764→   764→Selected
+   765→   765→↓
+   766→   766→Offer
+   767→   767→↓
+   768→   768→Hired
+   769→   769→```
+   770→   770→
+   771→   771→Use the TeamHub Recruitment reference for layout direction.
+   772→   772→
+   773→   773→---
+   774→   774→
+   775→   775→# 20. DOCUMENTS
+   776→   776→
+   777→   777→Documents are a core product module.
+   778→   778→
+   779→   779→Navigation:
+   780→   780→
+   781→   781→```text
+   782→   782→Documents
+   783→   783→├── All Documents
+   784→   784→├── Templates
+   785→   785→├── Generated Documents
+   786→   786→└── Email History
+   787→   787→```
+   788→   788→
+   789→   789→---
+   790→   790→
+   791→   791→# 21. DOCUMENT TYPES
+   792→   792→
+   793→   793→## Employment
+   794→   794→
+   795→   795→- Offer Letter
+   796→   796→- Appointment Letter
+   797→   797→- Employment Contract
+   798→   798→- Joining Letter
+   799→   799→- Confirmation Letter
+   800→   800→
+   801→   801→## Salary
+   802→   802→
+   803→   803→- Payslip
+   804→   804→- Salary Certificate
+   805→   805→- Increment Letter
+   806→   806→- Salary Revision Letter
+   807→   807→
+   808→   808→## HR
+   809→   809→
+   810→   810→- Promotion Letter
+   811→   811→- Transfer Letter
+   812→   812→- Warning Letter
+   813→   813→- Show Cause Notice
+   814→   814→- Experience Certificate
+   815→   815→- Employment Certificate
+   816→   816→- NOC
+   817→   817→
+   818→   818→## Leave
+   819→   819→
+   820→   820→- Leave Approval
+   821→   821→- Leave Cancellation
+   822→   822→
+   823→   823→## Separation
+   824→   824→
+   825→   825→- Resignation Acceptance
+   826→   826→- Relieving Letter
+   827→   827→- Experience Certificate
+   828→   828→- Final Settlement
+   829→   829→
+   830→   830→Allow custom document types.
+   831→   831→
+   832→   832→---
+   833→   833→
+   834→   834→# 22. DOCUMENT TEMPLATE SYSTEM
+   835→   835→
+   836→   836→HR can:
+   837→   837→
+   838→   838→```text
+   839→   839→Create Template
+   840→   840→Edit Template
+   841→   841→Duplicate Template
+   842→   842→Archive Template
+   843→   843→Preview Template
+   844→   844→```
+   845→   845→
+   846→   846→Template fields:
+   847→   847→
+   848→   848→- Name
+   849→   849→- Type
+   850→   850→- Description
+   851→   851→- Status
+   852→   852→- Version
+   853→   853→- Effective Date
+   854→   854→
+   855→   855→Support dynamic variables.
+   856→   856→
+   857→   857→---
+   858→   858→
+   859→   859→# 23. DOCUMENT VARIABLES
+   860→   860→
+   861→   861→## Employee
+   862→   862→
+   863→   863→```text
+   864→   864→{{employee.name}}
+   865→   865→{{employee.id}}
+   866→   866→{{employee.role}}
+   867→   867→{{employee.designation}}
+   868→   868→{{employee.department}}
+   869→   869→{{employee.joining_date}}
+   870→   870→{{employee.confirmation_date}}
+   871→   871→{{employee.salary}}
+   872→   872→{{employee.email}}
+   873→   873→{{employee.phone}}
+   874→   874→{{employee.address}}
+   875→   875→```
+   876→   876→
+   877→   877→## Company
+   878→   878→
+   879→   879→```text
+   880→   880→{{company.name}}
+   881→   881→{{company.address}}
+   882→   882→{{company.email}}
+   883→   883→{{company.phone}}
+   884→   884→{{company.website}}
+   885→   885→```
+   886→   886→
+   887→   887→## Document
+   888→   888→
+   889→   889→```text
+   890→   890→{{document.number}}
+   891→   891→{{document.date}}
+   892→   892→{{document.issue_date}}
+   893→   893→```
+   894→   894→
+   895→   895→## Payroll
+   896→   896→
+   897→   897→```text
+   898→   898→{{payroll.month}}
+   899→   899→{{payroll.basic_salary}}
+   900→   900→{{payroll.allowances}}
+   901→   901→{{payroll.deductions}}
+   902→   902→{{payroll.tax}}
+   903→   903→{{payroll.net_salary}}
+   904→   904→```
+   905→   905→
+   906→   906→---
+   907→   907→
+   908→   908→# 24. DOCUMENT GENERATION
+   909→   909→
+   910→   910→Workflow:
+   911→   911→
+   912→   912→```text
+   913→   913→Employee Profile
+   914→   914→      ↓
+   915→   915→Generate Document
+   916→   916→      ↓
+   917→   917→Select Type
+   918→   918→      ↓
+   919→   919→Select Template
+   920→   920→      ↓
+   921→   921→Auto-load Employee Data
+   922→   922→      ↓
+   923→   923→Populate Variables
+   924→   924→      ↓
+   925→   925→Preview
+   926→   926→      ↓
+   927→   927→Generate
+   928→   928→```
+   929→   929→
+   930→   930→No duplicate manual data entry.
+   931→   931→
+   932→   932→---
+   933→   933→
+   934→   934→# 25. DOCX
+   935→   935→
+   936→   936→Generate actual `.docx` files.
+   937→   937→
+   938→   938→Preserve:
+   939→   939→
+   940→   940→- Formatting
+   941→   941→- Tables
+   942→   942→- Headers
+   943→   943→- Footers
+   944→   944→- Images
+   945→   945→- Signatures
+   946→   946→- Page layout
+   947→   947→- Variables
+   948→   948→- Document numbering
+   949→   949→
+   950→   950→---
+   951→   951→
+   952→   952→# 26. PDF
+   953→   953→
+   954→   954→Generate matching PDF.
+   955→   955→
+   956→   956→Options:
+   957→   957→
+   958→   958→```text
+   959→   959→Generate DOCX
+   960→   960→Generate PDF
+   961→   961→Generate DOCX + PDF
+   962→   962→```
+   963→   963→
+   964→   964→---
+   965→   965→
+   966→   966→# 27. DOCUMENT PREVIEW
+   967→   967→
+   968→   968→Before final generation:
+   969→   969→
+   970→   970→```text
+   971→   971→Edit Data
+   972→   972→Preview
+   973→   973→Generate
+   974→   974→Cancel
+   975→   975→```
+   976→   976→
+   977→   977→After generation:
+   978→   978→
+   979→   979→```text
+   980→   980→Preview
+   981→   981→Download
+   982→   982→Send Email
+   983→   983→Regenerate
+   984→   984→Archive
+   985→   985→```
+   986→   986→
+   987→   987→---
+   988→   988→
+   989→   989→# 28. DOCUMENT NUMBERING
+   990→   990→
+   991→   991→Support configurable numbering.
+   992→   992→
+   993→   993→Example:
+   994→   994→
+   995→   995→```text
+   996→   996→TBH/HR/APPT/08142026/EMP001
+   997→   997→```
+   998→   998→
+   999→   999→Configurable pattern:
+  1000→  1000→
+  1001→  1001→```text
+  1002→  1002→{COMPANY}/{DEPARTMENT}/{DOCUMENT_TYPE}/{DATE}/{EMPLOYEE_ID}
+  1003→  1003→```
+  1004→  1004→
+  1005→  1005→---
+  1006→  1006→
+  1007→  1007→# 29. DOCUMENT VERSIONING
+  1008→  1008→
+  1009→  1009→Support:
+  1010→  1010→
+  1011→  1011→```text
+  1012→  1012→v1.0
+  1013→  1013→v1.1
+  1014→  1014→v2.0
+  1015→  1015→```
+  1016→  1016→
+  1017→  1017→Previously generated documents must never change when a template is edited.
+  1018→  1018→
+  1019→  1019→---
+  1020→  1020→
+  1021→  1021→# 30. EMPLOYEE DOCUMENT REPOSITORY
+  1022→  1022→
+  1023→  1023→Each employee has:
+  1024→  1024→
+  1025→  1025→```text
+  1026→  1026→Employment
+  1027→  1027→Salary
+  1028→  1028→Performance
+  1029→  1029→Leave
+  1030→  1030→Other
+  1031→  1031→```
+  1032→  1032→
+  1033→  1033→Actions:
+  1034→  1034→
+  1035→  1035→```text
+  1036→  1036→Preview
+  1037→  1037→Download
+  1038→  1038→Send Email
+  1039→  1039→Delete
+  1040→  1040→Archive
+  1041→  1041→```
+  1042→  1042→
+  1043→  1043→---
+  1044→  1044→
+  1045→  1045→# 31. DIRECT SEND TO EMPLOYEE
+  1046→  1046→
+  1047→  1047→Every generated document must have:
+  1048→  1048→
+  1049→  1049→```text
+  1050→  1050→Preview | Download | Send to Employee
+  1051→  1051→```
+  1052→  1052→
+  1053→  1053→Clicking Send opens:
+  1054→  1054→
+  1055→  1055→```text
+  1056→  1056→Send Document
+  1057→  1057→
+  1058→  1058→To:
+  1059→  1059→employee@email.com
+  1060→  1060→
+  1061→  1061→CC:
+  1062→  1062→BCC:
+  1063→  1063→
+  1064→  1064→Subject:
+  1065→  1065→
+  1066→  1066→Message:
+  1067→  1067→
+  1068→  1068→Attachment:
+  1069→  1069→Generated Document
+  1070→  1070→
+  1071→  1071→[Cancel] [Send Email]
+  1072→  1072→```
+  1073→  1073→
+  1074→  1074→The employee's official email should automatically populate.
+  1075→  1075→
+  1076→  1076→HR can edit before sending.
+  1077→  1077→
+  1078→  1078→---
+  1079→  1079→
+  1080→  1080→# 32. EMAIL TEMPLATES
+  1081→  1081→
+  1082→  1082→Create reusable templates:
+  1083→  1083→
+  1084→  1084→```text
+  1085→  1085→Payslip Email
+  1086→  1086→Appointment Letter Email
+  1087→  1087→Offer Letter Email
+  1088→  1088→Experience Certificate Email
+  1089→  1089→Salary Certificate Email
+  1090→  1090→Leave Approval Email
+  1091→  1091→Custom HR Email
+  1092→  1092→```
+  1093→  1093→
+  1094→  1094→Variables:
+  1095→  1095→
+  1096→  1096→```text
+  1097→  1097→{{employee.name}}
+  1098→  1098→{{employee.role}}
+  1099→  1099→{{employee.department}}
+  1100→  1100→{{company.name}}
+  1101→  1101→{{document.number}}
+  1102→  1102→{{document.date}}
+  1103→  1103→{{payroll.month}}
+  1104→  1104→```
+  1105→  1105→
+  1106→  1106→---
+  1107→  1107→
+  1108→  1108→# 33. EMAIL TRACKING
+  1109→  1109→
+  1110→  1110→Track:
+  1111→  1111→
+  1112→  1112→```text
+  1113→  1113→Document
+  1114→  1114→Employee
+  1115→  1115→Recipient
+  1116→  1116→Subject
+  1117→  1117→Sent By
+  1118→  1118→Sent Date
+  1119→  1119→Status
+  1120→  1120→```
+  1121→  1121→
+  1122→  1122→Statuses:
+  1123→  1123→
+  1124→  1124→```text
+  1125→  1125→Queued
+  1126→  1126→Sent
+  1127→  1127→Delivered
+  1128→  1128→Failed
+  1129→  1129→Bounced
+  1130→  1130→```
+  1131→  1131→
+  1132→  1132→---
+  1133→  1133→
+  1134→  1134→# 34. RESEND
+  1135→  1135→
+  1136→  1136→Every document supports:
+  1137→  1137→
+  1138→  1138→```text
+  1139→  1139→Send
+  1140→  1140→Resend
+  1141→  1141→```
+  1142→  1142→
+  1143→  1143→Keep all previous sending history.
+  1144→  1144→
+  1145→  1145→---
+  1146→  1146→
+  1147→  1147→# 35. BULK DOCUMENT GENERATION
+  1148→  1148→
+  1149→  1149→Workflow:
+  1150→  1150→
+  1151→  1151→```text
+  1152→  1152→Select Employees
+  1153→  1153→      ↓
+  1154→  1154→Select Document
+  1155→  1155→      ↓
+  1156→  1156→Select Template
+  1157→  1157→      ↓
+  1158→  1158→Generate
+  1159→  1159→      ↓
+  1160→  1160→Review
+  1161→  1161→      ↓
+  1162→  1162→Download ZIP
+  1163→  1163→```
+  1164→  1164→
+  1165→  1165→Every generated file must contain only the correct employee's data.
+  1166→  1166→
+  1167→  1167→---
+  1168→  1168→
+  1169→  1169→# 36. BULK EMAIL
+  1170→  1170→
+  1171→  1171→Workflow:
+  1172→  1172→
+  1173→  1173→```text
+  1174→  1174→Select Employees
+  1175→  1175→      ↓
+  1176→  1176→Generate Individual Documents
+  1177→  1177→      ↓
+  1178→  1178→Review
+  1179→  1179→      ↓
+  1180→  1180→Send
+  1181→  1181→```
+  1182→  1182→
+  1183→  1183→Critical security rule:
+  1184→  1184→
+  1185→  1185→**Employee A must never receive Employee B's document.**
+  1186→  1186→
+  1187→  1187→Validate every employee-document-recipient relationship before sending.
+  1188→  1188→
+  1189→  1189→---
+  1190→  1190→
+  1191→  1191→# 37. DOCUMENT DASHBOARD
+  1192→  1192→
+  1193→  1193→KPIs:
+  1194→  1194→
+  1195→  1195→```text
+  1196→  1196→Total Documents
+  1197→  1197→Generated Today
+  1198→  1198→Sent Today
+  1199→  1199→Pending Approval
+  1200→  1200→Failed Emails
+  1201→  1201→Templates
+  1202→  1202→```
+  1203→  1203→
+  1204→  1204→Recent documents:
+  1205→  1205→
+  1206→  1206→```text
+  1207→  1207→Document Number
+  1208→  1208→Employee
+  1209→  1209→Document Type
+  1210→  1210→Created Date
+  1211→  1211→Status
+  1212→  1212→Email Status
+  1213→  1213→Actions
+  1214→  1214→```
+  1215→  1215→
+  1216→  1216→---
+  1217→  1217→
+  1218→  1218→# 38. DOCUMENT APPROVAL
+  1219→  1219→
+  1220→  1220→Optional workflow:
+  1221→  1221→
+  1222→  1222→```text
+  1223→  1223→Draft
+  1224→  1224→↓
+  1225→  1225→Generated
+  1226→  1226→↓
+  1227→  1227→Pending Approval
+  1228→  1228→↓
+  1229→  1229→Approved
+  1230→  1230→↓
+  1231→  1231→Issued
+  1232→  1232→↓
+  1233→  1233→Sent
+  1234→  1234→```
+  1235→  1235→
+  1236→  1236→Approved documents should be locked.
+  1237→  1237→
+  1238→  1238→---
+  1239→  1239→
+  1240→  1240→# 39. SETTINGS
+  1241→  1241→
+  1242→  1242→Create:
+  1243→  1243→
+  1244→  1244→```text
+  1245→  1245→Organization
+  1246→  1246→Departments
+  1247→  1247→Roles
+  1248→  1248→Designations
+  1249→  1249→Leave Types
+  1250→  1250→Email Settings
+  1251→  1251→Document Numbering
+  1252→  1252→Document Templates
+  1253→  1253→```
+  1254→  1254→
+  1255→  1255→---
+  1256→  1256→
+  1257→  1257→# 40. EMAIL CONFIGURATION
+  1258→  1258→
+  1259→  1259→Support configurable email provider/SMTP.
+  1260→  1260→
+  1261→  1261→Fields:
+  1262→  1262→
+  1263→  1263→```text
+  1264→  1264→Sender Name
+  1265→  1265→Sender Email
+  1266→  1266→SMTP Host
+  1267→  1267→SMTP Port
+  1268→  1268→Username
+  1269→  1269→Password/API Key
+  1270→  1270→Encryption
+  1271→  1271→```
+  1272→  1272→
+  1273→  1273→Never expose credentials in frontend code.
+  1274→  1274→
+  1275→  1275→Provide:
+  1276→  1276→
+  1277→  1277→```text
+  1278→  1278→Send Test Email
+  1279→  1279→```
+  1280→  1280→
+  1281→  1281→---
+  1282→  1282→
+  1283→  1283→# 41. SEARCH
+  1284→  1284→
+  1285→  1285→Global search:
+  1286→  1286→
+  1287→  1287→```text
+  1288→  1288→Employees
+  1289→  1289→Employee ID
+  1290→  1290→Role
+  1291→  1291→Department
+  1292→  1292→Documents
+  1293→  1293→Document Number
+  1294→  1294→Candidates
+  1295→  1295→```
+  1296→  1296→
+  1297→  1297→---
+  1298→  1298→
+  1299→  1299→# 42. REPORTS
+  1300→  1300→
+  1301→  1301→Create:
+  1302→  1302→
+  1303→  1303→- Employee Report
+  1304→  1304→- Attendance Report
+  1305→  1305→- Leave Report
+  1306→  1306→- Payroll Report
+  1307→  1307→- Document Report
+  1308→  1308→
+  1309→  1309→Export:
+  1310→  1310→
+  1311→  1311→```text
+  1312→  1312→PDF
+  1313→  1313→Excel
+  1314→  1314→CSV
+  1315→  1315→```
+  1316→  1316→
+  1317→  1317→---
+  1318→  1318→
+  1319→  1319→# 43. AUDIT LOG
+  1320→  1320→
+  1321→  1321→Track:
+  1322→  1322→
+  1323→  1323→```text
+  1324→  1324→Login
+  1325→  1325→Employee Created
+  1326→  1326→Employee Updated
+  1327→  1327→Employee Deleted
+  1328→  1328→Document Generated
+  1329→  1329→Document Approved
+  1330→  1330→Document Issued
+  1331→  1331→Document Sent
+  1332→  1332→Document Downloaded
+  1333→  1333→Email Failed
+  1334→  1334→Settings Changed
+  1335→  1335→```
+  1336→  1336→
+  1337→  1337→---
+  1338→  1338→
+  1339→  1339→# 44. RESPONSIVE DESIGN
+  1340→  1340→
+  1341→  1341→Use the TeamHub Settings/Mobile reference as the responsive design guide.
+  1342→  1342→
+  1343→  1343→Support:
+  1344→  1344→
+  1345→  1345→- Desktop
+  1346→  1346→- Tablet
+  1347→  1347→- Mobile
+  1348→  1348→
+  1349→  1349→Desktop is the primary HR workspace.
+  1350→  1350→
+  1351→  1351→Mobile should prioritize:
+  1352→  1352→
+  1353→  1353→- Dashboard
+  1354→  1354→- Employee search
+  1355→  1355→- Employee profile
+  1356→  1356→- Leave
+  1357→  1357→- Documents
+  1358→  1358→- Approvals
+  1359→  1359→
+  1360→  1360→Tables should convert to cards or horizontally scroll where appropriate.
+  1361→  1361→
+  1362→  1362→---
+  1363→  1363→
+  1364→  1364→# 45. UI STATES
+  1365→  1365→
+  1366→  1366→Every module must have:
+  1367→  1367→
+  1368→  1368→- Loading state
+  1369→  1369→- Empty state
+  1370→  1370→- Error state
+  1371→  1371→- Success state
+  1372→  1372→- Confirmation state
+  1373→  1373→
+  1374→  1374→Example:
+  1375→  1375→
+  1376→  1376→```text
+  1377→  1377→No employees yet.
+  1378→  1378→
+  1379→  1379→Add your first employee to start managing HR records.
+  1380→  1380→
+  1381→  1381→[+ Add Employee]
+  1382→  1382→```
+  1383→  1383→
+  1384→  1384→---
+  1385→  1385→
+  1386→  1386→# 46. SECURITY
+  1387→  1387→
+  1388→  1388→HR information is sensitive.
+  1389→  1389→
+  1390→  1390→Implement:
+  1391→  1391→
+  1392→  1392→- Secure authentication
+  1393→  1393→- Backend validation
+  1394→  1394→- Secure file access
+  1395→  1395→- Protected document URLs
+  1396→  1396→- Secure email credentials
+  1397→  1397→- Audit logs
+  1398→  1398→- Safe attachments
+  1399→  1399→- Proper database relationships
+  1400→  1400→
+  1401→  1401→Never expose another employee's private information or documents.
+  1402→  1402→
+  1403→  1403→---
+  1404→  1404→
+  1405→  1405→# 47. TECHNICAL QUALITY
+  1406→  1406→
+  1407→  1407→Do not build a static prototype.
+  1408→  1408→
+  1409→  1409→All major UI actions must connect to real application functionality.
+  1410→  1410→
+  1411→  1411→Do not hard-code the primary application data.
+  1412→  1412→
+  1413→  1413→Use:
+  1414→  1414→
+  1415→  1415→- Real database persistence
+  1416→  1416→- Reusable components
+  1417→  1417→- Form validation
+  1418→  1418→- Pagination
+  1419→  1419→- Search
+  1420→  1420→- Filtering
+  1421→  1421→- Error handling
+  1422→  1422→- Secure file storage
+  1423→  1423→- Document generation service
+  1424→  1424→- Email service
+  1425→  1425→
+  1426→  1426→---
+  1427→  1427→
+  1428→  1428→# 48. MVP PRIORITY
+  1429→  1429→
+  1430→  1430→## P0
+  1431→  1431→
+  1432→  1432→```text
+  1433→  1433→HR Login
+  1434→  1434→Dashboard
+  1435→  1435→Employees
+  1436→  1436→Employee Profile
+  1437→  1437→Roles
+  1438→  1438→Departments
+  1439→  1439→Attendance
+  1440→  1440→Leave
+  1441→  1441→Payroll
+  1442→  1442→Payslip
+  1443→  1443→Documents
+  1444→  1444→Templates
+  1445→  1445→Variables
+  1446→  1446→DOCX
+  1447→  1447→PDF
+  1448→  1448→Document Numbering
+  1449→  1449→Document Repository
+  1450→  1450→Email Sending
+  1451→  1451→Email Templates
+  1452→  1452→Email History
+  1453→  1453→Search
+  1454→  1454→Settings
+  1455→  1455→```
+  1456→  1456→
+  1457→  1457→## P1
+  1458→  1458→
+  1459→  1459→```text
+  1460→  1460→Performance
+  1461→  1461→Recruitment
+  1462→  1462→Bulk Generation
+  1463→  1463→Bulk Email
+  1464→  1464→Approval Workflow
+  1465→  1465→Reports
+  1466→  1466→Audit Logs
+  1467→  1467→```
+  1468→  1468→
+  1469→  1469→## P2
+  1470→  1470→
+  1471→  1471→```text
+  1472→  1472→Employee Portal
+  1473→  1473→Employee Login
+  1474→  1474→Mobile App
+  1475→  1475→Digital Signature
+  1476→  1476→WhatsApp
+  1477→  1477→SMS
+  1478→  1478→Biometric Integration
+  1479→  1479→Advanced Payroll
+  1480→  1480→```
+  1481→  1481→
+  1482→  1482→---
+  1483→  1483→
+  1484→  1484→# 49. IMPLEMENTATION ORDER
+  1485→  1485→
+  1486→  1486→Build in this order:
+  1487→  1487→
+  1488→  1488→```text
+  1489→  1489→1. Project Foundation
+  1490→  1490→2. Database Schema
+  1491→  1491→3. Authentication
+  1492→  1492→4. Design System
+  1493→  1493→5. Global Layout
+  1494→  1494→6. Sidebar/Header
+  1495→  1495→7. Dashboard
+  1496→  1496→8. Departments/Roles
+  1497→  1497→9. Employee Management
+  1498→  1498→10. Employee Profile
+  1499→  1499→11. Attendance
+  1500→  1500→12. Leave
+  1501→  1501→13. Payroll
+  1502→  1502→14. Document Template Engine
+  1503→  1503→15. DOCX Generation
+  1504→  1504→16. PDF Generation
+  1505→  1505→17. Document Repository
+  1506→  1506→18. Email Integration
+  1507→  1507→19. Email Templates
+  1508→  1508→20. Email History
+  1509→  1509→21. Performance
+  1510→  1510→22. Recruitment
+  1511→  1511→23. Reports
+  1512→  1512→24. Audit Logs
+  1513→  1513→25. Responsive Optimization
+  1514→  1514→26. Testing
+  1515→  1515→27. Production Hardening
+  1516→  1516→```
+  1517→  1517→
+  1518→  1518→---
+  1519→  1519→
+  1520→  1520→# 50. CRITICAL END-TO-END TEST
+  1521→  1521→
+  1522→  1522→Before considering the application complete, test this exact workflow:
+  1523→  1523→
+  1524→  1524→```text
+  1525→  1525→HR Login
+  1526→  1526→   ↓
+  1527→  1527→Add Employee
+  1528→  1528→   ↓
+  1529→  1529→Assign Role + Department
+  1530→  1530→   ↓
+  1531→  1531→Open Employee Profile
+  1532→  1532→   ↓
+  1533→  1533→Generate Appointment Letter
+  1534→  1534→   ↓
+  1535→  1535→Select Template
+  1536→  1536→   ↓
+  1537→  1537→Auto-populate employee data
+  1538→  1538→   ↓
+  1539→  1539→Preview
+  1540→  1540→   ↓
+  1541→  1541→Generate DOCX + PDF
+  1542→  1542→   ↓
+  1543→  1543→Generate Document Number
+  1544→  1544→   ↓
+  1545→  1545→Save to Employee Documents
+  1546→  1546→   ↓
+  1547→  1547→Click Send to Employee
+  1548→  1548→   ↓
+  1549→  1549→Employee email automatically populated
+  1550→  1550→   ↓
+  1551→  1551→HR reviews email
+  1552→  1552→   ↓
+  1553→  1553→Send
+  1554→  1554→   ↓
+  1555→  1555→Email status recorded
+  1556→  1556→   ↓
+  1557→  1557→Document appears in Email History
+  1558→  1558→```
+  1559→  1559→
+  1560→  1560→Then test:
+  1561→  1561→
+  1562→  1562→```text
+  1563→  1563→Employee
+  1564→  1564→   ↓
+  1565→  1565→Payroll
+  1566→  1566→   ↓
+  1567→  1567→Generate August Payslip
+  1568→  1568→   ↓
+  1569→  1569→PDF
+  1570→  1570→   ↓
+  1571→  1571→Send to Employee
+  1572→  1572→   ↓
+  1573→  1573→Email History
+  1574→  1574→```
+  1575→  1575→
+  1576→  1576→Then test:
+  1577→  1577→
+  1578→  1578→```text
+  1579→  1579→50 Employees
+  1580→  1580→   ↓
+  1581→  1581→Bulk Generate Payslips
+  1582→  1582→   ↓
+  1583→  1583→50 Individual Documents
+  1584→  1584→   ↓
+  1585→  1585→50 Individual Emails
+  1586→  1586→   ↓
+  1587→  1587→Verify every attachment belongs to the correct employee
+  1588→  1588→```
+  1589→  1589→
+  1590→  1590→---
+  1591→  1591→
+  1592→  1592→# 51. FINAL DESIGN PRINCIPLE
+  1593→  1593→
+  1594→  1594→Do not create a collection of unrelated dashboards.
+  1595→  1595→
+  1596→  1596→Create one coherent HR product.
+  1597→  1597→
+  1598→  1598→The visual hierarchy should be:
+  1599→  1599→
+  1600→  1600→```text
+  1601→  1601→TeamHub Reference
+  1602→  1602→       ↓
+  1603→  1603→Extract Design Language
+  1604→  1604→       ↓
+  1605→  1605→Create Original Design System
+  1606→  1606→       ↓
+  1607→  1607→Apply Across Every Module
+  1608→  1608→```
+  1609→  1609→
+  1610→  1610→The TeamHub references should guide:
+  1611→  1611→
+  1612→  1612→- Layout
+  1613→  1613→- Spacing
+  1614→  1614→- Components
+  1615→  1615→- Data presentation
+  1616→  1616→- Charts
+  1617→  1617→- Forms
+  1618→  1618→- Tables
+  1619→  1619→- Navigation
+  1620→  1620→- Responsive behavior
+  1621→  1621→
+  1622→  1622→The application's own branding, HR workflows, document generation system and email delivery system must be original.
+  1623→  1623→
+  1624→  1624→---
+  1625→  1625→
+  1626→  1626→# 52. FINAL PRODUCT TARGET
+  1627→  1627→
+  1628→  1628→The finished application should allow an HR professional to perform this complete workflow quickly:
+  1629→  1629→
+  1630→  1630→```text
+  1631→  1631→MANAGE EMPLOYEE
+  1632→  1632→       ↓
+  1633→  1633→GENERATE HR DOCUMENT
+  1634→  1634→       ↓
+  1635→  1635→CREATE DOCX/PDF
+  1636→  1636→       ↓
+  1637→  1637→STORE DOCUMENT
+  1638→  1638→       ↓
+  1639→  1639→SEND DIRECTLY TO EMPLOYEE
+  1640→  1640→       ↓
+  1641→  1641→TRACK DELIVERY
+  1642→  1642→```
+  1643→  1643→
+  1644→  1644→The application should feel like a **real commercial HR SaaS application**, not a static UI prototype.
+  1645→  1645→
+  1646→  1646→Start by studying the supplied TeamHub visual reference gallery, establish the design system, then build the application in the implementation order above.
+  1647→  1647→

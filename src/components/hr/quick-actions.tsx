@@ -1,0 +1,38 @@
+"use client";
+
+import { useApp } from "@/lib/store";
+import { EmployeeFormDialog } from "./modules/employee-form-dialog";
+import { GenerateDocumentDialog } from "./modules/generate-document-dialog";
+import { PayslipDialog } from "./modules/payslip-dialog";
+import { AttendanceEntryDialog } from "./modules/attendance-entry-dialog";
+import { LeaveEntryDialog } from "./modules/leave-entry-dialog";
+
+export function QuickActions() {
+  const quickAction = useApp((s) => s.quickAction);
+  const setQuickAction = useApp((s) => s.setQuickAction);
+
+  return (
+    <>
+      <EmployeeFormDialog
+        open={quickAction === "add-employee"}
+        onOpenChange={(o) => !o && setQuickAction(null)}
+      />
+      <GenerateDocumentDialog
+        open={quickAction === "generate-document"}
+        onOpenChange={(o) => !o && setQuickAction(null)}
+      />
+      <PayslipDialog
+        open={quickAction === "create-payslip"}
+        onOpenChange={(o) => !o && setQuickAction(null)}
+      />
+      <AttendanceEntryDialog
+        open={quickAction === "add-attendance"}
+        onOpenChange={(o) => !o && setQuickAction(null)}
+      />
+      <LeaveEntryDialog
+        open={quickAction === "add-leave"}
+        onOpenChange={(o) => !o && setQuickAction(null)}
+      />
+    </>
+  );
+}
