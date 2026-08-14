@@ -30,7 +30,19 @@ import {
   BarChart3,
   Loader2,
   TrendingUp,
+  TrendingDown,
+  Minus,
   Filter,
+  Sparkles,
+  AlertTriangle,
+  ArrowUp,
+  ArrowDown,
+  ArrowRight,
+  ChevronDown,
+  ChevronUp,
+  Building2,
+  ShieldAlert,
+  Gauge,
 } from "lucide-react";
 
 import { PageHeader } from "../shared/page-header";
@@ -55,6 +67,13 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Badge } from "@/components/ui/badge";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import { AvatarBadge } from "../shared/avatar-badge";
 import { cn, formatCurrency } from "@/lib/utils";
 
 // ============================================================
@@ -263,6 +282,9 @@ export function ReportsModule() {
           </ChartCard>
         </div>
       </section>
+
+      {/* Predictions & Insights */}
+      <PredictionsSection />
 
       {/* Recruitment funnel */}
       <RecruitmentFunnelSection
@@ -935,5 +957,706 @@ function GenerateDialog({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  );
+}
+
+// ============================================================
+// Predictions & Insights — attrition risk, performance trends,
+// headcount forecast, and a department risk heatmap.
+// ============================================================
+
+interface AttritionEmployee {
+  employeeId: string;
+  name: string;
+  photo?: string | null;
+  department: string;
+  score: number;
+  riskLevel: "LOW" | "MEDIUM" | "HIGH";
+  factors: string[];
+}
+
+interface PerformanceTrendEmployee {
+  employeeId: string;
+  name: string;
+  trend: "UP" | "DOWN" | "STABLE";
+  currentScore: number;
+  previousScore: number;
+  delta: number;
+}
+
+interface DepartmentRisk {
+  name: string;
+  avgRisk: number;
+  lowPerformerCount: number;
+  vacancyCount: number;
+  headcount: number;
+}
+
+interface PredictionsPayload {
+  attritionRisk: {
+    employees: AttritionEmployee[];
+    avgRisk: number;
+    highRiskCount: number;
+    total: number;
+  };
+  performanceTrend: {
+    employees: PerformanceTrendEmployee[];
+    up: number;
+    down: number;
+    stable: number;
+    total: number;
+  };
+  headcountForecast: {
+    current: number;
+    forecast3m: number;
+    forecast6m: number;
+    forecast12m: number;
+    hireRate: number;
+    attritionRate: number;
+    netMonthly: number;
+    totalVacancies: number;
+  };
+  departmentRisk: {
+    departments: DepartmentRisk[];
+  };
+}
+
+const RISK_TONE: Record<string, string> = {
+  LOW: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/20",
+  MEDIUM: "bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/20",
+  HIGH: "bg-rose-500/10 text-rose-700 dark:text-rose-300 border-rose-500/20",
+};
+
+const RISK_BAR: Record<string, string> = {
+  LOW: "bg-emerald-500",
+  MEDIUM: "bg-amber-500",
+  HIGH: "bg-rose-500",
+};
+
+const RISK_GAUGE_STROKE: Record<string, string> = {
+  LOW: "#10b981",
+  MEDIUM: "#f59e0b",
+  HIGH: "#ef4444",
+};
+
+function riskLevelFromScore(score: number): "LOW" | "MEDIUM" | "HIGH" {
+  if (score >= 61) return "HIGH";
+  if (score >= 31) return "MEDIUM";
+  return "LOW";
+}
+
+function PredictionsSection() {
+  const { data, isLoading, isError } = useQuery<PredictionsPayload>({
+    queryKey: ["reports", "predictions"],
+    queryFn: async () => {
+      const r = await fetch("/api/reports/predictions");
+      if (!r.ok) throw new Error("Failed to load predictions");
+      return r.json();
+    },
+    staleTime: 60 * 1000,
+  });
+
+  return (
+    <section className="space-y-3">
+      <div className="flex items-center gap-2 flex-wrap">
+        <Sparkles className="size-4 text-primary" />
+        <h2 className="text-sm font-semibold">Predictions &amp; Insights</h2>
+        <span className="text-xs text-muted-foreground">
+          AI-assisted forecasts based on performance, attendance, salary
+          revisions, and hiring trends
+        </span>
+      </div>
+
+      {isError && (
+        <Card className="border-rose-500/30">
+          <CardContent className="p-6 text-sm text-rose-700">
+            Failed to load predictions. Please refresh to retry.
+          </CardContent>
+        </Card>
+      )}
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <AttritionRiskCard
+          data={data?.attritionRisk}
+          loading={isLoading}
+        />
+        <PerformanceTrendCard
+          data={data?.performanceTrend}
+          loading={isLoading}
+        />
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <HeadcountForecastCard
+          data={data?.headcountForecast}
+          loading={isLoading}
+        />
+        <DepartmentRiskCard
+          data={data?.departmentRisk}
+          loading={isLoading}
+        />
+      </div>
+    </section>
+  );
+}
+
+function PredictionsCardSkeleton() {
+  return (
+    <Card className="border-border/60 shadow-soft">
+      <CardContent className="p-5">
+        <Skeleton className="h-5 w-40 mb-4" />
+        <Skeleton className="h-32 w-full mb-3" />
+        <Skeleton className="h-20 w-full" />
+      </CardContent>
+    </Card>
+  );
+}
+
+function RiskGauge({ score }: { score: number }) {
+  const level = riskLevelFromScore(score);
+  const size = 120;
+  const stroke = 10;
+  const r = (size - stroke) / 2;
+  const c = 2 * Math.PI * r;
+  const offset = c - (Math.min(100, Math.max(0, score)) / 100) * c;
+  return (
+    <div
+      className="relative flex-shrink-0"
+      style={{ width: size, height: size }}
+    >
+      <svg width={size} height={size} className="-rotate-90">
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={r}
+          fill="none"
+          strokeWidth={stroke}
+          className="stroke-muted"
+        />
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={r}
+          fill="none"
+          strokeWidth={stroke}
+          strokeLinecap="round"
+          stroke={RISK_GAUGE_STROKE[level]}
+          className="transition-all duration-700"
+          strokeDasharray={c}
+          strokeDashoffset={offset}
+        />
+      </svg>
+      <div className="absolute inset-0 flex flex-col items-center justify-center">
+        <span className="text-2xl font-bold tabular-nums">{score}</span>
+        <span className="text-[10px] text-muted-foreground uppercase tracking-wide">
+          Avg risk
+        </span>
+      </div>
+    </div>
+  );
+}
+
+function AttritionRiskCard({
+  data,
+  loading,
+}: {
+  data?: PredictionsPayload["attritionRisk"];
+  loading: boolean;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  if (loading || !data) return <PredictionsCardSkeleton />;
+
+  const top = data.employees.slice(0, 5);
+  const rest = data.employees.slice(5);
+  const shown = expanded ? data.employees : top;
+
+  return (
+    <Card className="border-border/60 shadow-soft">
+      <CardHeader className="pb-2 pt-4 px-5">
+        <CardTitle className="text-sm font-semibold flex items-center gap-2">
+          <ShieldAlert className="size-4 text-rose-600" />
+          Attrition Risk
+        </CardTitle>
+        <p className="text-[11px] text-muted-foreground">
+          Top employees at risk of leaving, based on performance, salary
+          stagnation, absenteeism, and probation status.
+        </p>
+      </CardHeader>
+      <CardContent className="px-5 pb-4 space-y-3">
+        <div className="flex items-center gap-4">
+          <RiskGauge score={data.avgRisk} />
+          <div className="flex-1 space-y-2">
+            <div className="grid grid-cols-3 gap-2 text-xs">
+              <RiskStat
+                label="High"
+                value={data.employees.filter((e) => e.riskLevel === "HIGH").length}
+                tone="rose"
+              />
+              <RiskStat
+                label="Medium"
+                value={data.employees.filter((e) => e.riskLevel === "MEDIUM").length}
+                tone="amber"
+              />
+              <RiskStat
+                label="Low"
+                value={data.employees.filter((e) => e.riskLevel === "LOW").length}
+                tone="emerald"
+              />
+            </div>
+            <div className="text-xs text-muted-foreground">
+              {data.highRiskCount} high-risk · {data.total} employees scored ·
+              avg {data.avgRisk}/100
+            </div>
+          </div>
+        </div>
+
+        {shown.length === 0 ? (
+          <div className="text-sm text-muted-foreground py-4 text-center">
+            No employees to score yet.
+          </div>
+        ) : (
+          <div className="space-y-2 max-h-96 overflow-y-auto pr-1 custom-scrollbar">
+            {shown.map((e) => (
+              <div
+                key={e.employeeId}
+                className="flex items-start gap-3 p-2.5 rounded-lg border border-border/40 hover:bg-muted/30 transition-colors"
+              >
+                <AvatarBadge name={e.name} photo={e.photo} size="sm" />
+                <div className="flex-1 min-w-0 space-y-1">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="min-w-0">
+                      <div className="text-sm font-medium truncate">
+                        {e.name}
+                      </div>
+                      <div className="text-[11px] text-muted-foreground truncate">
+                        {e.employeeId} · {e.department}
+                      </div>
+                    </div>
+                    <Badge
+                      variant="outline"
+                      className={cn(
+                        "text-[10px] px-2 py-0.5 rounded-md flex-shrink-0",
+                        RISK_TONE[e.riskLevel]
+                      )}
+                    >
+                      {e.riskLevel} · {e.score}
+                    </Badge>
+                  </div>
+                  <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
+                    <div
+                      className={cn(
+                        "h-full rounded-full transition-all",
+                        RISK_BAR[e.riskLevel]
+                      )}
+                      style={{ width: `${Math.min(100, e.score)}%` }}
+                    />
+                  </div>
+                  <div className="flex flex-wrap gap-1">
+                    {e.factors.slice(0, 3).map((f, i) => (
+                      <span
+                        key={i}
+                        className="inline-flex items-center text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground border border-border/40"
+                      >
+                        {f}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {rest.length > 0 && (
+          <Collapsible open={expanded} onOpenChange={setExpanded}>
+            <CollapsibleTrigger asChild>
+              <Button variant="ghost" size="sm" className="w-full text-xs">
+                {expanded ? (
+                  <>
+                    <ChevronUp className="size-3.5 mr-1" /> Show top 5
+                  </>
+                ) : (
+                  <>
+                    <ChevronDown className="size-3.5 mr-1" /> View all (
+                    {data.total})
+                  </>
+                )}
+              </Button>
+            </CollapsibleTrigger>
+          </Collapsible>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function RiskStat({
+  label,
+  value,
+  tone,
+}: {
+  label: string;
+  value: number;
+  tone: "rose" | "amber" | "emerald";
+}) {
+  const tones: Record<string, string> = {
+    rose: "bg-rose-500/10 text-rose-700 dark:text-rose-300",
+    amber: "bg-amber-500/10 text-amber-700 dark:text-amber-300",
+    emerald: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
+  };
+  return (
+    <div className={cn("rounded-lg px-2 py-1.5 text-center", tones[tone])}>
+      <div className="text-base font-bold tabular-nums">{value}</div>
+      <div className="text-[10px] font-medium uppercase tracking-wide">
+        {label}
+      </div>
+    </div>
+  );
+}
+
+function PerformanceTrendCard({
+  data,
+  loading,
+}: {
+  data?: PredictionsPayload["performanceTrend"];
+  loading: boolean;
+}) {
+  if (loading || !data) return <PredictionsCardSkeleton />;
+
+  const declining = data.employees.filter((e) => e.trend === "DOWN");
+
+  return (
+    <Card className="border-border/60 shadow-soft">
+      <CardHeader className="pb-2 pt-4 px-5">
+        <CardTitle className="text-sm font-semibold flex items-center gap-2">
+          <TrendingUp className="size-4 text-emerald-600" />
+          Performance Trends
+        </CardTitle>
+        <p className="text-[11px] text-muted-foreground">
+          Direction of latest review score vs the previous review cycle.
+        </p>
+      </CardHeader>
+      <CardContent className="px-5 pb-4 space-y-3">
+        <div className="grid grid-cols-3 gap-2 text-xs">
+          <TrendStat
+            label="Improving"
+            value={data.up}
+            icon={TrendingUp}
+            tone="emerald"
+          />
+          <TrendStat
+            label="Stable"
+            value={data.stable}
+            icon={Minus}
+            tone="muted"
+          />
+          <TrendStat
+            label="Declining"
+            value={data.down}
+            icon={TrendingDown}
+            tone="rose"
+          />
+        </div>
+
+        <div className="text-xs text-muted-foreground">
+          {data.total} employees with multiple reviews
+        </div>
+
+        <div className="space-y-1.5">
+          <div className="text-xs font-semibold flex items-center gap-1.5 text-rose-700 dark:text-rose-300">
+            <AlertTriangle className="size-3.5" />
+            Needs attention
+          </div>
+          {declining.length === 0 ? (
+            <div className="text-xs text-muted-foreground py-3 text-center border border-dashed border-border/40 rounded-lg">
+              No declining performers — great!
+            </div>
+          ) : (
+            <div className="space-y-1.5 max-h-72 overflow-y-auto pr-1 custom-scrollbar">
+              {declining.slice(0, 12).map((e) => (
+                <div
+                  key={e.employeeId}
+                  className="flex items-center justify-between gap-2 p-2 rounded-lg border border-border/40 hover:bg-muted/30 transition-colors"
+                >
+                  <div className="min-w-0">
+                    <div className="text-sm font-medium truncate">{e.name}</div>
+                    <div className="text-[11px] text-muted-foreground truncate">
+                      {e.employeeId}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1.5 text-xs flex-shrink-0">
+                    <span className="text-muted-foreground tabular-nums">
+                      {e.previousScore}
+                    </span>
+                    <ArrowRight className="size-3 text-muted-foreground" />
+                    <span className="font-semibold tabular-nums">
+                      {e.currentScore}
+                    </span>
+                    <Badge
+                      variant="outline"
+                      className="text-[10px] px-1.5 py-0 border-rose-500/30 text-rose-700 dark:text-rose-300"
+                    >
+                      −{Math.abs(e.delta)}
+                    </Badge>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function TrendStat({
+  label,
+  value,
+  icon: Icon,
+  tone,
+}: {
+  label: string;
+  value: number;
+  icon: any;
+  tone: "emerald" | "rose" | "muted";
+}) {
+  const tones: Record<string, string> = {
+    emerald: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
+    rose: "bg-rose-500/10 text-rose-700 dark:text-rose-300",
+    muted: "bg-muted text-muted-foreground",
+  };
+  return (
+    <div className={cn("rounded-lg px-2 py-2 text-center", tones[tone])}>
+      <Icon className="size-3.5 mx-auto mb-1" />
+      <div className="text-base font-bold tabular-nums">{value}</div>
+      <div className="text-[10px] font-medium uppercase tracking-wide">
+        {label}
+      </div>
+    </div>
+  );
+}
+
+function HeadcountForecastCard({
+  data,
+  loading,
+}: {
+  data?: PredictionsPayload["headcountForecast"];
+  loading: boolean;
+}) {
+  if (loading || !data) return <PredictionsCardSkeleton />;
+
+  const stages = [
+    { label: "Now", value: data.current, months: 0 },
+    { label: "+3 months", value: data.forecast3m, months: 3 },
+    { label: "+6 months", value: data.forecast6m, months: 6 },
+    { label: "+12 months", value: data.forecast12m, months: 12 },
+  ];
+
+  return (
+    <Card className="border-border/60 shadow-soft">
+      <CardHeader className="pb-2 pt-4 px-5">
+        <CardTitle className="text-sm font-semibold flex items-center gap-2">
+          <Gauge className="size-4 text-amber-600" />
+          Headcount Forecast
+        </CardTitle>
+        <p className="text-[11px] text-muted-foreground">
+          Projection based on historical hiring rate, attrition rate, and open
+          vacancies.
+        </p>
+      </CardHeader>
+      <CardContent className="px-5 pb-4 space-y-3">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+          {stages.map((s, idx) => {
+            const prev = idx > 0 ? stages[idx - 1].value : s.value;
+            const diff = s.value - prev;
+            const trend =
+              diff > 0 ? "up" : diff < 0 ? "down" : "flat";
+            return (
+              <div
+                key={s.label}
+                className={cn(
+                  "rounded-lg p-2.5 border text-center",
+                  idx === 0
+                    ? "bg-primary/5 border-primary/20"
+                    : "border-border/40 bg-muted/20"
+                )}
+              >
+                <div className="text-[10px] text-muted-foreground uppercase tracking-wide">
+                  {s.label}
+                </div>
+                <div className="text-xl font-bold tabular-nums mt-0.5">
+                  {s.value}
+                </div>
+                {idx > 0 && (
+                  <div
+                    className={cn(
+                      "text-[10px] font-medium inline-flex items-center gap-0.5 mt-0.5",
+                      trend === "up" && "text-emerald-600",
+                      trend === "down" && "text-rose-600",
+                      trend === "flat" && "text-muted-foreground"
+                    )}
+                  >
+                    {trend === "up" && <ArrowUp className="size-2.5" />}
+                    {trend === "down" && <ArrowDown className="size-2.5" />}
+                    {trend === "flat" && <Minus className="size-2.5" />}
+                    {diff > 0 ? `+${diff}` : diff === 0 ? "0" : diff}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+
+        <div className="grid grid-cols-2 gap-2 text-xs">
+          <div className="rounded-lg p-2.5 border border-emerald-500/30 bg-emerald-500/5">
+            <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
+              Hire rate
+            </div>
+            <div className="text-lg font-bold tabular-nums text-emerald-700 dark:text-emerald-300">
+              {data.hireRate.toFixed(1)}/mo
+            </div>
+            <div className="text-[10px] text-muted-foreground mt-0.5">
+              avg over 12 months
+            </div>
+          </div>
+          <div className="rounded-lg p-2.5 border border-rose-500/30 bg-rose-500/5">
+            <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
+              Attrition rate
+            </div>
+            <div className="text-lg font-bold tabular-nums text-rose-700 dark:text-rose-300">
+              {data.attritionRate.toFixed(1)}/mo
+            </div>
+            <div className="text-[10px] text-muted-foreground mt-0.5">
+              {data.totalVacancies} open vacancies
+            </div>
+          </div>
+        </div>
+
+        <div className="text-xs text-muted-foreground flex items-center gap-1.5">
+          <ArrowRight className="size-3.5" />
+          Net monthly change:{" "}
+          <span
+            className={cn(
+              "font-semibold tabular-nums",
+              data.netMonthly > 0 && "text-emerald-600",
+              data.netMonthly < 0 && "text-rose-600",
+              data.netMonthly === 0 && "text-muted-foreground"
+            )}
+          >
+            {data.netMonthly > 0 ? "+" : ""}
+            {data.netMonthly.toFixed(1)} employees/mo
+          </span>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function DepartmentRiskCard({
+  data,
+  loading,
+}: {
+  data?: PredictionsPayload["departmentRisk"];
+  loading: boolean;
+}) {
+  if (loading || !data) return <PredictionsCardSkeleton />;
+
+  const depts = data.departments ?? [];
+
+  return (
+    <Card className="border-border/60 shadow-soft">
+      <CardHeader className="pb-2 pt-4 px-5">
+        <CardTitle className="text-sm font-semibold flex items-center gap-2">
+          <Building2 className="size-4 text-violet-600" />
+          Department Risk Heatmap
+        </CardTitle>
+        <p className="text-[11px] text-muted-foreground">
+          Per-department attrition risk, low performers, and vacancies.
+        </p>
+      </CardHeader>
+      <CardContent className="px-5 pb-4">
+        {depts.length === 0 ? (
+          <div className="text-sm text-muted-foreground py-6 text-center">
+            No departments yet.
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-96 overflow-y-auto pr-1 custom-scrollbar">
+            {depts.map((d) => {
+              const level = riskLevelFromScore(d.avgRisk);
+              return (
+                <div
+                  key={d.name}
+                  className={cn(
+                    "rounded-lg p-3 border transition-all",
+                    level === "HIGH" &&
+                      "border-rose-500/40 bg-rose-500/5",
+                    level === "MEDIUM" &&
+                      "border-amber-500/40 bg-amber-500/5",
+                    level === "LOW" &&
+                      "border-emerald-500/40 bg-emerald-500/5"
+                  )}
+                >
+                  <div className="flex items-center justify-between gap-2 mb-1.5">
+                    <div className="text-sm font-semibold truncate">
+                      {d.name}
+                    </div>
+                    <Badge
+                      variant="outline"
+                      className={cn(
+                        "text-[10px] px-1.5 py-0.5 rounded-md flex-shrink-0",
+                        RISK_TONE[level]
+                      )}
+                    >
+                      {level}
+                    </Badge>
+                  </div>
+                  <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden mb-2">
+                    <div
+                      className={cn(
+                        "h-full rounded-full transition-all",
+                        RISK_BAR[level]
+                      )}
+                      style={{ width: `${Math.min(100, d.avgRisk)}%` }}
+                    />
+                  </div>
+                  <div className="grid grid-cols-3 gap-1 text-center text-xs">
+                    <div>
+                      <div className="font-bold tabular-nums">
+                        {d.avgRisk}%
+                      </div>
+                      <div className="text-[9px] text-muted-foreground uppercase tracking-wide">
+                        Avg risk
+                      </div>
+                    </div>
+                    <div>
+                      <div className="font-bold tabular-nums">
+                        {d.headcount}
+                      </div>
+                      <div className="text-[9px] text-muted-foreground uppercase tracking-wide">
+                        Headcount
+                      </div>
+                    </div>
+                    <div>
+                      <div className="font-bold tabular-nums text-amber-700 dark:text-amber-300">
+                        {d.vacancyCount}
+                      </div>
+                      <div className="text-[9px] text-muted-foreground uppercase tracking-wide">
+                        Vacancies
+                      </div>
+                    </div>
+                  </div>
+                  {d.lowPerformerCount > 0 && (
+                    <div className="text-[10px] text-rose-700 dark:text-rose-300 mt-1.5 text-center">
+                      {d.lowPerformerCount} low performer
+                      {d.lowPerformerCount === 1 ? "" : "s"}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 }

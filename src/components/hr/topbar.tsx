@@ -2,9 +2,8 @@
 
 import { useApp } from "@/lib/store";
 import { NAV_ITEMS } from "./nav-config";
-import { cn, initials } from "@/lib/utils";
+import { initials } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -31,9 +30,9 @@ import {
   CalendarPlus,
 } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
 import { useEffect, useState } from "react";
 import { ThemeToggle } from "./theme-toggle";
+import { NotificationCenter } from "./notification-center";
 
 export function Topbar() {
   const authUser = useApp((s) => s.authUser);
@@ -45,6 +44,8 @@ export function Topbar() {
   const setModule = useApp((s) => s.setModule);
   const setShortcutsHelpOpen = useApp((s) => s.setShortcutsHelpOpen);
   const [pendingCount, setPendingCount] = useState(0);
+  const [notifOpen, setNotifOpen] = useState(false);
+  const [unreadNotifs, setUnreadNotifs] = useState(0);
 
   const current = NAV_ITEMS.find((n) => n.key === activeModule);
 
@@ -54,6 +55,33 @@ export function Topbar() {
       .then((d) => setPendingCount(d?.kpis?.pendingLeave ?? 0))
       .catch(() => {});
   }, []);
+
+  // Poll notification unread count every 60s while the app is open.
+  useEffect(() => {
+    let cancelled = false;
+    async function load() {
+      try {
+        const r = await fetch("/api/notifications?unreadOnly=true");
+        if (!r.ok) return;
+        const d = await r.json();
+        if (!cancelled) setUnreadNotifs(d?.unreadCount ?? 0);
+      } catch {
+        /* ignore */
+      }
+    }
+    load();
+    const id = setInterval(load, 60_000);
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+    };
+  }, [notifOpen]);
+
+  // Combined badge: unread notifications take precedence (they're
+  // higher-signal than the raw pending-leave count). When no
+  // unread notifications exist we fall back to the legacy
+  // pending-leave count so the bell still surfaces action items.
+  const badgeCount = unreadNotifs > 0 ? unreadNotifs : pendingCount;
 
   return (
     <header className="sticky top-0 z-30 h-16 border-b border-border bg-background/80 backdrop-blur-md px-4 md:px-6 flex items-center gap-3">
@@ -160,41 +188,23 @@ export function Topbar() {
           <Keyboard className="size-5" />
         </Button>
 
-        {/* Notifications */}
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" className="relative" aria-label="Notifications">
-              <Bell className="size-5" />
-              {pendingCount > 0 && (
-                <span className="absolute top-1.5 right-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-semibold text-destructive-foreground">
-                  {pendingCount}
-                </span>
-              )}
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-72">
-            <DropdownMenuLabel className="flex items-center justify-between">
-              <span>Notifications</span>
-              <Badge variant="secondary" className="text-[10px]">
-                {pendingCount} pending
-              </Badge>
-            </DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem
-              className="flex flex-col items-start gap-0.5"
-              onClick={() => setModule("leave")}
-            >
-              <div className="font-medium text-sm">Pending leave requests</div>
-              <div className="text-xs text-muted-foreground">
-                {pendingCount} request(s) awaiting your approval
-              </div>
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem className="text-xs text-muted-foreground justify-center">
-              View all in Leave module
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+        {/* Notifications — opens a slide-out panel */}
+        <Button
+          variant="ghost"
+          size="icon"
+          className="relative"
+          aria-label="Notifications"
+          onClick={() => setNotifOpen(true)}
+        >
+          <Bell className="size-5" />
+          {badgeCount > 0 && (
+            <span className="absolute top-1.5 right-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-semibold text-destructive-foreground">
+              {badgeCount > 99 ? "99+" : badgeCount}
+            </span>
+          )}
+        </Button>
+
+        <NotificationCenter open={notifOpen} onOpenChange={setNotifOpen} />
 
         {/* User menu */}
         <DropdownMenu>

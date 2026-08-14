@@ -1,0 +1,754 @@
+     1→"use client";
+     2→
+     3→import { useState, useMemo } from "react";
+     4→import { useQuery, useQueryClient } from "@tanstack/react-query";
+     5→import { toast } from "sonner";
+     6→import {
+     7→  Card,
+     8→  CardContent,
+     9→  CardHeader,
+    10→  CardTitle,
+    11→} from "@/components/ui/card";
+    12→import { Button } from "@/components/ui/button";
+    13→import { Input } from "@/components/ui/input";
+    14→import { Textarea } from "@/components/ui/textarea";
+    15→import { Checkbox } from "@/components/ui/checkbox";
+    16→import { Badge } from "@/components/ui/badge";
+    17→import { Progress } from "@/components/ui/progress";
+    18→import {
+    19→  Dialog,
+    20→  DialogContent,
+    21→  DialogHeader,
+    22→  DialogTitle,
+    23→  DialogFooter,
+    24→  DialogDescription,
+    25→} from "@/components/ui/dialog";
+    26→import {
+    27→  Select,
+    28→  SelectContent,
+    29→  SelectItem,
+    30→  SelectTrigger,
+    31→  SelectValue,
+    32→} from "@/components/ui/select";
+    33→import {
+    34→  Plus,
+    35→  SkipForward,
+    36→  Trash2,
+    37→  Loader2,
+    38→  CheckCircle2,
+    39→  CircleDashed,
+    40→  CircleDot,
+    41→  CalendarDays,
+    42→  UserCog,
+    43→  StickyNote,
+    44→  CheckCircle,
+    45→  RotateCcw,
+    46→  PencilLine,
+    47→} from "lucide-react";
+    48→import { cn, formatDate } from "@/lib/utils";
+    49→import { StatusBadge } from "../shared/status-badge";
+    50→import { EmptyState } from "../shared/empty-state";
+    51→
+    52→type OnboardingStatus =
+    53→  | "PENDING"
+    54→  | "IN_PROGRESS"
+    55→  | "COMPLETED"
+    56→  | "SKIPPED";
+    57→
+    58→interface OnboardingTask {
+    59→  id: string;
+    60→  employeeId: string;
+    61→  title: string;
+    62→  description?: string | null;
+    63→  dueDate?: string | null;
+    64→  assignedTo?: string | null;
+    65→  status: OnboardingStatus;
+    66→  notes?: string | null;
+    67→  completedAt?: string | null;
+    68→  sortOrder: number;
+    69→  isDefault: boolean;
+    70→  createdAt: string;
+    71→  updatedAt: string;
+    72→}
+    73→
+    74→const STATUS_CYCLE: Record<OnboardingStatus, OnboardingStatus> = {
+    75→  PENDING: "IN_PROGRESS",
+    76→  IN_PROGRESS: "COMPLETED",
+    77→  COMPLETED: "PENDING",
+    78→  SKIPPED: "PENDING",
+    79→};
+    80→
+    81→const STATUS_ICON: Record<OnboardingStatus, typeof CheckCircle2> = {
+    82→  PENDING: CircleDashed,
+    83→  IN_PROGRESS: CircleDot,
+    84→  COMPLETED: CheckCircle2,
+    85→  SKIPPED: SkipForward,
+    86→};
+    87→
+    88→const STATUS_COLOR: Record<OnboardingStatus, string> = {
+    89→  PENDING: "text-muted-foreground",
+    90→  IN_PROGRESS: "text-amber-600",
+    91→  COMPLETED: "text-emerald-600",
+    92→  SKIPPED: "text-rose-600",
+    93→};
+    94→
+    95→function isOverdue(dueDate?: string | null, status?: OnboardingStatus) {
+    96→  if (!dueDate) return false;
+    97→  if (status === "COMPLETED" || status === "SKIPPED") return false;
+    98→  return new Date(dueDate).getTime() < Date.now();
+    99→}
+   100→
+   101→function ProgressRing({ percent }: { percent: number }) {
+   102→  const size = 96;
+   103→  const stroke = 8;
+   104→  const r = (size - stroke) / 2;
+   105→  const c = 2 * Math.PI * r;
+   106→  const offset = c - (Math.min(100, Math.max(0, percent)) / 100) * c;
+   107→  return (
+   108→    <div className="relative" style={{ width: size, height: size }}>
+   109→      <svg width={size} height={size} className="-rotate-90">
+   110→        <circle
+   111→          cx={size / 2}
+   112→          cy={size / 2}
+   113→          r={r}
+   114→          fill="none"
+   115→          strokeWidth={stroke}
+   116→          className="stroke-muted"
+   117→        />
+   118→        <circle
+   119→          cx={size / 2}
+   120→          cy={size / 2}
+   121→          r={r}
+   122→          fill="none"
+   123→          strokeWidth={stroke}
+   124→          strokeLinecap="round"
+   125→          className="stroke-primary transition-all duration-500"
+   126→          strokeDasharray={c}
+   127→          strokeDashoffset={offset}
+   128→        />
+   129→      </svg>
+   130→      <div className="absolute inset-0 flex flex-col items-center justify-center">
+   131→        <span className="text-2xl font-bold tabular-nums">
+   132→          {Math.round(percent)}%
+   133→        </span>
+   134→        <span className="text-[10px] text-muted-foreground uppercase tracking-wide">
+   135→          Complete
+   136→        </span>
+   137→      </div>
+   138→    </div>
+   139→  );
+   140→}
+   141→
+   142→export function Onboarding({ employeeId }: { employeeId: string }) {
+   143→  const qc = useQueryClient();
+   144→  const [filter, setFilter] = useState<"all" | "pending" | "completed">("all");
+   145→  const [addOpen, setAddOpen] = useState(false);
+   146→  const [updatingId, setUpdatingId] = useState<string | null>(null);
+   147→  const [editingNotesId, setEditingNotesId] = useState<string | null>(null);
+   148→  const [notesDraft, setNotesDraft] = useState("");
+   149→
+   150→  const queryKey = ["onboarding", employeeId];
+   151→
+   152→  const { data, isLoading, isError } = useQuery({
+   153→    queryKey,
+   154→    queryFn: async () => {
+   155→      const r = await fetch(`/api/onboarding?employeeId=${employeeId}`);
+   156→      if (!r.ok) throw new Error("Failed to load onboarding tasks");
+   157→      return r.json();
+   158→    },
+   159→  });
+   160→
+   161→  const tasks: OnboardingTask[] = data?.items ?? [];
+   162→
+   163→  const stats = useMemo(() => {
+   164→    const total = tasks.length;
+   165→    const completed = tasks.filter((t) => t.status === "COMPLETED").length;
+   166→    const inProgress = tasks.filter((t) => t.status === "IN_PROGRESS").length;
+   167→    const skipped = tasks.filter((t) => t.status === "SKIPPED").length;
+   168→    const pending = tasks.filter((t) => t.status === "PENDING").length;
+   169→    const overdue = tasks.filter((t) => isOverdue(t.dueDate, t.status)).length;
+   170→    const activeTotal = total - skipped;
+   171→    const percent = activeTotal > 0 ? (completed / activeTotal) * 100 : 0;
+   172→    return { total, completed, inProgress, skipped, pending, overdue, percent };
+   173→  }, [tasks]);
+   174→
+   175→  const filteredTasks = useMemo(() => {
+   176→    if (filter === "pending") {
+   177→      return tasks.filter(
+   178→        (t) => t.status === "PENDING" || t.status === "IN_PROGRESS"
+   179→      );
+   180→    }
+   181→    if (filter === "completed") {
+   182→      return tasks.filter(
+   183→        (t) => t.status === "COMPLETED" || t.status === "SKIPPED"
+   184→      );
+   185→    }
+   186→    return tasks;
+   187→  }, [tasks, filter]);
+   188→
+   189→  async function patchTask(id: string, patch: Record<string, unknown>) {
+   190→    setUpdatingId(id);
+   191→    try {
+   192→      const r = await fetch(`/api/onboarding/${id}`, {
+   193→        method: "PATCH",
+   194→        headers: { "Content-Type": "application/json" },
+   195→        body: JSON.stringify(patch),
+   196→      });
+   197→      if (!r.ok) {
+   198→        const err = await r.json().catch(() => ({}));
+   199→        throw new Error(err.error || "Update failed");
+   200→      }
+   201→      await qc.invalidateQueries({ queryKey });
+   202→    } catch (e: any) {
+   203→      toast.error(e?.message || "Failed to update task");
+   204→    } finally {
+   205→      setUpdatingId(null);
+   206→    }
+   207→  }
+   208→
+   209→  async function cycleStatus(task: OnboardingTask) {
+   210→    const next = STATUS_CYCLE[task.status];
+   211→    await patchTask(task.id, { status: next });
+   212→    toast.success(`Marked as ${next.replace(/_/g, " ").toLowerCase()}`);
+   213→  }
+   214→
+   215→  async function skipTask(task: OnboardingTask) {
+   216→    await patchTask(task.id, { status: "SKIPPED" });
+   217→    toast.success(`Task skipped`);
+   218→  }
+   219→
+   220→  async function deleteTask(task: OnboardingTask) {
+   221→    setUpdatingId(task.id);
+   222→    try {
+   223→      const r = await fetch(`/api/onboarding/${task.id}`, {
+   224→        method: "DELETE",
+   225→      });
+   226→      if (!r.ok) throw new Error("Delete failed");
+   227→      await qc.invalidateQueries({ queryKey });
+   228→      toast.success("Task removed");
+   229→    } catch (e: any) {
+   230→      toast.error(e?.message || "Failed to delete task");
+   231→    } finally {
+   232→      setUpdatingId(null);
+   233→    }
+   234→  }
+   235→
+   236→  function startEditNotes(task: OnboardingTask) {
+   237→    setEditingNotesId(task.id);
+   238→    setNotesDraft(task.notes ?? "");
+   239→  }
+   240→
+   241→  async function saveNotes(task: OnboardingTask) {
+   242→    await patchTask(task.id, { notes: notesDraft });
+   243→    setEditingNotesId(null);
+   244→    toast.success("Notes saved");
+   245→  }
+   246→
+   247→  if (isLoading) {
+   248→    return (
+   249→      <div className="space-y-4">
+   250→        <div className="h-32 rounded-xl bg-muted/40 animate-pulse" />
+   251→        <div className="h-20 rounded-xl bg-muted/40 animate-pulse" />
+   252→        <div className="h-20 rounded-xl bg-muted/40 animate-pulse" />
+   253→        <div className="h-20 rounded-xl bg-muted/40 animate-pulse" />
+   254→      </div>
+   255→    );
+   256→  }
+   257→
+   258→  if (isError) {
+   259→    return (
+   260→      <EmptyState
+   261→        icon={CircleDashed}
+   262→        title="Couldn't load onboarding tasks"
+   263→        description="Please try again in a moment."
+   264→      />
+   265→    );
+   266→  }
+   267→
+   268→  return (
+   269→    <div className="space-y-4">
+   270→      {/* Summary card */}
+   271→      <Card className="border-border/60 shadow-soft">
+   272→        <CardContent className="p-4 sm:p-6">
+   273→          <div className="flex flex-col sm:flex-row items-center gap-6">
+   274→            <ProgressRing percent={stats.percent} />
+   275→            <div className="flex-1 w-full space-y-3">
+   276→              <div className="flex items-center justify-between flex-wrap gap-2">
+   277→                <div>
+   278→                  <div className="text-lg font-semibold">
+   279→                    {stats.completed} of {stats.total} tasks completed
+   280→                  </div>
+   281→                  <div className="text-xs text-muted-foreground mt-0.5">
+   282→                    Onboarding progress for this employee
+   283→                  </div>
+   284→                </div>
+   285→                <Button size="sm" onClick={() => setAddOpen(true)}>
+   286→                  <Plus className="size-4 mr-1.5" /> Add Task
+   287→                </Button>
+   288→              </div>
+   289→              <Progress value={stats.percent} className="h-2.5" />
+   290→              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+   291→                <StatPill
+   292→                  label="Pending"
+   293→                  value={stats.pending}
+   294→                  tone="amber"
+   295→                />
+   296→                <StatPill
+   297→                  label="In Progress"
+   298→                  value={stats.inProgress}
+   299→                  tone="sky"
+   300→                />
+   301→                <StatPill
+   302→                  label="Completed"
+   303→                  value={stats.completed}
+   304→                  tone="emerald"
+   305→                />
+   306→                <StatPill label="Skipped" value={stats.skipped} tone="rose" />
+   307→              </div>
+   308→              {stats.overdue > 0 && (
+   309→                <div className="text-xs font-medium text-rose-600 flex items-center gap-1.5">
+   310→                  <CalendarDays className="size-3.5" />
+   311→                  {stats.overdue} task{stats.overdue > 1 ? "s" : ""} overdue
+   312→                </div>
+   313→              )}
+   314→            </div>
+   315→          </div>
+   316→        </CardContent>
+   317→      </Card>
+   318→
+   319→      {/* Filters */}
+   320→      <div className="flex items-center justify-between gap-3 flex-wrap">
+   321→        <div className="inline-flex rounded-lg border border-border overflow-hidden">
+   322→          {(["all", "pending", "completed"] as const).map((f) => (
+   323→            <button
+   324→              key={f}
+   325→              onClick={() => setFilter(f)}
+   326→              className={cn(
+   327→                "px-3 py-1.5 text-xs font-medium capitalize transition-colors",
+   328→                filter === f
+   329→                  ? "bg-primary text-primary-foreground"
+   330→                  : "hover:bg-muted text-muted-foreground"
+   331→              )}
+   332→            >
+   333→              {f === "all"
+   334→                ? `All (${stats.total})`
+   335→                : f === "pending"
+   336→                  ? `Pending (${stats.pending + stats.inProgress})`
+   337→                  : `Completed (${stats.completed + stats.skipped})`}
+   338→            </button>
+   339→          ))}
+   340→        </div>
+   341→      </div>
+   342→
+   343→      {/* Checklist */}
+   344→      {filteredTasks.length === 0 ? (
+   345→        <EmptyState
+   346→          icon={CheckCircle}
+   347→          title="No onboarding tasks here"
+   348→          description={
+   349→            filter === "all"
+   350→              ? "Add a custom task to start tracking onboarding progress."
+   351→              : "No tasks match this filter."
+   352→          }
+   353→          actionLabel="Add Task"
+   354→          onAction={() => setAddOpen(true)}
+   355→        />
+   356→      ) : (
+   357→        <div className="space-y-2.5">
+   358→          {filteredTasks.map((task) => {
+   359→            const StatusIcon = STATUS_ICON[task.status];
+   360→            const overdue = isOverdue(task.dueDate, task.status);
+   361→            const isUpdating = updatingId === task.id;
+   362→            const isEditingNotes = editingNotesId === task.id;
+   363→            return (
+   364→              <Card
+   365→                key={task.id}
+   366→                className={cn(
+   367→                  "border-border/60 shadow-soft transition-all",
+   368→                  task.status === "COMPLETED" && "opacity-75",
+   369→                  task.status === "SKIPPED" && "opacity-60"
+   370→                )}
+   371→              >
+   372→                <CardContent className="p-4">
+   373→                  <div className="flex items-start gap-3">
+   374→                    {/* Checkbox / status cycler */}
+   375→                    <button
+   376→                      onClick={() => cycleStatus(task)}
+   377→                      disabled={isUpdating}
+   378→                      className="flex-shrink-0 mt-0.5 disabled:opacity-50"
+   379→                      aria-label={`Cycle status (currently ${task.status})`}
+   380→                      title={`Status: ${task.status.replace(/_/g, " ")} — click to advance`}
+   381→                    >
+   382→                      <Checkbox
+   383→                        checked={task.status === "COMPLETED"}
+   384→                        className={cn(
+   385→                          "size-5 data-[state=checked]:bg-emerald-500 data-[state=checked]:border-emerald-500",
+   386→                          task.status === "IN_PROGRESS" &&
+   387→                            "border-amber-500 data-[state=checked]:bg-amber-500 data-[state=checked]:border-amber-500"
+   388→                        )}
+   389→                      />
+   390→                    </button>
+   391→
+   392→                    <div className="flex-1 min-w-0 space-y-1.5">
+   393→                      <div className="flex items-start justify-between gap-2 flex-wrap">
+   394→                        <div className="flex items-start gap-2 min-w-0">
+   395→                          <StatusIcon
+   396→                            className={cn(
+   397→                              "size-4 mt-0.5 flex-shrink-0",
+   398→                              STATUS_COLOR[task.status]
+   399→                            )}
+   400→                          />
+   401→                          <div className="min-w-0">
+   402→                            <div
+   403→                              className={cn(
+   404→                                "text-sm font-medium leading-tight",
+   405→                                task.status === "COMPLETED" &&
+   406→                                  "line-through text-muted-foreground",
+   407→                                task.status === "SKIPPED" &&
+   408→                                  "line-through text-muted-foreground"
+   409→                              )}
+   410→                            >
+   411→                              {task.title}
+   412→                              {!task.isDefault && (
+   413→                                <Badge
+   414→                                  variant="outline"
+   415→                                  className="ml-2 text-[10px] py-0 px-1.5 font-normal"
+   416→                                >
+   417→                                  Custom
+   418→                                </Badge>
+   419→                              )}
+   420→                            </div>
+   421→                            {task.description && (
+   422→                              <div className="text-xs text-muted-foreground mt-0.5">
+   423→                                {task.description}
+   424→                              </div>
+   425→                            )}
+   426→                          </div>
+   427→                        </div>
+   428→                        <StatusBadge
+   429→                          status={task.status}
+   430→                          label={task.status.replace(/_/g, " ")}
+   431→                        />
+   432→                      </div>
+   433→
+   434→                      {/* Meta row */}
+   435→                      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-muted-foreground">
+   436→                        {task.assignedTo && (
+   437→                          <span className="inline-flex items-center gap-1">
+   438→                            <UserCog className="size-3" />
+   439→                            {task.assignedTo}
+   440→                          </span>
+   441→                        )}
+   442→                        {task.dueDate && (
+   443→                          <span
+   444→                            className={cn(
+   445→                              "inline-flex items-center gap-1",
+   446→                              overdue && "text-rose-600 font-medium"
+   447→                            )}
+   448→                          >
+   449→                            <CalendarDays className="size-3" />
+   450→                            Due {formatDate(task.dueDate)}
+   451→                            {overdue && " · overdue"}
+   452→                          </span>
+   453→                        )}
+   454→                        {task.completedAt && (
+   455→                          <span className="inline-flex items-center gap-1 text-emerald-600">
+   456→                            <CheckCircle className="size-3" />
+   457→                            Done {formatDate(task.completedAt)}
+   458→                          </span>
+   459→                        )}
+   460→                      </div>
+   461→
+   462→                      {/* Notes */}
+   463→                      {isEditingNotes ? (
+   464→                        <div className="space-y-2 mt-2">
+   465→                          <Textarea
+   466→                            value={notesDraft}
+   467→                            onChange={(e) => setNotesDraft(e.target.value)}
+   468→                            placeholder="Add a note about this task…"
+   469→                            rows={2}
+   470→                            className="text-xs"
+   471→                          />
+   472→                          <div className="flex gap-2">
+   473→                            <Button
+   474→                              size="sm"
+   475→                              onClick={() => saveNotes(task)}
+   476→                              disabled={isUpdating}
+   477→                            >
+   478→                              {isUpdating ? (
+   479→                                <Loader2 className="size-3.5 animate-spin mr-1" />
+   480→                              ) : (
+   481→                                <CheckCircle className="size-3.5 mr-1" />
+   482→                              )}
+   483→                              Save
+   484→                            </Button>
+   485→                            <Button
+   486→                              size="sm"
+   487→                              variant="ghost"
+   488→                              onClick={() => setEditingNotesId(null)}
+   489→                            >
+   490→                              Cancel
+   491→                            </Button>
+   492→                          </div>
+   493→                        </div>
+   494→                      ) : (
+   495→                        <button
+   496→                          onClick={() => startEditNotes(task)}
+   497→                          className="group flex items-start gap-1.5 text-xs text-left mt-1 max-w-full"
+   498→                        >
+   499→                          <StickyNote className="size-3 mt-0.5 text-muted-foreground flex-shrink-0" />
+   500→                          {task.notes ? (
+   501→                            <span className="text-foreground break-words">
+   502→                              {task.notes}
+   503→                            </span>
+   504→                          ) : (
+   505→                            <span className="text-muted-foreground group-hover:text-foreground inline-flex items-center gap-1">
+   506→                              Add a note
+   507→                              <PencilLine className="size-3 opacity-0 group-hover:opacity-100" />
+   508→                            </span>
+   509→                          )}
+   510→                        </button>
+   511→                      )}
+   512→                    </div>
+   513→
+   514→                    {/* Action buttons */}
+   515→                    <div className="flex flex-col gap-1 flex-shrink-0">
+   516→                      {task.status !== "SKIPPED" && (
+   517→                        <Button
+   518→                          size="sm"
+   519→                          variant="ghost"
+   520→                          className="h-7 text-xs text-muted-foreground hover:text-rose-600"
+   521→                          onClick={() => skipTask(task)}
+   522→                          disabled={isUpdating}
+   523→                          title="Skip this task"
+   524→                        >
+   525→                          <SkipForward className="size-3.5 mr-1" /> Skip
+   526→                        </Button>
+   527→                      )}
+   528→                      {task.status === "SKIPPED" && (
+   529→                        <Button
+   530→                          size="sm"
+   531→                          variant="ghost"
+   532→                          className="h-7 text-xs"
+   533→                          onClick={() => patchTask(task.id, { status: "PENDING" })}
+   534→                          disabled={isUpdating}
+   535→                          title="Reopen"
+   536→                        >
+   537→                          <RotateCcw className="size-3.5 mr-1" /> Reopen
+   538→                        </Button>
+   539→                      )}
+   540→                      {!task.isDefault && (
+   541→                        <Button
+   542→                          size="sm"
+   543→                          variant="ghost"
+   544→                          className="h-7 text-xs text-muted-foreground hover:text-rose-600"
+   545→                          onClick={() => deleteTask(task)}
+   546→                          disabled={isUpdating}
+   547→                          title="Delete this task"
+   548→                        >
+   549→                          {isUpdating ? (
+   550→                            <Loader2 className="size-3.5 animate-spin" />
+   551→                          ) : (
+   552→                            <Trash2 className="size-3.5" />
+   553→                          )}
+   554→                        </Button>
+   555→                      )}
+   556→                    </div>
+   557→                  </div>
+   558→                </CardContent>
+   559→              </Card>
+   560→            );
+   561→          })}
+   562→        </div>
+   563→      )}
+   564→
+   565→      <AddTaskDialog
+   566→        open={addOpen}
+   567→        onOpenChange={setAddOpen}
+   568→        employeeId={employeeId}
+   569→        onSaved={() => qc.invalidateQueries({ queryKey })}
+   570→      />
+   571→    </div>
+   572→  );
+   573→}
+   574→
+   575→function StatPill({
+   576→  label,
+   577→  value,
+   578→  tone,
+   579→}: {
+   580→  label: string;
+   581→  value: number;
+   582→  tone: "amber" | "sky" | "emerald" | "rose";
+   583→}) {
+   584→  const tones: Record<string, string> = {
+   585→    amber: "bg-amber-500/10 text-amber-700 dark:text-amber-300",
+   586→    sky: "bg-sky-500/10 text-sky-700 dark:text-sky-300",
+   587→    emerald:
+   588→      "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
+   589→    rose: "bg-rose-500/10 text-rose-700 dark:text-rose-300",
+   590→  };
+   591→  return (
+   592→    <div
+   593→      className={cn(
+   594→        "rounded-lg px-2.5 py-1.5 flex items-center justify-between gap-2",
+   595→        tones[tone]
+   596→      )}
+   597→    >
+   598→      <span className="text-[10px] font-medium uppercase tracking-wide">
+   599→        {label}
+   600→      </span>
+   601→      <span className="font-bold tabular-nums">{value}</span>
+   602→    </div>
+   603→  );
+   604→}
+   605→
+   606→function AddTaskDialog({
+   607→  open,
+   608→  onOpenChange,
+   609→  employeeId,
+   610→  onSaved,
+   611→}: {
+   612→  open: boolean;
+   613→  onOpenChange: (v: boolean) => void;
+   614→  employeeId: string;
+   615→  onSaved: () => void;
+   616→}) {
+   617→  const [title, setTitle] = useState("");
+   618→  const [description, setDescription] = useState("");
+   619→  const [dueDate, setDueDate] = useState("");
+   620→  const [assignedTo, setAssignedTo] = useState("");
+   621→  const [saving, setSaving] = useState(false);
+   622→
+   623→  function reset() {
+   624→    setTitle("");
+   625→    setDescription("");
+   626→    setDueDate("");
+   627→    setAssignedTo("");
+   628→  }
+   629→
+   630→  async function handleSave() {
+   631→    if (!title.trim()) {
+   632→      toast.error("Task title is required");
+   633→      return;
+   634→    }
+   635→    setSaving(true);
+   636→    try {
+   637→      const body: Record<string, unknown> = {
+   638→        employeeId,
+   639→        title: title.trim(),
+   640→      };
+   641→      if (description.trim()) body.description = description.trim();
+   642→      if (dueDate) body.dueDate = dueDate;
+   643→      if (assignedTo.trim()) body.assignedTo = assignedTo.trim();
+   644→
+   645→      const r = await fetch("/api/onboarding", {
+   646→        method: "POST",
+   647→        headers: { "Content-Type": "application/json" },
+   648→        body: JSON.stringify(body),
+   649→      });
+   650→      if (!r.ok) {
+   651→        const err = await r.json().catch(() => ({}));
+   652→        throw new Error(err.error || "Failed to add task");
+   653→      }
+   654→      toast.success("Task added");
+   655→      reset();
+   656→      onOpenChange(false);
+   657→      onSaved();
+   658→    } catch (e: any) {
+   659→      toast.error(e?.message || "Failed to add task");
+   660→    } finally {
+   661→      setSaving(false);
+   662→    }
+   663→  }
+   664→
+   665→  return (
+   666→    <Dialog open={open} onOpenChange={onOpenChange}>
+   667→      <DialogContent className="sm:max-w-md">
+   668→        <DialogHeader>
+   669→          <DialogTitle>Add onboarding task</DialogTitle>
+   670→          <DialogDescription>
+   671→            Create a custom checklist item for this employee.
+   672→          </DialogDescription>
+   673→        </DialogHeader>
+   674→        <div className="space-y-3">
+   675→          <div>
+   676→            <label className="text-xs font-medium text-muted-foreground">
+   677→              Title *
+   678→            </label>
+   679→            <Input
+   680→              value={title}
+   681→              onChange={(e) => setTitle(e.target.value)}
+   682→              placeholder="e.g. Set up GitHub access"
+   683→              autoFocus
+   684→            />
+   685→          </div>
+   686→          <div>
+   687→            <label className="text-xs font-medium text-muted-foreground">
+   688→              Description
+   689→            </label>
+   690→            <Textarea
+   691→              value={description}
+   692→              onChange={(e) => setDescription(e.target.value)}
+   693→              placeholder="Optional details or instructions"
+   694→              rows={2}
+   695→            />
+   696→          </div>
+   697→          <div className="grid grid-cols-2 gap-3">
+   698→            <div>
+   699→              <label className="text-xs font-medium text-muted-foreground">
+   700→                Due date
+   701→              </label>
+   702→              <Input
+   703→                type="date"
+   704→                value={dueDate}
+   705→                onChange={(e) => setDueDate(e.target.value)}
+   706→              />
+   707→            </div>
+   708→            <div>
+   709→              <label className="text-xs font-medium text-muted-foreground">
+   710→                Assigned to
+   711→              </label>
+   712→              <Select
+   713→                value={assignedTo || "NONE"}
+   714→                onValueChange={(v) =>
+   715→                  setAssignedTo(v === "NONE" ? "" : v)
+   716→                }
+   717→              >
+   718→                <SelectTrigger>
+   719→                  <SelectValue placeholder="—" />
+   720→                </SelectTrigger>
+   721→                <SelectContent>
+   722→                  <SelectItem value="NONE">—</SelectItem>
+   723→                  <SelectItem value="HR">HR</SelectItem>
+   724→                  <SelectItem value="IT">IT</SelectItem>
+   725→                  <SelectItem value="Finance">Finance</SelectItem>
+   726→                  <SelectItem value="Manager">Manager</SelectItem>
+   727→                  <SelectItem value="Admin">Admin</SelectItem>
+   728→                </SelectContent>
+   729→              </Select>
+   730→            </div>
+   731→          </div>
+   732→        </div>
+   733→        <DialogFooter>
+   734→          <Button
+   735→            variant="ghost"
+   736→            onClick={() => onOpenChange(false)}
+   737→            disabled={saving}
+   738→          >
+   739→            Cancel
+   740→          </Button>
+   741→          <Button onClick={handleSave} disabled={saving}>
+   742→            {saving ? (
+   743→              <Loader2 className="size-4 animate-spin mr-1.5" />
+   744→            ) : (
+   745→              <Plus className="size-4 mr-1.5" />
+   746→            )}
+   747→            Add task
+   748→          </Button>
+   749→        </DialogFooter>
+   750→      </DialogContent>
+   751→    </Dialog>
+   752→  );
+   753→}
+   754→

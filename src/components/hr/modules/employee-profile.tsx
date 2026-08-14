@@ -35,12 +35,16 @@ import {
   CalendarCheck,
   CalendarDays,
   User as UserIcon,
+  DoorOpen,
+  Loader2,
 } from "lucide-react";
 import { EmployeeFormDialog } from "./employee-form-dialog";
 import { SalaryHistory } from "./salary-history";
 import { Onboarding } from "./onboarding";
+import { Offboarding } from "./offboarding";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { formatDate, formatCurrency, relativeTime } from "@/lib/utils";
+import { toast } from "sonner";
 
 export function EmployeeProfile({ id }: { id: string }) {
   const setEmployeeView = useApp((s) => s.setEmployeeView);
@@ -48,11 +52,40 @@ export function EmployeeProfile({ id }: { id: string }) {
   const setModule = useApp((s) => s.setModule);
   const qc = useQueryClient();
   const [editOpen, setEditOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState("overview");
+  const [startingOffboarding, setStartingOffboarding] = useState(false);
 
   const { data: emp, isLoading } = useQuery({
     queryKey: ["employee", id],
     queryFn: () => fetch(`/api/employees/${id}`).then((r) => r.json()),
   });
+
+  // Employee is in offboarding mode if their status is RESIGNED or TERMINATED.
+  const isOffboarding =
+    emp?.employmentStatus === "RESIGNED" ||
+    emp?.employmentStatus === "TERMINATED";
+
+  async function startOffboarding() {
+    setStartingOffboarding(true);
+    try {
+      const r = await fetch(`/api/employees/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ employmentStatus: "RESIGNED" }),
+      });
+      if (!r.ok) {
+        const err = await r.json().catch(() => ({}));
+        throw new Error(err.error || "Failed to start offboarding");
+      }
+      await qc.invalidateQueries({ queryKey: ["employee", id] });
+      toast.success("Offboarding started — status set to RESIGNED.");
+      setActiveTab("offboarding");
+    } catch (e: any) {
+      toast.error(e?.message || "Failed to start offboarding");
+    } finally {
+      setStartingOffboarding(false);
+    }
+  }
 
   if (isLoading) {
     return (
@@ -163,7 +196,7 @@ export function EmployeeProfile({ id }: { id: string }) {
       </Card>
 
       {/* Tabs */}
-      <Tabs defaultValue="overview">
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
         <div className="overflow-x-auto pb-1 -mx-1 px-1">
           <TabsList className="flex w-max">
             <TabsTrigger value="overview">Overview</TabsTrigger>
@@ -175,6 +208,9 @@ export function EmployeeProfile({ id }: { id: string }) {
             <TabsTrigger value="documents">Documents</TabsTrigger>
             <TabsTrigger value="activity">Activity</TabsTrigger>
             <TabsTrigger value="onboarding">Onboarding</TabsTrigger>
+            {isOffboarding && (
+              <TabsTrigger value="offboarding">Offboarding</TabsTrigger>
+            )}
           </TabsList>
         </div>
 
@@ -704,9 +740,50 @@ export function EmployeeProfile({ id }: { id: string }) {
         </TabsContent>
 
         {/* Onboarding */}
-        <TabsContent value="onboarding" className="mt-4">
+        <TabsContent value="onboarding" className="mt-4 space-y-4">
+          {!isOffboarding && (
+            <Card className="border-rose-500/30 bg-rose-50/50 dark:bg-rose-950/10">
+              <CardContent className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="flex items-start gap-3">
+                  <div className="size-10 rounded-xl bg-rose-500/15 text-rose-700 dark:text-rose-300 flex items-center justify-center flex-shrink-0">
+                    <DoorOpen className="size-5" />
+                  </div>
+                  <div>
+                    <div className="font-semibold text-sm">
+                      Initiating an exit?
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Start the offboarding workflow to track the exit
+                      checklist (resignation letter, asset recovery, final
+                      settlement, relieving letter, and more).
+                    </p>
+                  </div>
+                </div>
+                <Button
+                  variant="outline"
+                  className="border-rose-500/40 text-rose-700 dark:text-rose-300 hover:bg-rose-500/10"
+                  onClick={startOffboarding}
+                  disabled={startingOffboarding}
+                >
+                  {startingOffboarding ? (
+                    <Loader2 className="size-4 mr-1.5 animate-spin" />
+                  ) : (
+                    <DoorOpen className="size-4 mr-1.5" />
+                  )}
+                  Start Offboarding
+                </Button>
+              </CardContent>
+            </Card>
+          )}
           <Onboarding employeeId={id} />
         </TabsContent>
+
+        {/* Offboarding */}
+        {isOffboarding && (
+          <TabsContent value="offboarding" className="mt-4">
+            <Offboarding employeeId={id} />
+          </TabsContent>
+        )}
       </Tabs>
 
       <EmployeeFormDialog
