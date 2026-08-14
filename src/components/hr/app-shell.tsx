@@ -10,10 +10,14 @@ import { LeaveModule } from "./modules/leave";
 import { PayrollModule } from "./modules/payroll";
 import { PerformanceModule } from "./modules/performance";
 import { RecruitmentModule } from "./modules/recruitment";
+import { InterviewsModule } from "./modules/interviews";
+import { SurveysModule } from "./modules/surveys";
 import { DocumentsModule } from "./modules/documents";
 import { ReportsModule } from "./modules/reports";
 import { AuditModule } from "./modules/audit";
 import { SettingsModule } from "./modules/settings";
+import { AssetsModule } from "./modules/assets";
+import { TrainingModule } from "./modules/training";
 import { CommandPalette } from "./command-palette";
 import { QuickActions } from "./quick-actions";
 import { useKeyboardShortcuts } from "@/hooks/use-keyboard-shortcuts";
@@ -29,10 +33,14 @@ const MODULE_COMPONENTS: Record<string, React.ComponentType> = {
   payroll: PayrollModule,
   performance: PerformanceModule,
   recruitment: RecruitmentModule,
+  interviews: InterviewsModule,
+  feedback: SurveysModule,
   documents: DocumentsModule,
   reports: ReportsModule,
   audit: AuditModule,
   settings: SettingsModule,
+  assets: AssetsModule,
+  training: TrainingModule,
 };
 
 export function AppShell() {

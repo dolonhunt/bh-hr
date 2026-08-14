@@ -16,7 +16,10 @@ type ModuleKey =
   | "candidates"
   | "audit"
   | "documents"
-  | "email-logs";
+  | "email-logs"
+  | "assets"
+  | "training-courses"
+  | "training-enrollments";
 
 const VALID_MODULES: ModuleKey[] = [
   "employees",
@@ -28,6 +31,9 @@ const VALID_MODULES: ModuleKey[] = [
   "audit",
   "documents",
   "email-logs",
+  "assets",
+  "training-courses",
+  "training-enrollments",
 ];
 
 // CSV escaping: wrap fields containing commas, quotes, or newlines in double quotes;
@@ -561,6 +567,308 @@ async function fetchEmailLogs(p: ExportParams) {
 }
 
 // ============================================================
+// Assets & Training (stored in Activity model with JSON metadata)
+// ============================================================
+
+function parseAssetMeta(description: string | null) {
+  const fallback = {
+    name: "",
+    type: "OTHER",
+    serialNumber: "",
+    condition: "GOOD",
+    status: "AVAILABLE",
+    notes: null as string | null,
+    assignedToId: null as string | null,
+    assignedToName: null as string | null,
+    assignedDate: null as string | null,
+    returnDate: null as string | null,
+    expectedReturnDate: null as string | null,
+  };
+  if (!description) return fallback;
+  try {
+    const parsed = JSON.parse(description);
+    return {
+      name: String(parsed.name ?? ""),
+      type: String(parsed.type ?? "OTHER"),
+      serialNumber: String(parsed.serialNumber ?? ""),
+      condition: String(parsed.condition ?? "GOOD"),
+      status: String(parsed.status ?? "AVAILABLE"),
+      notes: parsed.notes ?? null,
+      assignedToId: parsed.assignedToId ?? null,
+      assignedToName: parsed.assignedToName ?? null,
+      assignedDate: parsed.assignedDate ?? null,
+      returnDate: parsed.returnDate ?? null,
+      expectedReturnDate: parsed.expectedReturnDate ?? null,
+    };
+  } catch {
+    return fallback;
+  }
+}
+
+function parseCourseMeta(description: string | null) {
+  const fallback = {
+    description: null as string | null,
+    trainer: null as string | null,
+    startDate: null as string | null,
+    endDate: null as string | null,
+    duration: "",
+    capacity: 0,
+    category: "General",
+    status: "SCHEDULED",
+  };
+  if (!description) return fallback;
+  try {
+    const parsed = JSON.parse(description);
+    return {
+      description: parsed.description ?? null,
+      trainer: parsed.trainer ?? null,
+      startDate: parsed.startDate ?? null,
+      endDate: parsed.endDate ?? null,
+      duration: String(parsed.duration ?? ""),
+      capacity: Number(parsed.capacity ?? 0) || 0,
+      category: String(parsed.category ?? "General"),
+      status: String(parsed.status ?? "SCHEDULED"),
+    };
+  } catch {
+    return fallback;
+  }
+}
+
+function parseEnrollmentMeta(description: string | null) {
+  const fallback = {
+    courseId: "",
+    courseTitle: "",
+    enrolledAt: "",
+    completedAt: null as string | null,
+    score: null as number | null,
+    certificate: null as string | null,
+    status: "ENROLLED",
+  };
+  if (!description) return fallback;
+  try {
+    const parsed = JSON.parse(description);
+    return {
+      courseId: String(parsed.courseId ?? ""),
+      courseTitle: String(parsed.courseTitle ?? ""),
+      enrolledAt: parsed.enrolledAt ?? "",
+      completedAt: parsed.completedAt ?? null,
+      score:
+        parsed.score === null || parsed.score === undefined
+          ? null
+          : Number(parsed.score),
+      certificate: parsed.certificate ?? null,
+      status: String(parsed.status ?? "ENROLLED"),
+    };
+  } catch {
+    return fallback;
+  }
+}
+
+async function fetchAssets(p: ExportParams) {
+  const where: any = { type: "ASSET" };
+  if (p.search) {
+    where.OR = [
+      { title: { contains: p.search } },
+      { description: { contains: p.search } },
+    ];
+  }
+  // employeeId filter (if assignedToId is provided via "departmentId" or "employeeId"
+  // we apply it via the activity.employeeId column).
+  if (p.entityType === "employeeId") {
+    // not used; placeholder for clarity
+  }
+
+  const items = await db.activity.findMany({
+    where,
+    orderBy: { createdAt: "desc" },
+  });
+
+  let rows = items.map((a) => {
+    const m = parseAssetMeta(a.description);
+    return {
+      name: m.name || a.title,
+      type: m.type,
+      serial: m.serialNumber,
+      condition: m.condition,
+      status: m.status,
+      assignedTo: m.assignedToName ?? "",
+      assignedDate: m.assignedDate ? fmtDateOnly(m.assignedDate) : "",
+      returnDate: m.returnDate ? fmtDateOnly(m.returnDate) : "",
+      expectedReturnDate: m.expectedReturnDate
+        ? fmtDateOnly(m.expectedReturnDate)
+        : "",
+      notes: m.notes ?? "",
+      createdAt: fmtDate(a.createdAt),
+    };
+  });
+
+  if (p.status) rows = rows.filter((r) => r.status === p.status.toUpperCase());
+  if (p.type) rows = rows.filter((r) => r.type === p.type.toUpperCase());
+
+  const headers = [
+    "Asset Name",
+    "Type",
+    "Serial Number",
+    "Condition",
+    "Assigned To",
+    "Assigned Date",
+    "Return Date",
+    "Expected Return",
+    "Status",
+    "Notes",
+    "Created At",
+  ];
+  const csvRows: (string | number | null | undefined)[][] = rows.map((r) => [
+    r.name,
+    r.type,
+    r.serial,
+    r.condition,
+    r.assignedTo,
+    r.assignedDate,
+    r.returnDate,
+    r.expectedReturnDate,
+    r.status,
+    r.notes,
+    r.createdAt,
+  ]);
+  return { headers, rows: csvRows };
+}
+
+async function fetchTrainingCourses(p: ExportParams) {
+  const where: any = { type: "TRAINING_COURSE" };
+  if (p.search) {
+    where.OR = [
+      { title: { contains: p.search } },
+      { description: { contains: p.search } },
+    ];
+  }
+
+  const items = await db.activity.findMany({
+    where,
+    orderBy: { createdAt: "desc" },
+  });
+
+  // Enrollment counts
+  const enrollments = await db.activity.findMany({
+    where: { type: "TRAINING_ENROLLMENT" },
+    select: { description: true },
+  });
+  const countByCourse: Record<string, number> = {};
+  for (const e of enrollments) {
+    const m = parseEnrollmentMeta(e.description);
+    if (m.status === "DROPPED") continue;
+    countByCourse[m.courseId] = (countByCourse[m.courseId] ?? 0) + 1;
+  }
+
+  let rows = items.map((a) => {
+    const m = parseCourseMeta(a.description);
+    return {
+      title: a.title,
+      trainer: m.trainer ?? "",
+      category: m.category,
+      startDate: m.startDate ? fmtDateOnly(m.startDate) : "",
+      endDate: m.endDate ? fmtDateOnly(m.endDate) : "",
+      duration: m.duration,
+      capacity: m.capacity,
+      enrolled: countByCourse[a.id] ?? 0,
+      status: m.status,
+      description: m.description ?? "",
+    };
+  });
+
+  if (p.status)
+    rows = rows.filter((r) => r.status === p.status.toUpperCase());
+
+  const headers = [
+    "Course Title",
+    "Category",
+    "Trainer",
+    "Start Date",
+    "End Date",
+    "Duration",
+    "Capacity",
+    "Enrolled",
+    "Status",
+    "Description",
+  ];
+  const csvRows: (string | number | null | undefined)[][] = rows.map((r) => [
+    r.title,
+    r.category,
+    r.trainer,
+    r.startDate,
+    r.endDate,
+    r.duration,
+    r.capacity,
+    r.enrolled,
+    r.status,
+    r.description,
+  ]);
+  return { headers, rows: csvRows };
+}
+
+async function fetchTrainingEnrollments(p: ExportParams) {
+  const where: any = { type: "TRAINING_ENROLLMENT" };
+  if (p.search) {
+    where.OR = [
+      { title: { contains: p.search } },
+      { description: { contains: p.search } },
+    ];
+  }
+
+  const items = await db.activity.findMany({
+    where,
+    include: {
+      employee: {
+        select: { id: true, fullName: true, employeeId: true },
+      },
+    },
+    orderBy: { createdAt: "desc" },
+  });
+
+  let rows = items.map((a) => {
+    const m = parseEnrollmentMeta(a.description);
+    return {
+      employeeName: a.employee?.fullName ?? "",
+      employeeCode: a.employee?.employeeId ?? "",
+      course: m.courseTitle,
+      enrolledAt: m.enrolledAt ? fmtDateOnly(m.enrolledAt) : "",
+      completedAt: m.completedAt ? fmtDateOnly(m.completedAt) : "",
+      score: m.score ?? "",
+      certificate: m.certificate ?? "",
+      status: m.status,
+    };
+  });
+
+  if (p.status)
+    rows = rows.filter((r) => r.status === p.status.toUpperCase());
+  if (p.entityType === "courseId") {
+    // optional filter — entityType carries courseId value when supplied as courseId=<x>
+  }
+
+  const headers = [
+    "Employee Name",
+    "Employee Code",
+    "Course",
+    "Enrolled At",
+    "Completed At",
+    "Score",
+    "Certificate",
+    "Status",
+  ];
+  const csvRows: (string | number | null | undefined)[][] = rows.map((r) => [
+    r.employeeName,
+    r.employeeCode,
+    r.course,
+    r.enrolledAt,
+    r.completedAt,
+    r.score,
+    r.certificate,
+    r.status,
+  ]);
+  return { headers, rows: csvRows };
+}
+
+// ============================================================
 // Route handler
 // ============================================================
 
@@ -628,6 +936,15 @@ export async function GET(req: NextRequest) {
         break;
       case "email-logs":
         result = await fetchEmailLogs(params);
+        break;
+      case "assets":
+        result = await fetchAssets(params);
+        break;
+      case "training-courses":
+        result = await fetchTrainingCourses(params);
+        break;
+      case "training-enrollments":
+        result = await fetchTrainingEnrollments(params);
         break;
       default:
         return NextResponse.json({ error: "Invalid module" }, { status: 400 });

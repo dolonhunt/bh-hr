@@ -11,10 +11,14 @@ export type ModuleKey =
   | "payroll"
   | "performance"
   | "recruitment"
+  | "interviews"
+  | "feedback"
   | "documents"
   | "reports"
   | "audit"
   | "settings"
+  | "assets"
+  | "training"
   | "search";
 
 export type EmployeeView = "list" | "grid" | "new" | "profile";

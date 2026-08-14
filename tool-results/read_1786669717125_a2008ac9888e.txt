@@ -1,0 +1,993 @@
+     1→"use client";
+     2→
+     3→import { useState, useMemo } from "react";
+     4→import { useQuery, useQueryClient } from "@tanstack/react-query";
+     5→import { toast } from "sonner";
+     6→import {
+     7→  Card,
+     8→  CardContent,
+     9→  CardHeader,
+    10→  CardTitle,
+    11→} from "@/components/ui/card";
+    12→import { Button } from "@/components/ui/button";
+    13→import { Input } from "@/components/ui/input";
+    14→import { Textarea } from "@/components/ui/textarea";
+    15→import { Checkbox } from "@/components/ui/checkbox";
+    16→import { Badge } from "@/components/ui/badge";
+    17→import { Progress } from "@/components/ui/progress";
+    18→import {
+    19→  Dialog,
+    20→  DialogContent,
+    21→  DialogHeader,
+    22→  DialogTitle,
+    23→  DialogFooter,
+    24→  DialogDescription,
+    25→} from "@/components/ui/dialog";
+    26→import {
+    27→  Select,
+    28→  SelectContent,
+    29→  SelectItem,
+    30→  SelectTrigger,
+    31→  SelectValue,
+    32→} from "@/components/ui/select";
+    33→import {
+    34→  Plus,
+    35→  SkipForward,
+    36→  Trash2,
+    37→  Loader2,
+    38→  CheckCircle2,
+    39→  CircleDashed,
+    40→  CircleDot,
+    41→  CalendarDays,
+    42→  UserCog,
+    43→  StickyNote,
+    44→  CheckCircle,
+    45→  RotateCcw,
+    46→  PencilLine,
+    47→  DoorOpen,
+    48→  AlertTriangle,
+    49→  CalendarX,
+    50→} from "lucide-react";
+    51→import { cn, formatDate } from "@/lib/utils";
+    52→import { StatusBadge } from "../shared/status-badge";
+    53→import { EmptyState } from "../shared/empty-state";
+    54→
+    55→type OffboardingStatus =
+    56→  | "PENDING"
+    57→  | "IN_PROGRESS"
+    58→  | "COMPLETED"
+    59→  | "SKIPPED";
+    60→
+    61→type ExitReason =
+    62→  | "RESIGNATION"
+    63→  | "TERMINATION"
+    64→  | "CONTRACT_END"
+    65→  | "RETIREMENT";
+    66→
+    67→interface OffboardingTask {
+    68→  id: string;
+    69→  employeeId: string;
+    70→  title: string;
+    71→  description?: string | null;
+    72→  dueDate?: string | null;
+    73→  assignedTo?: string | null;
+    74→  status: OffboardingStatus;
+    75→  notes?: string | null;
+    76→  completedAt?: string | null;
+    77→  sortOrder: number;
+    78→  isDefault: boolean;
+    79→  exitDate?: string | null;
+    80→  exitReason?: ExitReason | null;
+    81→  createdAt: string;
+    82→  updatedAt: string;
+    83→}
+    84→
+    85→const STATUS_CYCLE: Record<OffboardingStatus, OffboardingStatus> = {
+    86→  PENDING: "IN_PROGRESS",
+    87→  IN_PROGRESS: "COMPLETED",
+    88→  COMPLETED: "PENDING",
+    89→  SKIPPED: "PENDING",
+    90→};
+    91→
+    92→const STATUS_ICON: Record<OffboardingStatus, typeof CheckCircle2> = {
+    93→  PENDING: CircleDashed,
+    94→  IN_PROGRESS: CircleDot,
+    95→  COMPLETED: CheckCircle2,
+    96→  SKIPPED: SkipForward,
+    97→};
+    98→
+    99→const STATUS_COLOR: Record<OffboardingStatus, string> = {
+   100→  PENDING: "text-muted-foreground",
+   101→  IN_PROGRESS: "text-amber-600",
+   102→  COMPLETED: "text-emerald-600",
+   103→  SKIPPED: "text-rose-600",
+   104→};
+   105→
+   106→const EXIT_REASON_LABEL: Record<ExitReason, string> = {
+   107→  RESIGNATION: "Resignation",
+   108→  TERMINATION: "Termination",
+   109→  CONTRACT_END: "Contract End",
+   110→  RETIREMENT: "Retirement",
+   111→};
+   112→
+   113→const EXIT_REASON_TONE: Record<ExitReason, string> = {
+   114→  RESIGNATION: "bg-rose-500/10 text-rose-700 dark:text-rose-300",
+   115→  TERMINATION: "bg-rose-500/15 text-rose-800 dark:text-rose-200",
+   116→  CONTRACT_END: "bg-amber-500/10 text-amber-700 dark:text-amber-300",
+   117→  RETIREMENT: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
+   118→};
+   119→
+   120→function isOverdue(dueDate?: string | null, status?: OffboardingStatus) {
+   121→  if (!dueDate) return false;
+   122→  if (status === "COMPLETED" || status === "SKIPPED") return false;
+   123→  return new Date(dueDate).getTime() < Date.now();
+   124→}
+   125→
+   126→function ProgressRing({ percent }: { percent: number }) {
+   127→  const size = 96;
+   128→  const stroke = 8;
+   129→  const r = (size - stroke) / 2;
+   130→  const c = 2 * Math.PI * r;
+   131→  const offset = c - (Math.min(100, Math.max(0, percent)) / 100) * c;
+   132→  return (
+   133→    <div className="relative" style={{ width: size, height: size }}>
+   134→      <svg width={size} height={size} className="-rotate-90">
+   135→        <circle
+   136→          cx={size / 2}
+   137→          cy={size / 2}
+   138→          r={r}
+   139→          fill="none"
+   140→          strokeWidth={stroke}
+   141→          className="stroke-muted"
+   142→        />
+   143→        <circle
+   144→          cx={size / 2}
+   145→          cy={size / 2}
+   146→          r={r}
+   147→          fill="none"
+   148→          strokeWidth={stroke}
+   149→          strokeLinecap="round"
+   150→          className="stroke-rose-500 transition-all duration-500"
+   151→          strokeDasharray={c}
+   152→          strokeDashoffset={offset}
+   153→        />
+   154→      </svg>
+   155→      <div className="absolute inset-0 flex flex-col items-center justify-center">
+   156→        <span className="text-2xl font-bold tabular-nums">
+   157→          {Math.round(percent)}%
+   158→        </span>
+   159→        <span className="text-[10px] text-muted-foreground uppercase tracking-wide">
+   160→          Complete
+   161→        </span>
+   162→      </div>
+   163→    </div>
+   164→  );
+   165→}
+   166→
+   167→function daysUntilExit(exitDate?: string | null): number | null {
+   168→  if (!exitDate) return null;
+   169→  const exit = new Date(exitDate);
+   170→  if (isNaN(exit.getTime())) return null;
+   171→  const today = new Date();
+   172→  today.setHours(0, 0, 0, 0);
+   173→  exit.setHours(0, 0, 0, 0);
+   174→  return Math.round((exit.getTime() - today.getTime()) / (24 * 60 * 60 * 1000));
+   175→}
+   176→
+   177→export function Offboarding({ employeeId }: { employeeId: string }) {
+   178→  const qc = useQueryClient();
+   179→  const [filter, setFilter] = useState<"all" | "pending" | "completed">("all");
+   180→  const [addOpen, setAddOpen] = useState(false);
+   181→  const [exitEditOpen, setExitEditOpen] = useState(false);
+   182→  const [updatingId, setUpdatingId] = useState<string | null>(null);
+   183→  const [editingNotesId, setEditingNotesId] = useState<string | null>(null);
+   184→  const [notesDraft, setNotesDraft] = useState("");
+   185→
+   186→  const queryKey = ["offboarding", employeeId];
+   187→
+   188→  const { data, isLoading, isError } = useQuery({
+   189→    queryKey,
+   190→    queryFn: async () => {
+   191→      const r = await fetch(`/api/offboarding?employeeId=${employeeId}`);
+   192→      if (!r.ok) throw new Error("Failed to load offboarding tasks");
+   193→      return r.json();
+   194→    },
+   195→  });
+   196→
+   197→  const tasks: OffboardingTask[] = data?.items ?? [];
+   198→
+   199→  const exitDate = tasks[0]?.exitDate ?? null;
+   200→  const exitReason = tasks[0]?.exitReason ?? null;
+   201→
+   202→  const stats = useMemo(() => {
+   203→    const total = tasks.length;
+   204→    const completed = tasks.filter((t) => t.status === "COMPLETED").length;
+   205→    const inProgress = tasks.filter((t) => t.status === "IN_PROGRESS").length;
+   206→    const skipped = tasks.filter((t) => t.status === "SKIPPED").length;
+   207→    const pending = tasks.filter((t) => t.status === "PENDING").length;
+   208→    const overdue = tasks.filter((t) => isOverdue(t.dueDate, t.status)).length;
+   209→    const activeTotal = total - skipped;
+   210→    const percent = activeTotal > 0 ? (completed / activeTotal) * 100 : 0;
+   211→    return { total, completed, inProgress, skipped, pending, overdue, percent };
+   212→  }, [tasks]);
+   213→
+   214→  const filteredTasks = useMemo(() => {
+   215→    if (filter === "pending") {
+   216→      return tasks.filter(
+   217→        (t) => t.status === "PENDING" || t.status === "IN_PROGRESS"
+   218→      );
+   219→    }
+   220→    if (filter === "completed") {
+   221→      return tasks.filter(
+   222→        (t) => t.status === "COMPLETED" || t.status === "SKIPPED"
+   223→      );
+   224→    }
+   225→    return tasks;
+   226→  }, [tasks, filter]);
+   227→
+   228→  async function patchTask(id: string, patch: Record<string, unknown>) {
+   229→    setUpdatingId(id);
+   230→    try {
+   231→      const r = await fetch(`/api/offboarding/${id}`, {
+   232→        method: "PATCH",
+   233→        headers: { "Content-Type": "application/json" },
+   234→        body: JSON.stringify(patch),
+   235→      });
+   236→      if (!r.ok) {
+   237→        const err = await r.json().catch(() => ({}));
+   238→        throw new Error(err.error || "Update failed");
+   239→      }
+   240→      await qc.invalidateQueries({ queryKey });
+   241→    } catch (e: any) {
+   242→      toast.error(e?.message || "Failed to update task");
+   243→    } finally {
+   244→      setUpdatingId(null);
+   245→    }
+   246→  }
+   247→
+   248→  async function cycleStatus(task: OffboardingTask) {
+   249→    const next = STATUS_CYCLE[task.status];
+   250→    await patchTask(task.id, { status: next });
+   251→    toast.success(`Marked as ${next.replace(/_/g, " ").toLowerCase()}`);
+   252→  }
+   253→
+   254→  async function skipTask(task: OffboardingTask) {
+   255→    await patchTask(task.id, { status: "SKIPPED" });
+   256→    toast.success(`Task skipped`);
+   257→  }
+   258→
+   259→  async function deleteTask(task: OffboardingTask) {
+   260→    setUpdatingId(task.id);
+   261→    try {
+   262→      const r = await fetch(`/api/offboarding/${task.id}`, {
+   263→        method: "DELETE",
+   264→      });
+   265→      if (!r.ok) throw new Error("Delete failed");
+   266→      await qc.invalidateQueries({ queryKey });
+   267→      toast.success("Task removed");
+   268→    } catch (e: any) {
+   269→      toast.error(e?.message || "Failed to delete task");
+   270→    } finally {
+   271→      setUpdatingId(null);
+   272→    }
+   273→  }
+   274→
+   275→  function startEditNotes(task: OffboardingTask) {
+   276→    setEditingNotesId(task.id);
+   277→    setNotesDraft(task.notes ?? "");
+   278→  }
+   279→
+   280→  async function saveNotes(task: OffboardingTask) {
+   281→    await patchTask(task.id, { notes: notesDraft });
+   282→    setEditingNotesId(null);
+   283→    toast.success("Notes saved");
+   284→  }
+   285→
+   286→  if (isLoading) {
+   287→    return (
+   288→      <div className="space-y-4">
+   289→        <div className="h-32 rounded-xl bg-muted/40 animate-pulse" />
+   290→        <div className="h-20 rounded-xl bg-muted/40 animate-pulse" />
+   291→        <div className="h-20 rounded-xl bg-muted/40 animate-pulse" />
+   292→        <div className="h-20 rounded-xl bg-muted/40 animate-pulse" />
+   293→      </div>
+   294→    );
+   295→  }
+   296→
+   297→  if (isError) {
+   298→    return (
+   299→      <EmptyState
+   300→        icon={CircleDashed}
+   301→        title="Couldn't load offboarding tasks"
+   302→        description="Please try again in a moment."
+   303→      />
+   304→    );
+   305→  }
+   306→
+   307→  const dLeft = daysUntilExit(exitDate);
+   308→
+   309→  return (
+   310→    <div className="space-y-4">
+   311→      {/* Exit summary card */}
+   312→      <Card className="border-rose-500/30 shadow-soft bg-gradient-to-br from-rose-50/60 via-amber-50/30 to-card dark:from-rose-950/20 dark:via-amber-950/10">
+   313→        <CardContent className="p-4 sm:p-6">
+   314→          <div className="flex flex-col sm:flex-row items-center gap-6">
+   315→            <ProgressRing percent={stats.percent} />
+   316→            <div className="flex-1 w-full space-y-3">
+   317→              <div className="flex items-center justify-between flex-wrap gap-2">
+   318→                <div>
+   319→                  <div className="flex items-center gap-2">
+   320→                    <DoorOpen className="size-4 text-rose-600" />
+   321→                    <span className="text-xs font-semibold uppercase tracking-wide text-rose-700 dark:text-rose-300">
+   322→                      Employee Offboarding
+   323→                    </span>
+   324→                  </div>
+   325→                  <div className="text-lg font-semibold mt-1">
+   326→                    {stats.completed} of {stats.total} tasks completed
+   327→                  </div>
+   328→                  <div className="text-xs text-muted-foreground mt-0.5">
+   329→                    {exitDate
+   330→                      ? `Exit scheduled for ${formatDate(exitDate)}`
+   331→                      : "No exit date set yet"}
+   332→                    {exitReason && (
+   333→                      <span className="ml-2">· {EXIT_REASON_LABEL[exitReason]}</span>
+   334→                    )}
+   335→                  </div>
+   336→                </div>
+   337→                <div className="flex gap-2 flex-wrap">
+   338→                  <Button
+   339→                    size="sm"
+   340→                    variant="outline"
+   341→                    onClick={() => setExitEditOpen(true)}
+   342→                  >
+   343→                    <CalendarDays className="size-4 mr-1.5" />
+   344→                    Edit Exit Info
+   345→                  </Button>
+   346→                  <Button size="sm" onClick={() => setAddOpen(true)}>
+   347→                    <Plus className="size-4 mr-1.5" /> Add Task
+   348→                  </Button>
+   349→                </div>
+   350→              </div>
+   351→              <Progress
+   352→                value={stats.percent}
+   353→                className="h-2.5 [&>div]:bg-rose-500"
+   354→              />
+   355→              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+   356→                <StatPill label="Pending" value={stats.pending} tone="amber" />
+   357→                <StatPill
+   358→                  label="In Progress"
+   359→                  value={stats.inProgress}
+   360→                  tone="sky"
+   361→                />
+   362→                <StatPill
+   363→                  label="Completed"
+   364→                  value={stats.completed}
+   365→                  tone="emerald"
+   366→                />
+   367→                <StatPill label="Skipped" value={stats.skipped} tone="rose" />
+   368→              </div>
+   369→              <div className="flex flex-wrap items-center gap-2 text-xs">
+   370→                {exitReason && (
+   371→                  <span
+   372→                    className={cn(
+   373→                      "inline-flex items-center gap-1.5 px-2 py-1 rounded-md font-medium",
+   374→                      EXIT_REASON_TONE[exitReason]
+   375→                    )}
+   376→                  >
+   377→                    <AlertTriangle className="size-3" />
+   378→                    {EXIT_REASON_LABEL[exitReason]}
+   379→                  </span>
+   380→                )}
+   381→                {dLeft !== null && dLeft > 0 && (
+   382→                  <span className="inline-flex items-center gap-1.5 text-amber-700 dark:text-amber-300 font-medium">
+   383→                    <CalendarX className="size-3" />
+   384→                    {dLeft} day{dLeft === 1 ? "" : "s"} until exit
+   385→                  </span>
+   386→                )}
+   387→                {dLeft !== null && dLeft === 0 && (
+   388→                  <span className="inline-flex items-center gap-1.5 text-rose-700 dark:text-rose-300 font-medium">
+   389→                    <CalendarX className="size-3" />
+   390→                    Exit is today
+   391→                  </span>
+   392→                )}
+   393→                {dLeft !== null && dLeft < 0 && (
+   394→                  <span className="inline-flex items-center gap-1.5 text-rose-700 dark:text-rose-300 font-medium">
+   395→                    <CalendarX className="size-3" />
+   396→                    Exit date passed {Math.abs(dLeft)}d ago
+   397→                  </span>
+   398→                )}
+   399→                {stats.overdue > 0 && (
+   400→                  <span className="inline-flex items-center gap-1.5 text-rose-600 font-medium">
+   401→                    <CalendarDays className="size-3" />
+   402→                    {stats.overdue} task{stats.overdue > 1 ? "s" : ""} overdue
+   403→                  </span>
+   404→                )}
+   405→              </div>
+   406→            </div>
+   407→          </div>
+   408→        </CardContent>
+   409→      </Card>
+   410→
+   411→      {/* Filters */}
+   412→      <div className="flex items-center justify-between gap-3 flex-wrap">
+   413→        <div className="inline-flex rounded-lg border border-border overflow-hidden">
+   414→          {(["all", "pending", "completed"] as const).map((f) => (
+   415→            <button
+   416→              key={f}
+   417→              onClick={() => setFilter(f)}
+   418→              className={cn(
+   419→                "px-3 py-1.5 text-xs font-medium capitalize transition-colors",
+   420→                filter === f
+   421→                  ? "bg-primary text-primary-foreground"
+   422→                  : "hover:bg-muted text-muted-foreground"
+   423→              )}
+   424→            >
+   425→              {f === "all"
+   426→                ? `All (${stats.total})`
+   427→                : f === "pending"
+   428→                  ? `Pending (${stats.pending + stats.inProgress})`
+   429→                  : `Completed (${stats.completed + stats.skipped})`}
+   430→            </button>
+   431→          ))}
+   432→        </div>
+   433→      </div>
+   434→
+   435→      {/* Checklist */}
+   436→      {filteredTasks.length === 0 ? (
+   437→        <EmptyState
+   438→          icon={CheckCircle}
+   439→          title="No offboarding tasks here"
+   440→          description={
+   441→            filter === "all"
+   442→              ? "Add a custom task to start tracking offboarding progress."
+   443→              : "No tasks match this filter."
+   444→          }
+   445→          actionLabel="Add Task"
+   446→          onAction={() => setAddOpen(true)}
+   447→        />
+   448→      ) : (
+   449→        <div className="space-y-2.5">
+   450→          {filteredTasks.map((task) => {
+   451→            const StatusIcon = STATUS_ICON[task.status];
+   452→            const overdue = isOverdue(task.dueDate, task.status);
+   453→            const isUpdating = updatingId === task.id;
+   454→            const isEditingNotes = editingNotesId === task.id;
+   455→            return (
+   456→              <Card
+   457→                key={task.id}
+   458→                className={cn(
+   459→                  "border-border/60 shadow-soft transition-all",
+   460→                  task.status === "COMPLETED" && "opacity-75",
+   461→                  task.status === "SKIPPED" && "opacity-60"
+   462→                )}
+   463→              >
+   464→                <CardContent className="p-4">
+   465→                  <div className="flex items-start gap-3">
+   466→                    <button
+   467→                      onClick={() => cycleStatus(task)}
+   468→                      disabled={isUpdating}
+   469→                      className="flex-shrink-0 mt-0.5 disabled:opacity-50"
+   470→                      aria-label={`Cycle status (currently ${task.status})`}
+   471→                      title={`Status: ${task.status.replace(/_/g, " ")} — click to advance`}
+   472→                    >
+   473→                      <Checkbox
+   474→                        checked={task.status === "COMPLETED"}
+   475→                        className={cn(
+   476→                          "size-5 data-[state=checked]:bg-rose-500 data-[state=checked]:border-rose-500",
+   477→                          task.status === "IN_PROGRESS" &&
+   478→                            "border-amber-500 data-[state=checked]:bg-amber-500 data-[state=checked]:border-amber-500"
+   479→                        )}
+   480→                      />
+   481→                    </button>
+   482→
+   483→                    <div className="flex-1 min-w-0 space-y-1.5">
+   484→                      <div className="flex items-start justify-between gap-2 flex-wrap">
+   485→                        <div className="flex items-start gap-2 min-w-0">
+   486→                          <StatusIcon
+   487→                            className={cn(
+   488→                              "size-4 mt-0.5 flex-shrink-0",
+   489→                              STATUS_COLOR[task.status]
+   490→                            )}
+   491→                          />
+   492→                          <div className="min-w-0">
+   493→                            <div
+   494→                              className={cn(
+   495→                                "text-sm font-medium leading-tight",
+   496→                                task.status === "COMPLETED" &&
+   497→                                  "line-through text-muted-foreground",
+   498→                                task.status === "SKIPPED" &&
+   499→                                  "line-through text-muted-foreground"
+   500→                              )}
+   501→                            >
+   502→                              {task.title}
+   503→                              {!task.isDefault && (
+   504→                                <Badge
+   505→                                  variant="outline"
+   506→                                  className="ml-2 text-[10px] py-0 px-1.5 font-normal"
+   507→                                >
+   508→                                  Custom
+   509→                                </Badge>
+   510→                              )}
+   511→                            </div>
+   512→                            {task.description && (
+   513→                              <div className="text-xs text-muted-foreground mt-0.5">
+   514→                                {task.description}
+   515→                              </div>
+   516→                            )}
+   517→                          </div>
+   518→                        </div>
+   519→                        <StatusBadge
+   520→                          status={task.status}
+   521→                          label={task.status.replace(/_/g, " ")}
+   522→                        />
+   523→                      </div>
+   524→
+   525→                      {/* Meta row */}
+   526→                      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-muted-foreground">
+   527→                        {task.assignedTo && (
+   528→                          <span className="inline-flex items-center gap-1">
+   529→                            <UserCog className="size-3" />
+   530→                            {task.assignedTo}
+   531→                          </span>
+   532→                        )}
+   533→                        {task.dueDate && (
+   534→                          <span
+   535→                            className={cn(
+   536→                              "inline-flex items-center gap-1",
+   537→                              overdue && "text-rose-600 font-medium"
+   538→                            )}
+   539→                          >
+   540→                            <CalendarDays className="size-3" />
+   541→                            Due {formatDate(task.dueDate)}
+   542→                            {overdue && " · overdue"}
+   543→                          </span>
+   544→                        )}
+   545→                        {task.completedAt && (
+   546→                          <span className="inline-flex items-center gap-1 text-emerald-600">
+   547→                            <CheckCircle className="size-3" />
+   548→                            Done {formatDate(task.completedAt)}
+   549→                          </span>
+   550→                        )}
+   551→                      </div>
+   552→
+   553→                      {/* Notes */}
+   554→                      {isEditingNotes ? (
+   555→                        <div className="space-y-2 mt-2">
+   556→                          <Textarea
+   557→                            value={notesDraft}
+   558→                            onChange={(e) => setNotesDraft(e.target.value)}
+   559→                            placeholder="Add a note about this task…"
+   560→                            rows={2}
+   561→                            className="text-xs"
+   562→                          />
+   563→                          <div className="flex gap-2">
+   564→                            <Button
+   565→                              size="sm"
+   566→                              onClick={() => saveNotes(task)}
+   567→                              disabled={isUpdating}
+   568→                            >
+   569→                              {isUpdating ? (
+   570→                                <Loader2 className="size-3.5 animate-spin mr-1" />
+   571→                              ) : (
+   572→                                <CheckCircle className="size-3.5 mr-1" />
+   573→                              )}
+   574→                              Save
+   575→                            </Button>
+   576→                            <Button
+   577→                              size="sm"
+   578→                              variant="ghost"
+   579→                              onClick={() => setEditingNotesId(null)}
+   580→                            >
+   581→                              Cancel
+   582→                            </Button>
+   583→                          </div>
+   584→                        </div>
+   585→                      ) : (
+   586→                        <button
+   587→                          onClick={() => startEditNotes(task)}
+   588→                          className="group flex items-start gap-1.5 text-xs text-left mt-1 max-w-full"
+   589→                        >
+   590→                          <StickyNote className="size-3 mt-0.5 text-muted-foreground flex-shrink-0" />
+   591→                          {task.notes ? (
+   592→                            <span className="text-foreground break-words">
+   593→                              {task.notes}
+   594→                            </span>
+   595→                          ) : (
+   596→                            <span className="text-muted-foreground group-hover:text-foreground inline-flex items-center gap-1">
+   597→                              Add a note
+   598→                              <PencilLine className="size-3 opacity-0 group-hover:opacity-100" />
+   599→                            </span>
+   600→                          )}
+   601→                        </button>
+   602→                      )}
+   603→                    </div>
+   604→
+   605→                    {/* Action buttons */}
+   606→                    <div className="flex flex-col gap-1 flex-shrink-0">
+   607→                      {task.status !== "SKIPPED" && (
+   608→                        <Button
+   609→                          size="sm"
+   610→                          variant="ghost"
+   611→                          className="h-7 text-xs text-muted-foreground hover:text-rose-600"
+   612→                          onClick={() => skipTask(task)}
+   613→                          disabled={isUpdating}
+   614→                          title="Skip this task"
+   615→                        >
+   616→                          <SkipForward className="size-3.5 mr-1" /> Skip
+   617→                        </Button>
+   618→                      )}
+   619→                      {task.status === "SKIPPED" && (
+   620→                        <Button
+   621→                          size="sm"
+   622→                          variant="ghost"
+   623→                          className="h-7 text-xs"
+   624→                          onClick={() =>
+   625→                            patchTask(task.id, { status: "PENDING" })
+   626→                          }
+   627→                          disabled={isUpdating}
+   628→                          title="Reopen"
+   629→                        >
+   630→                          <RotateCcw className="size-3.5 mr-1" /> Reopen
+   631→                        </Button>
+   632→                      )}
+   633→                      {!task.isDefault && (
+   634→                        <Button
+   635→                          size="sm"
+   636→                          variant="ghost"
+   637→                          className="h-7 text-xs text-muted-foreground hover:text-rose-600"
+   638→                          onClick={() => deleteTask(task)}
+   639→                          disabled={isUpdating}
+   640→                          title="Delete this task"
+   641→                        >
+   642→                          {isUpdating ? (
+   643→                            <Loader2 className="size-3.5 animate-spin" />
+   644→                          ) : (
+   645→                            <Trash2 className="size-3.5" />
+   646→                          )}
+   647→                        </Button>
+   648→                      )}
+   649→                    </div>
+   650→                  </div>
+   651→                </CardContent>
+   652→              </Card>
+   653→            );
+   654→          })}
+   655→        </div>
+   656→      )}
+   657→
+   658→      <AddTaskDialog
+   659→        open={addOpen}
+   660→        onOpenChange={setAddOpen}
+   661→        employeeId={employeeId}
+   662→        exitDate={exitDate}
+   663→        exitReason={exitReason}
+   664→        onSaved={() => qc.invalidateQueries({ queryKey })}
+   665→      />
+   666→
+   667→      <ExitInfoDialog
+   668→        open={exitEditOpen}
+   669→        onOpenChange={setExitEditOpen}
+   670→        tasks={tasks}
+   671→        onSaved={() => qc.invalidateQueries({ queryKey })}
+   672→      />
+   673→    </div>
+   674→  );
+   675→}
+   676→
+   677→function StatPill({
+   678→  label,
+   679→  value,
+   680→  tone,
+   681→}: {
+   682→  label: string;
+   683→  value: number;
+   684→  tone: "amber" | "sky" | "emerald" | "rose";
+   685→}) {
+   686→  const tones: Record<string, string> = {
+   687→    amber: "bg-amber-500/10 text-amber-700 dark:text-amber-300",
+   688→    sky: "bg-sky-500/10 text-sky-700 dark:text-sky-300",
+   689→    emerald: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
+   690→    rose: "bg-rose-500/10 text-rose-700 dark:text-rose-300",
+   691→  };
+   692→  return (
+   693→    <div
+   694→      className={cn(
+   695→        "rounded-lg px-2.5 py-1.5 flex items-center justify-between gap-2",
+   696→        tones[tone]
+   697→      )}
+   698→    >
+   699→      <span className="text-[10px] font-medium uppercase tracking-wide">
+   700→        {label}
+   701→      </span>
+   702→      <span className="font-bold tabular-nums">{value}</span>
+   703→    </div>
+   704→  );
+   705→}
+   706→
+   707→function AddTaskDialog({
+   708→  open,
+   709→  onOpenChange,
+   710→  employeeId,
+   711→  exitDate,
+   712→  exitReason,
+   713→  onSaved,
+   714→}: {
+   715→  open: boolean;
+   716→  onOpenChange: (v: boolean) => void;
+   717→  employeeId: string;
+   718→  exitDate?: string | null;
+   719→  exitReason?: ExitReason | null;
+   720→  onSaved: () => void;
+   721→}) {
+   722→  const [title, setTitle] = useState("");
+   723→  const [description, setDescription] = useState("");
+   724→  const [dueDate, setDueDate] = useState("");
+   725→  const [assignedTo, setAssignedTo] = useState("");
+   726→  const [saving, setSaving] = useState(false);
+   727→
+   728→  function reset() {
+   729→    setTitle("");
+   730→    setDescription("");
+   731→    setDueDate("");
+   732→    setAssignedTo("");
+   733→  }
+   734→
+   735→  async function handleSave() {
+   736→    if (!title.trim()) {
+   737→      toast.error("Task title is required");
+   738→      return;
+   739→    }
+   740→    setSaving(true);
+   741→    try {
+   742→      const body: Record<string, unknown> = {
+   743→        employeeId,
+   744→        title: title.trim(),
+   745→      };
+   746→      if (description.trim()) body.description = description.trim();
+   747→      if (dueDate) body.dueDate = dueDate;
+   748→      if (assignedTo.trim()) body.assignedTo = assignedTo.trim();
+   749→
+   750→      const r = await fetch("/api/offboarding", {
+   751→        method: "POST",
+   752→        headers: { "Content-Type": "application/json" },
+   753→        body: JSON.stringify(body),
+   754→      });
+   755→      if (!r.ok) {
+   756→        const err = await r.json().catch(() => ({}));
+   757→        throw new Error(err.error || "Failed to add task");
+   758→      }
+   759→      toast.success("Task added");
+   760→      reset();
+   761→      onOpenChange(false);
+   762→      onSaved();
+   763→    } catch (e: any) {
+   764→      toast.error(e?.message || "Failed to add task");
+   765→    } finally {
+   766→      setSaving(false);
+   767→    }
+   768→  }
+   769→
+   770→  // Default the due date to the exit date if known.
+   771→  const defaultDue = exitDate ? exitDate.slice(0, 10) : "";
+   772→
+   773→  return (
+   774→    <Dialog open={open} onOpenChange={onOpenChange}>
+   775→      <DialogContent className="sm:max-w-md">
+   776→        <DialogHeader>
+   777→          <DialogTitle>Add offboarding task</DialogTitle>
+   778→          <DialogDescription>
+   779→            Create a custom checklist item for this employee.
+   780→            {exitDate && (
+   781→              <span className="block mt-1 text-xs">
+   782→                Inheriting exit date {formatDate(exitDate)}
+   783→                {exitReason ? ` · ${EXIT_REASON_LABEL[exitReason]}` : ""}.
+   784→              </span>
+   785→            )}
+   786→          </DialogDescription>
+   787→        </DialogHeader>
+   788→        <div className="space-y-3">
+   789→          <div>
+   790→            <label className="text-xs font-medium text-muted-foreground">
+   791→              Title *
+   792→            </label>
+   793→            <Input
+   794→              value={title}
+   795→              onChange={(e) => setTitle(e.target.value)}
+   796→              placeholder="e.g. Schedule KT handover"
+   797→              autoFocus
+   798→            />
+   799→          </div>
+   800→          <div>
+   801→            <label className="text-xs font-medium text-muted-foreground">
+   802→              Description
+   803→            </label>
+   804→            <Textarea
+   805→              value={description}
+   806→              onChange={(e) => setDescription(e.target.value)}
+   807→              placeholder="Optional details or instructions"
+   808→              rows={2}
+   809→            />
+   810→          </div>
+   811→          <div className="grid grid-cols-2 gap-3">
+   812→            <div>
+   813→              <label className="text-xs font-medium text-muted-foreground">
+   814→                Due date
+   815→              </label>
+   816→              <Input
+   817→                type="date"
+   818→                value={dueDate}
+   819→                onChange={(e) => setDueDate(e.target.value)}
+   820→                placeholder={defaultDue}
+   821→              />
+   822→            </div>
+   823→            <div>
+   824→              <label className="text-xs font-medium text-muted-foreground">
+   825→                Assigned to
+   826→              </label>
+   827→              <Select
+   828→                value={assignedTo || "NONE"}
+   829→                onValueChange={(v) =>
+   830→                  setAssignedTo(v === "NONE" ? "" : v)
+   831→                }
+   832→              >
+   833→                <SelectTrigger>
+   834→                  <SelectValue placeholder="—" />
+   835→                </SelectTrigger>
+   836→                <SelectContent>
+   837→                  <SelectItem value="NONE">—</SelectItem>
+   838→                  <SelectItem value="HR">HR</SelectItem>
+   839→                  <SelectItem value="IT">IT</SelectItem>
+   840→                  <SelectItem value="Finance">Finance</SelectItem>
+   841→                  <SelectItem value="Manager">Manager</SelectItem>
+   842→                  <SelectItem value="Admin">Admin</SelectItem>
+   843→                </SelectContent>
+   844→              </Select>
+   845→            </div>
+   846→          </div>
+   847→        </div>
+   848→        <DialogFooter>
+   849→          <Button
+   850→            variant="ghost"
+   851→            onClick={() => onOpenChange(false)}
+   852→            disabled={saving}
+   853→          >
+   854→            Cancel
+   855→          </Button>
+   856→          <Button onClick={handleSave} disabled={saving}>
+   857→            {saving ? (
+   858→              <Loader2 className="size-4 animate-spin mr-1.5" />
+   859→            ) : (
+   860→              <Plus className="size-4 mr-1.5" />
+   861→            )}
+   862→            Add task
+   863→          </Button>
+   864→        </DialogFooter>
+   865→      </DialogContent>
+   866→    </Dialog>
+   867→  );
+   868→}
+   869→
+   870→function ExitInfoDialog({
+   871→  open,
+   872→  onOpenChange,
+   873→  tasks,
+   874→  onSaved,
+   875→}: {
+   876→  open: boolean;
+   877→  onOpenChange: (v: boolean) => void;
+   878→  tasks: OffboardingTask[];
+   879→  onSaved: () => void;
+   880→}) {
+   881→  // Pre-fill from first task (or defaults).
+   882→  const initialDate = tasks[0]?.exitDate
+   883→    ? tasks[0].exitDate!.slice(0, 10)
+   884→    : "";
+   885→  const initialReason = tasks[0]?.exitReason ?? "RESIGNATION";
+   886→  const [exitDate, setExitDate] = useState(initialDate);
+   887→  const [exitReason, setExitReason] = useState<ExitReason>(initialReason);
+   888→  const [saving, setSaving] = useState(false);
+   889→
+   890→  // Sync state whenever dialog opens (so external edits don't stick).
+   891→  const [openSig, setOpenSig] = useState(open);
+   892→  if (openSig !== open) {
+   893→    setOpenSig(open);
+   894→    if (open) {
+   895→      setExitDate(initialDate);
+   896→      setExitReason(initialReason);
+   897→    }
+   898→  }
+   899→
+   900→  async function handleSave() {
+   901→    if (tasks.length === 0) {
+   902→      onOpenChange(false);
+   903→      return;
+   904→    }
+   905→    setSaving(true);
+   906→    try {
+   907→      // Patching the first task broadcasts exit info to all sibling tasks.
+   908→      const body: Record<string, unknown> = {
+   909→        exitReason,
+   910→        exitDate: exitDate ? new Date(exitDate).toISOString() : null,
+   911→      };
+   912→      const r = await fetch(`/api/offboarding/${tasks[0].id}`, {
+   913→        method: "PATCH",
+   914→        headers: { "Content-Type": "application/json" },
+   915→        body: JSON.stringify(body),
+   916→      });
+   917→      if (!r.ok) {
+   918→        const err = await r.json().catch(() => ({}));
+   919→        throw new Error(err.error || "Failed to update exit info");
+   920→      }
+   921→      toast.success("Exit information updated");
+   922→      onOpenChange(false);
+   923→      onSaved();
+   924→    } catch (e: any) {
+   925→      toast.error(e?.message || "Failed to update exit info");
+   926→    } finally {
+   927→      setSaving(false);
+   928→    }
+   929→  }
+   930→
+   931→  return (
+   932→    <Dialog open={open} onOpenChange={onOpenChange}>
+   933→      <DialogContent className="sm:max-w-md">
+   934→        <DialogHeader>
+   935→          <DialogTitle>Edit exit information</DialogTitle>
+   936→          <DialogDescription>
+   937→            Set the planned exit date and reason. This applies to all
+   938→            offboarding tasks for this employee.
+   939→          </DialogDescription>
+   940→        </DialogHeader>
+   941→        <div className="space-y-3">
+   942→          <div>
+   943→            <label className="text-xs font-medium text-muted-foreground">
+   944→              Exit date
+   945→            </label>
+   946→            <Input
+   947→              type="date"
+   948→              value={exitDate}
+   949→              onChange={(e) => setExitDate(e.target.value)}
+   950→            />
+   951→          </div>
+   952→          <div>
+   953→            <label className="text-xs font-medium text-muted-foreground">
+   954→              Exit reason
+   955→            </label>
+   956→            <Select
+   957→              value={exitReason}
+   958→              onValueChange={(v) => setExitReason(v as ExitReason)}
+   959→            >
+   960→              <SelectTrigger>
+   961→                <SelectValue />
+   962→              </SelectTrigger>
+   963→              <SelectContent>
+   964→                <SelectItem value="RESIGNATION">Resignation</SelectItem>
+   965→                <SelectItem value="TERMINATION">Termination</SelectItem>
+   966→                <SelectItem value="CONTRACT_END">Contract End</SelectItem>
+   967→                <SelectItem value="RETIREMENT">Retirement</SelectItem>
+   968→              </SelectContent>
+   969→            </Select>
+   970→          </div>
+   971→        </div>
+   972→        <DialogFooter>
+   973→          <Button
+   974→            variant="ghost"
+   975→            onClick={() => onOpenChange(false)}
+   976→            disabled={saving}
+   977→          >
+   978→            Cancel
+   979→          </Button>
+   980→          <Button onClick={handleSave} disabled={saving}>
+   981→            {saving ? (
+   982→              <Loader2 className="size-4 animate-spin mr-1.5" />
+   983→            ) : (
+   984→              <CheckCircle className="size-4 mr-1.5" />
+   985→            )}
+   986→            Save
+   987→          </Button>
+   988→        </DialogFooter>
+   989→      </DialogContent>
+   990→    </Dialog>
+   991→  );
+   992→}
+   993→

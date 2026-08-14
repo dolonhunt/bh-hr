@@ -10,6 +10,10 @@ import {
   BarChart3,
   History,
   Settings,
+  Package,
+  GraduationCap,
+  CalendarClock,
+  MessageSquare,
   type LucideIcon,
 } from "lucide-react";
 import type { ModuleKey } from "@/lib/store";
@@ -66,11 +70,35 @@ export const NAV_ITEMS: NavItem[] = [
     description: "Jobs & candidates",
   },
   {
+    key: "interviews",
+    label: "Interviews",
+    icon: CalendarClock,
+    description: "Schedule & track",
+  },
+  {
+    key: "feedback",
+    label: "Feedback",
+    icon: MessageSquare,
+    description: "Surveys & feedback",
+  },
+  {
     key: "documents",
     label: "Documents",
     icon: FileText,
     description: "Templates & generation",
     badge: "live",
+  },
+  {
+    key: "training",
+    label: "Training",
+    icon: GraduationCap,
+    description: "Courses & development",
+  },
+  {
+    key: "assets",
+    label: "Assets",
+    icon: Package,
+    description: "Equipment & assets",
   },
   {
     key: "reports",
