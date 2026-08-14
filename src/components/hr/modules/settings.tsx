@@ -34,6 +34,17 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Progress } from "@/components/ui/progress";
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -59,9 +70,16 @@ import {
   EyeOff,
   MapPin,
   FileText,
+  Database,
+  Download,
+  Upload,
+  TriangleAlert,
+  Loader2,
+  ShieldCheck,
+  Clock,
 } from "lucide-react";
 import { toast } from "sonner";
-import { cn } from "@/lib/utils";
+import { cn, formatDate, downloadBlob } from "@/lib/utils";
 import { StatusBadge } from "../shared/status-badge";
 import { EmptyState } from "../shared/empty-state";
 import { EmailTemplateEditor } from "./email-template-editor";
@@ -75,6 +93,7 @@ const TABS = [
   { key: "email", label: "Email Settings", icon: Mail },
   { key: "email-templates", label: "Email Templates", icon: FileText },
   { key: "numbering", label: "Document Numbering", icon: Hash },
+  { key: "backup", label: "Data & Backup", icon: Database },
 ] as const;
 
 type TabKey = (typeof TABS)[number]["key"];
@@ -125,6 +144,7 @@ export function SettingsModule() {
           {tab === "email" && <EmailSettingsTab />}
           {tab === "email-templates" && <EmailTemplatesTab />}
           {tab === "numbering" && <DocumentNumberingTab />}
+          {tab === "backup" && <DataBackupTab />}
         </div>
       </div>
     </div>
@@ -1225,6 +1245,457 @@ function DocumentNumberingTab() {
         </div>
       </CardContent>
     </Card>
+  );
+}
+
+// ============================== DATA & BACKUP ==============================
+function DataBackupTab() {
+  const qc = useQueryClient();
+  const [exporting, setExporting] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [importProgress, setImportProgress] = useState(0);
+  const [importResult, setImportResult] = useState<any>(null);
+  const [confirmImportOpen, setConfirmImportOpen] = useState(false);
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
+  const [resetOpen, setResetOpen] = useState(false);
+  const [resetText, setResetText] = useState("");
+  const [resetting, setResetting] = useState(false);
+
+  // Read last backup timestamp from settings (key: lastBackupAt).
+  const { data: settingsData } = useQuery<any>({
+    queryKey: ["settings"],
+    queryFn: () => fetch("/api/settings").then((r) => r.json()),
+  });
+  const lastBackupAt = settingsData?.settings?.lastBackupAt as
+    | string
+    | undefined;
+
+  async function handleExport() {
+    setExporting(true);
+    try {
+      const res = await fetch("/api/backup/export");
+      if (!res.ok) throw new Error("Export failed");
+      const blob = await res.blob();
+      const dateStr = new Date().toISOString().slice(0, 10);
+      downloadBlob(blob, `teamhub-backup-${dateStr}.json`);
+      toast.success("Backup exported successfully");
+      qc.invalidateQueries({ queryKey: ["settings"] });
+    } catch (e: any) {
+      toast.error(e?.message ?? "Export failed");
+    } finally {
+      setExporting(false);
+    }
+  }
+
+  function pickFile() {
+    setImportResult(null);
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = ".json,application/json";
+    input.onchange = () => {
+      const file = input.files?.[0];
+      if (!file) return;
+      if (!file.name.endsWith(".json")) {
+        toast.error("Please select a .json backup file");
+        return;
+      }
+      setPendingFile(file);
+      setConfirmImportOpen(true);
+    };
+    input.click();
+  }
+
+  async function performImport() {
+    if (!pendingFile) {
+      setConfirmImportOpen(false);
+      return;
+    }
+    setConfirmImportOpen(false);
+    setImporting(true);
+    setImportProgress(10);
+    setImportResult(null);
+    try {
+      const text = await pendingFile.text();
+      let parsed: any;
+      try {
+        parsed = JSON.parse(text);
+      } catch {
+        throw new Error("File is not valid JSON");
+      }
+      if (!parsed || !parsed.tables) {
+        throw new Error("Invalid backup file: missing `tables` object");
+      }
+      setImportProgress(40);
+      const res = await fetch("/api/backup/import", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(parsed),
+      });
+      setImportProgress(80);
+      const json = await res.json();
+      if (!res.ok) {
+        throw new Error(json.error || "Import failed");
+      }
+      setImportResult(json);
+      setImportProgress(100);
+      toast.success("Backup imported successfully");
+      qc.invalidateQueries();
+    } catch (e: any) {
+      toast.error(e?.message ?? "Import failed");
+      setImportProgress(0);
+    } finally {
+      setImporting(false);
+      setPendingFile(null);
+    }
+  }
+
+  async function performReset() {
+    if (resetText !== "DELETE") {
+      toast.error('You must type "DELETE" to confirm');
+      return;
+    }
+    setResetting(true);
+    try {
+      const res = await fetch("/api/backup/reset?confirm=DELETE", {
+        method: "POST",
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        throw new Error(json.error || "Reset failed");
+      }
+      toast.success("All data reset (Users and Company preserved)");
+      setResetOpen(false);
+      setResetText("");
+      qc.invalidateQueries();
+    } catch (e: any) {
+      toast.error(e?.message ?? "Reset failed");
+    } finally {
+      setResetting(false);
+    }
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Export */}
+      <Card className="border-border/60 shadow-soft">
+        <CardContent className="p-6 space-y-4">
+          <div className="flex items-start justify-between gap-4 pb-3 border-b border-border/60">
+            <div className="flex items-start gap-3 min-w-0">
+              <div className="size-10 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-300 flex items-center justify-center flex-shrink-0">
+                <Download className="size-5" />
+              </div>
+              <div className="min-w-0">
+                <div className="font-semibold">Export Backup</div>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Download all HR data as a JSON file. Keep it somewhere safe —
+                  you can restore from it later.
+                </p>
+              </div>
+            </div>
+            <Button onClick={handleExport} disabled={exporting} className="flex-shrink-0">
+              {exporting ? (
+                <>
+                  <Loader2 className="size-4 mr-1.5 animate-spin" /> Exporting…
+                </>
+              ) : (
+                <>
+                  <Download className="size-4 mr-1.5" /> Export Backup
+                </>
+              )}
+            </Button>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="rounded-lg bg-muted/40 p-4">
+              <div className="text-xs font-medium uppercase tracking-wider text-muted-foreground mb-2">
+                Included in backup
+              </div>
+              <ul className="text-sm space-y-1.5 text-foreground/80">
+                <li className="flex items-center gap-2">
+                  <Check className="size-3.5 text-emerald-600" /> All employees
+                </li>
+                <li className="flex items-center gap-2">
+                  <Check className="size-3.5 text-emerald-600" /> Attendance &
+                  leave records
+                </li>
+                <li className="flex items-center gap-2">
+                  <Check className="size-3.5 text-emerald-600" /> Payroll &
+                  payslips
+                </li>
+                <li className="flex items-center gap-2">
+                  <Check className="size-3.5 text-emerald-600" /> Documents &
+                  templates
+                </li>
+                <li className="flex items-center gap-2">
+                  <Check className="size-3.5 text-emerald-600" /> Departments,
+                  roles, designations
+                </li>
+                <li className="flex items-center gap-2">
+                  <Check className="size-3.5 text-emerald-600" /> Settings &
+                  email config (passwords excluded)
+                </li>
+              </ul>
+            </div>
+            <div className="rounded-lg bg-muted/40 p-4 flex flex-col justify-between">
+              <div>
+                <div className="text-xs font-medium uppercase tracking-wider text-muted-foreground mb-2">
+                  Last backup
+                </div>
+                <div className="flex items-center gap-2 text-sm">
+                  <Clock className="size-4 text-muted-foreground" />
+                  {lastBackupAt
+                    ? formatDate(lastBackupAt, "datetime")
+                    : "Never — exports not yet run"}
+                </div>
+              </div>
+              <div className="mt-4 text-[11px] text-muted-foreground flex items-start gap-1.5">
+                <ShieldCheck className="size-3.5 mt-0.5 flex-shrink-0" />
+                User passwords are excluded from the export for security.
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Import */}
+      <Card className="border-border/60 shadow-soft">
+        <CardContent className="p-6 space-y-4">
+          <div className="flex items-start justify-between gap-4 pb-3 border-b border-border/60">
+            <div className="flex items-start gap-3 min-w-0">
+              <div className="size-10 rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-300 flex items-center justify-center flex-shrink-0">
+                <Upload className="size-5" />
+              </div>
+              <div className="min-w-0">
+                <div className="font-semibold">Import Backup</div>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Restore data from a previously exported JSON backup file.
+                  Existing records will be updated; new ones will be created.
+                </p>
+              </div>
+            </div>
+            <Button
+              variant="outline"
+              onClick={pickFile}
+              disabled={importing}
+              className="flex-shrink-0"
+            >
+              {importing ? (
+                <>
+                  <Loader2 className="size-4 mr-1.5 animate-spin" /> Importing…
+                </>
+              ) : (
+                <>
+                  <Upload className="size-4 mr-1.5" /> Import Backup
+                </>
+              )}
+            </Button>
+          </div>
+
+          {/* Warning */}
+          <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-4 flex items-start gap-3">
+            <TriangleAlert className="size-5 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
+            <div className="text-sm text-amber-900 dark:text-amber-200">
+              <div className="font-medium">This will overwrite existing data.</div>
+              <p className="text-xs mt-0.5 opacity-90">
+                Make sure you have a current backup before importing. The
+                operation cannot be undone.
+              </p>
+            </div>
+          </div>
+
+          {importing && (
+            <div className="space-y-2">
+              <Progress value={importProgress} className="h-2" />
+              <div className="text-xs text-muted-foreground text-center">
+                Restoring data… {importProgress}%
+              </div>
+            </div>
+          )}
+
+          {importResult && (
+            <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-4 space-y-3">
+              <div className="flex items-center gap-2 text-sm font-medium text-emerald-800 dark:text-emerald-200">
+                <Check className="size-4" />
+                Import complete —{" "}
+                {Object.entries(importResult.imported || {}).reduce(
+                  (sum, [, n]) => sum + (n as number),
+                  0
+                )}{" "}
+                records restored
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 text-xs">
+                {Object.entries(importResult.imported || {})
+                  .filter(([, n]) => (n as number) > 0)
+                  .map(([key, n]) => (
+                    <div
+                      key={key}
+                      className="flex items-center justify-between rounded bg-background/60 px-2 py-1 border border-border/40"
+                    >
+                      <span className="text-muted-foreground capitalize">
+                        {key}
+                      </span>
+                      <span className="font-semibold tabular-nums">
+                        {n as number}
+                      </span>
+                    </div>
+                  ))}
+              </div>
+              {importResult.errors?.length > 0 && (
+                <div className="text-xs text-amber-700 dark:text-amber-300">
+                  <div className="font-medium mb-1">
+                    {importResult.errors.length} table(s) had partial errors:
+                  </div>
+                  <ul className="list-disc ml-4 space-y-0.5 max-h-32 overflow-y-auto">
+                    {importResult.errors.map(
+                      (err: any, i: number) => (
+                        <li key={i}>
+                          {err.table}
+                          {err.count ? ` (${err.count} rows)` : ""}: {err.message}
+                        </li>
+                      )
+                    )}
+                  </ul>
+                </div>
+              )}
+              <div className="text-[11px] text-muted-foreground">
+                Restored from backup exported at{" "}
+                {importResult.meta?.exportedAt
+                  ? formatDate(importResult.meta.exportedAt, "datetime")
+                  : "unknown date"}
+                .
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Danger zone */}
+      <Card className="border-rose-500/40 shadow-soft">
+        <CardContent className="p-6 space-y-4">
+          <div className="flex items-start gap-3 pb-3 border-b border-rose-500/20">
+            <div className="size-10 rounded-xl bg-rose-500/10 text-rose-600 dark:text-rose-300 flex items-center justify-center flex-shrink-0">
+              <TriangleAlert className="size-5" />
+            </div>
+            <div className="min-w-0">
+              <div className="font-semibold text-rose-700 dark:text-rose-300">
+                Danger Zone
+              </div>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Destructive actions. These cannot be undone — proceed with
+                extreme caution.
+              </p>
+            </div>
+          </div>
+
+          <div className="rounded-lg border border-rose-500/30 bg-rose-500/5 p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <div className="text-sm font-medium">Reset all data</div>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Deletes every record across all tables except{" "}
+                <span className="font-medium text-foreground">Users</span> and{" "}
+                <span className="font-medium text-foreground">Company</span>.
+                You will need to re-import or re-enter all HR data.
+              </p>
+            </div>
+            <Button
+              variant="destructive"
+              onClick={() => setResetOpen(true)}
+              disabled={resetting}
+              className="flex-shrink-0"
+            >
+              <TriangleAlert className="size-4 mr-1.5" /> Reset all data
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Confirmation: Import */}
+      <AlertDialog open={confirmImportOpen} onOpenChange={setConfirmImportOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will overwrite existing data with the contents of{" "}
+              <span className="font-medium text-foreground">
+                {pendingFile?.name}
+              </span>
+              . The operation cannot be undone. Make sure you have a current
+              backup.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel
+              onClick={() => {
+                setPendingFile(null);
+              }}
+            >
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction onClick={performImport}>
+              Yes, import &amp; overwrite
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Confirmation: Reset */}
+      <AlertDialog open={resetOpen} onOpenChange={setResetOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Reset all data?</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-3">
+                <p>
+                  This will permanently delete every record across all tables
+                  except Users and Company.{" "}
+                  <span className="font-semibold text-rose-600">
+                    This cannot be undone.
+                  </span>
+                </p>
+                <p>
+                  To confirm, type{" "}
+                  <span className="font-mono font-semibold bg-muted px-1.5 py-0.5 rounded">
+                    DELETE
+                  </span>{" "}
+                  below:
+                </p>
+                <Input
+                  value={resetText}
+                  onChange={(e) => setResetText(e.target.value)}
+                  placeholder="DELETE"
+                  className="font-mono"
+                  autoComplete="off"
+                />
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel
+              onClick={() => {
+                setResetText("");
+              }}
+            >
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={performReset}
+              disabled={resetText !== "DELETE" || resetting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {resetting ? (
+                <>
+                  <Loader2 className="size-4 mr-1.5 animate-spin" /> Resetting…
+                </>
+              ) : (
+                <>
+                  <TriangleAlert className="size-4 mr-1.5" /> Reset everything
+                </>
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
   );
 }
 

@@ -1,0 +1,785 @@
+     1→"use client";
+     2→
+     3→import { useEffect, useState } from "react";
+     4→import { useApp } from "@/lib/store";
+     5→import { AvatarBadge } from "../shared/avatar-badge";
+     6→import { StatusBadge } from "../shared/status-badge";
+     7→import { EmptyState } from "../shared/empty-state";
+     8→import { Button } from "@/components/ui/button";
+     9→import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+    10→import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+    11→import {
+    12→  Table,
+    13→  TableBody,
+    14→  TableCell,
+    15→  TableHead,
+    16→  TableHeader,
+    17→  TableRow,
+    18→} from "@/components/ui/table";
+    19→import {
+    20→  ArrowLeft,
+    21→  Pencil,
+    22→  FileText,
+    23→  Mail,
+    24→  Upload,
+    25→  Phone,
+    26→  Mail as MailIcon,
+    27→  MapPin,
+    28→  Calendar,
+    29→  Building2,
+    30→  Briefcase,
+    31→  Wallet,
+    32→  Banknote,
+    33→  Activity,
+    34→  TrendingUp,
+    35→  CalendarCheck,
+    36→  CalendarDays,
+    37→  User as UserIcon,
+    38→} from "lucide-react";
+    39→import { EmployeeFormDialog } from "./employee-form-dialog";
+    40→import { useQuery, useQueryClient } from "@tanstack/react-query";
+    41→import { formatDate, formatCurrency, relativeTime } from "@/lib/utils";
+    42→
+    43→export function EmployeeProfile({ id }: { id: string }) {
+    44→  const setEmployeeView = useApp((s) => s.setEmployeeView);
+    45→  const setQuickAction = useApp((s) => s.setQuickAction);
+    46→  const setModule = useApp((s) => s.setModule);
+    47→  const qc = useQueryClient();
+    48→  const [editOpen, setEditOpen] = useState(false);
+    49→
+    50→  const { data: emp, isLoading } = useQuery({
+    51→    queryKey: ["employee", id],
+    52→    queryFn: () => fetch(`/api/employees/${id}`).then((r) => r.json()),
+    53→  });
+    54→
+    55→  if (isLoading) {
+    56→    return (
+    57→      <div className="space-y-4">
+    58→        <div className="h-32 rounded-xl bg-muted/40 animate-pulse" />
+    59→        <div className="h-64 rounded-xl bg-muted/40 animate-pulse" />
+    60→      </div>
+    61→    );
+    62→  }
+    63→
+    64→  if (!emp) {
+    65→    return (
+    66→      <EmptyState
+    67→        icon={UserIcon}
+    68→        title="Employee not found"
+    69→        description="This employee may have been deleted."
+    70→        actionLabel="Back to list"
+    71→        onAction={() => setEmployeeView("list")}
+    72→      />
+    73→    );
+    74→  }
+    75→
+    76→  const netSalary =
+    77→    (emp.basicSalary || 0) +
+    78→    (emp.allowances || 0) -
+    79→    (emp.deductions || 0) -
+    80→    (emp.tax || 0);
+    81→
+    82→  return (
+    83→    <div className="space-y-6">
+    84→      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+    85→        <Button
+    86→          variant="ghost"
+    87→          size="sm"
+    88→          onClick={() => setEmployeeView("list")}
+    89→          className="self-start"
+    90→        >
+    91→          <ArrowLeft className="size-4 mr-1.5" /> Back to Employees
+    92→        </Button>
+    93→        <div className="flex gap-2 flex-wrap">
+    94→          <Button variant="outline" size="sm" onClick={() => setEditOpen(true)}>
+    95→            <Pencil className="size-4 mr-1.5" /> <span className="hidden sm:inline">Edit</span>
+    96→          </Button>
+    97→          <Button
+    98→            variant="outline"
+    99→            size="sm"
+   100→            onClick={() => setQuickAction("generate-document")}
+   101→          >
+   102→            <FileText className="size-4 mr-1.5" /> <span className="hidden sm:inline">Generate Document</span>
+   103→            <span className="sm:hidden">Document</span>
+   104→          </Button>
+   105→          <Button size="sm" onClick={() => setQuickAction("create-payslip")}>
+   106→            <Wallet className="size-4 mr-1.5" /> <span className="hidden sm:inline">Create Payslip</span>
+   107→            <span className="sm:hidden">Payslip</span>
+   108→          </Button>
+   109→        </div>
+   110→      </div>
+   111→
+   112→      {/* Profile header card */}
+   113→      <Card className="border-border/60 shadow-soft overflow-hidden">
+   114→        <div
+   115→          className="h-24"
+   116→          style={{
+   117→            background: `linear-gradient(135deg, ${emp.department?.color ?? "#10b981"}, ${emp.department?.color ?? "#10b981"}80)`,
+   118→          }}
+   119→        />
+   120→        <CardContent className="p-4 sm:p-6 -mt-12">
+   121→          <div className="flex flex-col md:flex-row md:items-end gap-4">
+   122→            <AvatarBadge
+   123→              name={emp.fullName}
+   124→              photo={emp.photo}
+   125→              size="xl"
+   126→              className="ring-4 ring-card"
+   127→            />
+   128→            <div className="flex-1 min-w-0">
+   129→              <div className="flex items-center gap-2 flex-wrap">
+   130→                <h1 className="text-2xl font-bold tracking-tight">
+   131→                  {emp.fullName}
+   132→                </h1>
+   133→                <StatusBadge status={emp.employmentStatus} />
+   134→              </div>
+   135→              <div className="text-sm text-muted-foreground mt-1 flex items-center gap-3 flex-wrap">
+   136→                <span className="font-mono">{emp.employeeId}</span>
+   137→                <span>·</span>
+   138→                <span className="flex items-center gap-1">
+   139→                  <Briefcase className="size-3.5" />
+   140→                  {emp.designation?.name ?? "—"}
+   141→                </span>
+   142→                <span>·</span>
+   143→                <span className="flex items-center gap-1">
+   144→                  <Building2 className="size-3.5" />
+   145→                  {emp.department?.name ?? "—"}
+   146→                </span>
+   147→              </div>
+   148→            </div>
+   149→            <div className="flex flex-col sm:flex-row gap-3 md:items-end text-sm">
+   150→              <div className="flex items-center gap-2 text-muted-foreground">
+   151→                <MailIcon className="size-4" />
+   152→                <span className="text-foreground">{emp.officialEmail}</span>
+   153→              </div>
+   154→              <div className="flex items-center gap-2 text-muted-foreground">
+   155→                <Phone className="size-4" />
+   156→                <span className="text-foreground">{emp.phone ?? "—"}</span>
+   157→              </div>
+   158→            </div>
+   159→          </div>
+   160→        </CardContent>
+   161→      </Card>
+   162→
+   163→      {/* Tabs */}
+   164→      <Tabs defaultValue="overview">
+   165→        <div className="overflow-x-auto pb-1 -mx-1 px-1">
+   166→          <TabsList className="flex w-max">
+   167→            <TabsTrigger value="overview">Overview</TabsTrigger>
+   168→            <TabsTrigger value="personal">Personal</TabsTrigger>
+   169→            <TabsTrigger value="employment">Employment</TabsTrigger>
+   170→            <TabsTrigger value="attendance">Attendance</TabsTrigger>
+   171→            <TabsTrigger value="leave">Leave</TabsTrigger>
+   172→            <TabsTrigger value="payroll">Payroll</TabsTrigger>
+   173→            <TabsTrigger value="documents">Documents</TabsTrigger>
+   174→            <TabsTrigger value="activity">Activity</TabsTrigger>
+   175→          </TabsList>
+   176→        </div>
+   177→
+   178→        {/* Overview */}
+   179→        <TabsContent value="overview" className="space-y-4 mt-4">
+   180→          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
+   181→            <StatCard
+   182→              icon={CalendarCheck}
+   183→              label="Attendance Rate"
+   184→              value="94%"
+   185→              tone="emerald"
+   186→            />
+   187→            <StatCard
+   188→              icon={CalendarDays}
+   189→              label="Leave Taken"
+   190→              value={`${emp.leaveRequests?.length ?? 0} days`}
+   191→              tone="amber"
+   192→            />
+   193→            <StatCard
+   194→              icon={Wallet}
+   195→              label="Net Salary"
+   196→              value={formatCurrency(netSalary)}
+   197→              tone="teal"
+   198→            />
+   199→            <StatCard
+   200→              icon={FileText}
+   201→              label="Documents"
+   202→              value={emp.documents?.length ?? 0}
+   203→              tone="violet"
+   204→            />
+   205→          </div>
+   206→
+   207→          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+   208→            <Card className="border-border/60 shadow-soft">
+   209→              <CardHeader className="pb-3">
+   210→                <CardTitle className="text-base">Quick Info</CardTitle>
+   211→              </CardHeader>
+   212→              <CardContent className="space-y-2.5 text-sm">
+   213→                <InfoRow
+   214→                  icon={Calendar}
+   215→                  label="Joining Date"
+   216→                  value={formatDate(emp.joiningDate)}
+   217→                />
+   218→                <InfoRow
+   219→                  icon={Calendar}
+   220→                  label="Confirmation Date"
+   221→                  value={formatDate(emp.confirmationDate)}
+   222→                />
+   223→                <InfoRow
+   224→                  icon={Building2}
+   225→                  label="Department"
+   226→                  value={emp.department?.name ?? "—"}
+   227→                />
+   228→                <InfoRow
+   229→                  icon={Briefcase}
+   230→                  label="Role"
+   231→                  value={emp.role?.name ?? "—"}
+   232→                />
+   233→                <InfoRow
+   234→                  icon={Briefcase}
+   235→                  label="Employment Type"
+   236→                  value={(emp.employmentType || "").replace(/_/g, " ")}
+   237→                />
+   238→                <InfoRow
+   239→                  icon={MapPin}
+   240→                  label="Work Location"
+   241→                  value={emp.workLocation ?? "—"}
+   242→                />
+   243→              </CardContent>
+   244→            </Card>
+   245→
+   246→            <Card className="border-border/60 shadow-soft">
+   247→              <CardHeader className="pb-3">
+   248→                <CardTitle className="text-base">Recent Activity</CardTitle>
+   249→              </CardHeader>
+   250→              <CardContent className="space-y-2">
+   251→                {(emp.activities ?? []).slice(0, 6).map((a: any) => (
+   252→                  <div
+   253→                    key={a.id}
+   254→                    className="flex items-start gap-2.5 text-sm py-1.5 border-b border-border/40 last:border-0"
+   255→                  >
+   256→                    <div className="size-7 rounded-lg bg-primary/10 text-primary flex items-center justify-center flex-shrink-0">
+   257→                      <Activity className="size-3.5" />
+   258→                    </div>
+   259→                    <div className="flex-1 min-w-0">
+   260→                      <div className="text-sm">{a.title}</div>
+   261→                      {a.description && (
+   262→                        <div className="text-xs text-muted-foreground truncate">
+   263→                          {a.description}
+   264→                        </div>
+   265→                      )}
+   266→                      <div className="text-[11px] text-muted-foreground mt-0.5">
+   267→                        {relativeTime(a.createdAt)}
+   268→                      </div>
+   269→                    </div>
+   270→                  </div>
+   271→                ))}
+   272→                {(emp.activities ?? []).length === 0 && (
+   273→                  <p className="text-sm text-muted-foreground py-6 text-center">
+   274→                    No recent activity.
+   275→                  </p>
+   276→                )}
+   277→              </CardContent>
+   278→            </Card>
+   279→          </div>
+   280→        </TabsContent>
+   281→
+   282→        {/* Personal */}
+   283→        <TabsContent value="personal" className="mt-4">
+   284→          <Card className="border-border/60 shadow-soft">
+   285→            <CardHeader>
+   286→              <CardTitle className="text-base">Personal Information</CardTitle>
+   287→            </CardHeader>
+   288→            <CardContent>
+   289→              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+   290→                <InfoRow icon={UserIcon} label="Full Name" value={emp.fullName} />
+   291→                <InfoRow icon={UserIcon} label="Gender" value={emp.gender} />
+   292→                <InfoRow
+   293→                  icon={Calendar}
+   294→                  label="Date of Birth"
+   295→                  value={formatDate(emp.dateOfBirth)}
+   296→                />
+   297→                <InfoRow icon={Phone} label="Phone" value={emp.phone ?? "—"} />
+   298→                <InfoRow
+   299→                  icon={MailIcon}
+   300→                  label="Personal Email"
+   301→                  value={emp.personalEmail ?? "—"}
+   302→                />
+   303→                <InfoRow
+   304→                  icon={MailIcon}
+   305→                  label="Official Email"
+   306→                  value={emp.officialEmail ?? "—"}
+   307→                />
+   308→                <InfoRow
+   309→                  icon={MapPin}
+   310→                  label="Address"
+   311→                  value={emp.address ?? "—"}
+   312→                />
+   313→                <InfoRow
+   314→                  icon={MapPin}
+   315→                  label="City / Country"
+   316→                  value={[emp.city, emp.country].filter(Boolean).join(", ") || "—"}
+   317→                />
+   318→                <InfoRow
+   319→                  icon={Phone}
+   320→                  label="Emergency Contact"
+   321→                  value={
+   322→                    emp.emergencyContactName
+   323→                      ? `${emp.emergencyContactName} (${emp.emergencyRelation ?? "—"}): ${emp.emergencyContactPhone ?? ""}`
+   324→                      : "—"
+   325→                  }
+   326→                />
+   327→              </div>
+   328→            </CardContent>
+   329→          </Card>
+   330→        </TabsContent>
+   331→
+   332→        {/* Employment */}
+   333→        <TabsContent value="employment" className="mt-4">
+   334→          <Card className="border-border/60 shadow-soft">
+   335→            <CardHeader>
+   336→              <CardTitle className="text-base">Employment Information</CardTitle>
+   337→            </CardHeader>
+   338→            <CardContent>
+   339→              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+   340→                <InfoRow
+   341→                  icon={Building2}
+   342→                  label="Department"
+   343→                  value={emp.department?.name ?? "—"}
+   344→                />
+   345→                <InfoRow
+   346→                  icon={Briefcase}
+   347→                  label="Role"
+   348→                  value={emp.role?.name ?? "—"}
+   349→                />
+   350→                <InfoRow
+   351→                  icon={Briefcase}
+   352→                  label="Designation"
+   353→                  value={emp.designation?.name ?? "—"}
+   354→                />
+   355→                <InfoRow
+   356→                  icon={Briefcase}
+   357→                  label="Employment Type"
+   358→                  value={(emp.employmentType || "").replace(/_/g, " ")}
+   359→                />
+   360→                <InfoRow
+   361→                  icon={Calendar}
+   362→                  label="Joining Date"
+   363→                  value={formatDate(emp.joiningDate)}
+   364→                />
+   365→                <InfoRow
+   366→                  icon={Calendar}
+   367→                  label="Confirmation Date"
+   368→                  value={formatDate(emp.confirmationDate)}
+   369→                />
+   370→                <InfoRow
+   371→                  icon={UserIcon}
+   372→                  label="Reporting Manager"
+   373→                  value={emp.manager?.fullName ?? "—"}
+   374→                />
+   375→                <InfoRow
+   376→                  icon={MapPin}
+   377→                  label="Work Location"
+   378→                  value={emp.workLocation ?? "—"}
+   379→                />
+   380→                <InfoRow
+   381→                  icon={Briefcase}
+   382→                  label="Status"
+   383→                  value={<StatusBadge status={emp.employmentStatus} />}
+   384→                />
+   385→              </div>
+   386→            </CardContent>
+   387→          </Card>
+   388→        </TabsContent>
+   389→
+   390→        {/* Attendance */}
+   391→        <TabsContent value="attendance" className="mt-4">
+   392→          <Card className="border-border/60 shadow-soft">
+   393→            <CardHeader>
+   394→              <CardTitle className="text-base">Recent Attendance</CardTitle>
+   395→            </CardHeader>
+   396→            <CardContent>
+   397→              <div className="overflow-x-auto">
+   398→                <Table>
+   399→                  <TableHeader>
+   400→                    <TableRow className="bg-muted/40">
+   401→                      <TableHead>Date</TableHead>
+   402→                      <TableHead>Check In</TableHead>
+   403→                      <TableHead>Check Out</TableHead>
+   404→                      <TableHead>Hours</TableHead>
+   405→                      <TableHead>Status</TableHead>
+   406→                    </TableRow>
+   407→                  </TableHeader>
+   408→                  <TableBody>
+   409→                    {(emp.attendance ?? []).map((a: any) => (
+   410→                      <TableRow key={a.id}>
+   411→                        <TableCell className="text-sm">
+   412→                          {formatDate(a.date)}
+   413→                        </TableCell>
+   414→                        <TableCell className="text-sm">
+   415→                          {a.checkIn
+   416→                            ? new Date(a.checkIn).toLocaleTimeString("en-GB", {
+   417→                                hour: "2-digit",
+   418→                                minute: "2-digit",
+   419→                              })
+   420→                            : "—"}
+   421→                        </TableCell>
+   422→                        <TableCell className="text-sm">
+   423→                          {a.checkOut
+   424→                            ? new Date(a.checkOut).toLocaleTimeString("en-GB", {
+   425→                                hour: "2-digit",
+   426→                                minute: "2-digit",
+   427→                              })
+   428→                            : "—"}
+   429→                        </TableCell>
+   430→                        <TableCell className="text-sm tabular-nums">
+   431→                          {a.workingHours?.toFixed(1) ?? "0"}h
+   432→                        </TableCell>
+   433→                        <TableCell>
+   434→                          <StatusBadge status={a.status} />
+   435→                        </TableCell>
+   436→                      </TableRow>
+   437→                    ))}
+   438→                  </TableBody>
+   439→                </Table>
+   440→              </div>
+   441→            </CardContent>
+   442→          </Card>
+   443→        </TabsContent>
+   444→
+   445→        {/* Leave */}
+   446→        <TabsContent value="leave" className="mt-4">
+   447→          <Card className="border-border/60 shadow-soft">
+   448→            <CardHeader>
+   449→              <CardTitle className="text-base">Leave History</CardTitle>
+   450→            </CardHeader>
+   451→            <CardContent>
+   452→              <div className="overflow-x-auto">
+   453→                <Table>
+   454→                  <TableHeader>
+   455→                    <TableRow className="bg-muted/40">
+   456→                      <TableHead>Type</TableHead>
+   457→                      <TableHead>Start</TableHead>
+   458→                      <TableHead>End</TableHead>
+   459→                      <TableHead>Days</TableHead>
+   460→                      <TableHead>Reason</TableHead>
+   461→                      <TableHead>Status</TableHead>
+   462→                    </TableRow>
+   463→                  </TableHeader>
+   464→                  <TableBody>
+   465→                    {(emp.leaveRequests ?? []).map((lr: any) => (
+   466→                      <TableRow key={lr.id}>
+   467→                        <TableCell className="text-sm">
+   468→                          {lr.leaveType?.name}
+   469→                        </TableCell>
+   470→                        <TableCell className="text-sm">
+   471→                          {formatDate(lr.startDate)}
+   472→                        </TableCell>
+   473→                        <TableCell className="text-sm">
+   474→                          {formatDate(lr.endDate)}
+   475→                        </TableCell>
+   476→                        <TableCell className="text-sm">{lr.days}</TableCell>
+   477→                        <TableCell className="text-sm text-muted-foreground max-w-[200px] truncate">
+   478→                          {lr.reason}
+   479→                        </TableCell>
+   480→                        <TableCell>
+   481→                          <StatusBadge status={lr.status} />
+   482→                        </TableCell>
+   483→                      </TableRow>
+   484→                    ))}
+   485→                    {(emp.leaveRequests ?? []).length === 0 && (
+   486→                      <TableRow>
+   487→                        <TableCell
+   488→                          colSpan={6}
+   489→                          className="text-center text-sm text-muted-foreground py-8"
+   490→                        >
+   491→                          No leave records.
+   492→                        </TableCell>
+   493→                      </TableRow>
+   494→                    )}
+   495→                  </TableBody>
+   496→                </Table>
+   497→              </div>
+   498→            </CardContent>
+   499→          </Card>
+   500→        </TabsContent>
+   501→
+   502→        {/* Payroll */}
+   503→        <TabsContent value="payroll" className="mt-4">
+   504→          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+   505→            <Card className="border-border/60 shadow-soft">
+   506→              <CardHeader>
+   507→                <CardTitle className="text-base">Salary Structure</CardTitle>
+   508→              </CardHeader>
+   509→              <CardContent className="space-y-3">
+   510→                <SalaryRow label="Basic Salary" value={emp.basicSalary} />
+   511→                <SalaryRow label="Allowances" value={emp.allowances} />
+   512→                <SalaryRow label="Deductions" value={-emp.deductions} />
+   513→                <SalaryRow label="Tax" value={-emp.tax} />
+   514→                <div className="border-t border-border pt-3">
+   515→                  <SalaryRow
+   516→                    label="Net Salary"
+   517→                    value={netSalary}
+   518→                    highlight
+   519→                  />
+   520→                </div>
+   521→              </CardContent>
+   522→            </Card>
+   523→
+   524→            <Card className="lg:col-span-2 border-border/60 shadow-soft">
+   525→              <CardHeader>
+   526→                <CardTitle className="text-base">Bank Details</CardTitle>
+   527→              </CardHeader>
+   528→              <CardContent>
+   529→                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+   530→                  <InfoRow
+   531→                    icon={Banknote}
+   532→                    label="Bank Name"
+   533→                    value={emp.bankName ?? "—"}
+   534→                  />
+   535→                  <InfoRow
+   536→                    icon={Banknote}
+   537→                    label="Account Number"
+   538→                    value={emp.bankAccount ?? "—"}
+   539→                  />
+   540→                  <InfoRow
+   541→                    icon={Banknote}
+   542→                    label="IFSC"
+   543→                    value={emp.bankIfsc ?? "—"}
+   544→                  />
+   545→                  <InfoRow
+   546→                    icon={Wallet}
+   547→                    label="Payment Method"
+   548→                    value={(emp.paymentMethod || "").replace(/_/g, " ")}
+   549→                  />
+   550→                </div>
+   551→                <div className="mt-6">
+   552→                  <div className="text-sm font-medium mb-2">
+   553→                    Recent Payroll Records
+   554→                  </div>
+   555→                  <div className="overflow-x-auto">
+   556→                    <Table>
+   557→                      <TableHeader>
+   558→                        <TableRow className="bg-muted/40">
+   559→                          <TableHead>Month</TableHead>
+   560→                          <TableHead>Net</TableHead>
+   561→                          <TableHead>Status</TableHead>
+   562→                          <TableHead>Paid On</TableHead>
+   563→                        </TableRow>
+   564→                      </TableHeader>
+   565→                      <TableBody>
+   566→                        {(emp.payrolls ?? []).map((p: any) => (
+   567→                          <TableRow key={p.id}>
+   568→                            <TableCell className="text-sm">
+   569→                              {p.payrollMonth}
+   570→                            </TableCell>
+   571→                            <TableCell className="text-sm tabular-nums">
+   572→                              {formatCurrency(p.netSalary)}
+   573→                            </TableCell>
+   574→                            <TableCell>
+   575→                              <StatusBadge status={p.status} />
+   576→                            </TableCell>
+   577→                            <TableCell className="text-sm">
+   578→                              {formatDate(p.paymentDate)}
+   579→                            </TableCell>
+   580→                          </TableRow>
+   581→                        ))}
+   582→                      </TableBody>
+   583→                    </Table>
+   584→                  </div>
+   585→                </div>
+   586→              </CardContent>
+   587→            </Card>
+   588→          </div>
+   589→        </TabsContent>
+   590→
+   591→        {/* Documents */}
+   592→        <TabsContent value="documents" className="mt-4">
+   593→          <Card className="border-border/60 shadow-soft">
+   594→            <CardHeader className="flex flex-row items-center justify-between">
+   595→              <CardTitle className="text-base">Employee Documents</CardTitle>
+   596→              <Button
+   597→                size="sm"
+   598→                variant="outline"
+   599→                onClick={() => setQuickAction("generate-document")}
+   600→              >
+   601→                <FileText className="size-4 mr-1.5" /> Generate
+   602→              </Button>
+   603→            </CardHeader>
+   604→            <CardContent>
+   605→              <div className="overflow-x-auto">
+   606→                <Table>
+   607→                  <TableHeader>
+   608→                    <TableRow className="bg-muted/40">
+   609→                      <TableHead>Document No.</TableHead>
+   610→                      <TableHead>Type</TableHead>
+   611→                      <TableHead>Created</TableHead>
+   612→                      <TableHead>Status</TableHead>
+   613→                      <TableHead className="text-right">Actions</TableHead>
+   614→                    </TableRow>
+   615→                  </TableHeader>
+   616→                  <TableBody>
+   617→                    {(emp.documents ?? []).map((d: any) => (
+   618→                      <TableRow key={d.id}>
+   619→                        <TableCell className="font-mono text-xs">
+   620→                          {d.documentNumber}
+   621→                        </TableCell>
+   622→                        <TableCell className="text-sm">{d.type}</TableCell>
+   623→                        <TableCell className="text-sm">
+   624→                          {formatDate(d.createdAt)}
+   625→                        </TableCell>
+   626→                        <TableCell>
+   627→                          <StatusBadge status={d.status} />
+   628→                        </TableCell>
+   629→                        <TableCell className="text-right">
+   630→                          <Button
+   631→                            size="sm"
+   632→                            variant="ghost"
+   633→                            onClick={() => setModule("documents")}
+   634→                          >
+   635→                            View
+   636→                          </Button>
+   637→                        </TableCell>
+   638→                      </TableRow>
+   639→                    ))}
+   640→                    {(emp.documents ?? []).length === 0 && (
+   641→                      <TableRow>
+   642→                        <TableCell
+   643→                          colSpan={5}
+   644→                          className="text-center text-sm text-muted-foreground py-8"
+   645→                        >
+   646→                          No documents yet. Generate one to get started.
+   647→                        </TableCell>
+   648→                      </TableRow>
+   649→                    )}
+   650→                  </TableBody>
+   651→                </Table>
+   652→              </div>
+   653→            </CardContent>
+   654→          </Card>
+   655→        </TabsContent>
+   656→
+   657→        {/* Activity */}
+   658→        <TabsContent value="activity" className="mt-4">
+   659→          <Card className="border-border/60 shadow-soft">
+   660→            <CardHeader>
+   661→              <CardTitle className="text-base">Activity Timeline</CardTitle>
+   662→            </CardHeader>
+   663→            <CardContent>
+   664→              <div className="space-y-3">
+   665→                {(emp.activities ?? []).map((a: any) => (
+   666→                  <div
+   667→                    key={a.id}
+   668→                    className="flex items-start gap-3 pb-3 border-b border-border/40 last:border-0"
+   669→                  >
+   670→                    <div className="size-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center flex-shrink-0">
+   671→                      <Activity className="size-4" />
+   672→                    </div>
+   673→                    <div className="flex-1">
+   674→                      <div className="text-sm font-medium">{a.title}</div>
+   675→                      {a.description && (
+   676→                        <div className="text-xs text-muted-foreground">
+   677→                          {a.description}
+   678→                        </div>
+   679→                      )}
+   680→                      <div className="text-[11px] text-muted-foreground mt-0.5">
+   681→                        {relativeTime(a.createdAt)}
+   682→                      </div>
+   683→                    </div>
+   684→                  </div>
+   685→                ))}
+   686→                {(emp.activities ?? []).length === 0 && (
+   687→                  <p className="text-sm text-muted-foreground py-8 text-center">
+   688→                    No activity yet.
+   689→                  </p>
+   690→                )}
+   691→              </div>
+   692→            </CardContent>
+   693→          </Card>
+   694→        </TabsContent>
+   695→      </Tabs>
+   696→
+   697→      <EmployeeFormDialog
+   698→        open={editOpen}
+   699→        onOpenChange={setEditOpen}
+   700→        employee={{ id }}
+   701→        onSaved={() => qc.invalidateQueries({ queryKey: ["employee", id] })}
+   702→      />
+   703→    </div>
+   704→  );
+   705→}
+   706→
+   707→function StatCard({
+   708→  icon: Icon,
+   709→  label,
+   710→  value,
+   711→  tone,
+   712→}: {
+   713→  icon: any;
+   714→  label: string;
+   715→  value: any;
+   716→  tone: "emerald" | "amber" | "teal" | "violet";
+   717→}) {
+   718→  const tones: Record<string, string> = {
+   719→    emerald: "bg-emerald-500/10 text-emerald-600",
+   720→    amber: "bg-amber-500/10 text-amber-600",
+   721→    teal: "bg-teal-500/10 text-teal-600",
+   722→    violet: "bg-violet-500/10 text-violet-600",
+   723→  };
+   724→  return (
+   725→    <Card className="border-border/60 shadow-soft p-4">
+   726→      <div className="flex items-center gap-3">
+   727→        <div
+   728→          className={`size-10 rounded-xl flex items-center justify-center ${tones[tone]}`}
+   729→        >
+   730→          <Icon className="size-5" />
+   731→        </div>
+   732→        <div className="min-w-0">
+   733→          <div className="text-xs text-muted-foreground">{label}</div>
+   734→          <div className="text-lg font-semibold truncate">{value}</div>
+   735→        </div>
+   736→      </div>
+   737→    </Card>
+   738→  );
+   739→}
+   740→
+   741→function InfoRow({
+   742→  icon: Icon,
+   743→  label,
+   744→  value,
+   745→}: {
+   746→  icon: any;
+   747→  label: string;
+   748→  value: React.ReactNode;
+   749→}) {
+   750→  return (
+   751→    <div className="flex items-start gap-2.5">
+   752→      <Icon className="size-4 text-muted-foreground flex-shrink-0 mt-0.5" />
+   753→      <div className="min-w-0">
+   754→        <div className="text-xs text-muted-foreground">{label}</div>
+   755→        <div className="text-sm font-medium break-words">{value}</div>
+   756→      </div>
+   757→    </div>
+   758→  );
+   759→}
+   760→
+   761→function SalaryRow({
+   762→  label,
+   763→  value,
+   764→  highlight,
+   765→}: {
+   766→  label: string;
+   767→  value: number;
+   768→  highlight?: boolean;
+   769→}) {
+   770→  return (
+   771→    <div className="flex items-center justify-between">
+   772→      <span
+   773→        className={`text-sm ${highlight ? "font-semibold" : "text-muted-foreground"}`}
+   774→      >
+   775→        {label}
+   776→      </span>
+   777→      <span
+   778→        className={`tabular-nums ${highlight ? "text-lg font-bold text-primary" : value < 0 ? "text-rose-600" : ""}`}
+   779→      >
+   780→        {formatCurrency(Math.abs(value))}
+   781→      </span>
+   782→    </div>
+   783→  );
+   784→}
+   785→

@@ -23,7 +23,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { toast } from "sonner";
-import { Loader2, UserPlus, Upload, X } from "lucide-react";
+import { Loader2, UserPlus, Upload, X, MessageSquareText } from "lucide-react";
 import { AvatarBadge } from "../shared/avatar-badge";
 
 interface Props {
@@ -73,6 +73,7 @@ export function EmployeeFormDialog({ open, onOpenChange, employee, onSaved }: Pr
     bankIfsc: "",
     paymentMethod: "BANK_TRANSFER",
     photo: "",
+    revisionReason: "",
   });
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -105,6 +106,7 @@ export function EmployeeFormDialog({ open, onOpenChange, employee, onSaved }: Pr
             confirmationDate: emp.confirmationDate
               ? new Date(emp.confirmationDate).toISOString().slice(0, 10)
               : "",
+            revisionReason: "",
           });
         });
     } else if (open && !employee) {
@@ -141,6 +143,7 @@ export function EmployeeFormDialog({ open, onOpenChange, employee, onSaved }: Pr
         bankIfsc: "",
         paymentMethod: "BANK_TRANSFER",
         photo: "",
+        revisionReason: "",
       });
     }
   }, [open, employee]);
@@ -590,6 +593,25 @@ export function EmployeeFormDialog({ open, onOpenChange, employee, onSaved }: Pr
                     ).toLocaleString()}
                   </span>
                 </div>
+
+                {isEdit && (
+                  <Field
+                    label="Reason for change (optional)"
+                    className="md:col-span-2"
+                  >
+                    <Textarea
+                      rows={2}
+                      value={form.revisionReason ?? ""}
+                      onChange={(e) => set("revisionReason", e.target.value)}
+                      placeholder="e.g. Annual increment, promotion to Senior Engineer, performance bonus adjustment…"
+                    />
+                    <div className="text-[11px] text-muted-foreground mt-1 flex items-center gap-1">
+                      <MessageSquareText className="size-3" />
+                      Recorded in the employee's salary revision history if any
+                      payroll field changes.
+                    </div>
+                  </Field>
+                )}
               </TabsContent>
             </Tabs>
           </div>

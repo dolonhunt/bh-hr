@@ -54,6 +54,12 @@ export async function PATCH(
   const { id } = await params;
   const body = await req.json();
 
+  // Fetch current employee BEFORE updating, so we can diff salary fields.
+  const prior = await db.employee.findUnique({ where: { id } });
+  if (!prior) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+
   const updated = await db.employee.update({
     where: { id },
     data: {
@@ -96,6 +102,53 @@ export async function PATCH(
     },
   });
 
+  // Salary revision tracking: compare old vs new values for the 4 payroll fields.
+  // If any changed, write an Activity entry of type "SALARY_REVISION".
+  const numOrZero = (v: unknown): number =>
+    typeof v === "number" && !isNaN(v) ? v : typeof v === "string" && v !== "" ? Number(v) || 0 : 0;
+
+  const oldBasic = numOrZero(prior.basicSalary);
+  const newBasic = numOrZero(body.basicSalary);
+  const oldAllowances = numOrZero(prior.allowances);
+  const newAllowances = numOrZero(body.allowances);
+  const oldDeductions = numOrZero(prior.deductions);
+  const newDeductions = numOrZero(body.deductions);
+  const oldTax = numOrZero(prior.tax);
+  const newTax = numOrZero(body.tax);
+
+  const salaryChanged =
+    oldBasic !== newBasic ||
+    oldAllowances !== newAllowances ||
+    oldDeductions !== newDeductions ||
+    oldTax !== newTax;
+
+  if (salaryChanged) {
+    const revisionReason =
+      typeof body.revisionReason === "string" && body.revisionReason.trim()
+        ? body.revisionReason.trim()
+        : null;
+
+    await db.activity.create({
+      data: {
+        employeeId: id,
+        type: "SALARY_REVISION",
+        title: "Salary Revised",
+        description: JSON.stringify({
+          oldBasicSalary: oldBasic,
+          newBasicSalary: newBasic,
+          oldAllowances,
+          newAllowances,
+          oldDeductions,
+          newDeductions,
+          oldTax,
+          newTax,
+          reason: revisionReason,
+          changedBy: "HR_ADMIN",
+        }),
+      },
+    });
+  }
+
   await db.activity.create({
     data: {
       employeeId: id,
@@ -110,7 +163,9 @@ export async function PATCH(
       action: "EMPLOYEE_UPDATE",
       entityType: "Employee",
       entityId: id,
-      description: `Updated employee ${updated.fullName}`,
+      description: salaryChanged
+        ? `Updated employee ${updated.fullName} (incl. salary revision)`
+        : `Updated employee ${updated.fullName}`,
     },
   });
 

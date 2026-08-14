@@ -1057,3 +1057,170 @@ Stage Summary:
   8. Add salary revision history tracking.
   9. Add org chart visualization (reporting hierarchy).
   10. Add HR analytics predictions (attrition risk, performance trends).
+
+---
+Task ID: 6-B
+Agent: salary-revisions-backup-restore
+Task: Add salary revision history tracking + data backup/restore (export/import JSON, danger-zone reset).
+
+Work Log:
+- Read worklog.md (rounds 1-5 complete: 11 modules, 65+ endpoints, 15 templates, Performance + Recruitment rebuilt, leave balances, attendance CSV import, directory PDF, document version comparison, framer-motion page transitions).
+- Read schema.prisma (cannot modify — used existing `Activity` model for salary revisions via `type="SALARY_REVISION"` and JSON-encoded `description`).
+- Inspected existing files: `src/app/api/employees/[id]/route.ts` (PATCH), `src/components/hr/modules/employee-profile.tsx`, `src/components/hr/modules/employee-form-dialog.tsx`, `src/components/hr/modules/settings.tsx`, `src/app/api/settings/route.ts`, `src/lib/utils.ts` (`downloadBlob`, `formatCurrency`, `formatDate`), `src/components/ui/alert-dialog.tsx`, `src/components/ui/progress.tsx`, `src/components/hr/shared/empty-state.tsx`.
+
+Files Created:
+1. `src/app/api/salary-revisions/route.ts` (NEW) — GET `?employeeId=` returns salary revision history ordered by date desc. Each item: `{ id, employeeId, oldBasicSalary, newBasicSalary, oldAllowances, newAllowances, oldDeductions, newDeductions, oldTax, newTax, oldNetSalary, newNetSalary, reason, changedBy, changedAt }`. Parses JSON-encoded `description` from Activity rows of type `SALARY_REVISION`.
+2. `src/components/hr/modules/salary-history.tsx` (NEW) — Vertical-timeline component showing salary revisions with:
+   - Summary cards: Current Net Salary, Total Increase (vs earliest known net), Avg Annual Increase % (compound rate from joiningDate, fallback to first→last revision span).
+   - Timeline with colored nodes (emerald=up, rose=down, muted=flat), each entry shows date+changedBy, old→new net salary with delta pill (absolute + %), per-component breakdown (Basic/Allow/Deduct/Tax) with up/down arrows for changed fields, and reason in italic quote.
+   - EmptyState when no revisions yet.
+   - Loading skeleton.
+3. `src/app/api/backup/export/route.ts` (NEW) — GET returns JSON `{version:1, exportedAt, tables:{...}}` with all 21 tables (users, company, departments, roles, designations, leaveTypes, employees, attendance, leaveRequests, payrolls, documentTemplates, generatedDocuments, emailLogs, emailSettings, performances, jobs, candidates, activities, auditLogs, documentNumbering, settings). Sets `Content-Type: application/json` and `Content-Disposition: attachment; filename="teamhub-backup-{date}.json"`. Strips `password` from each user row. Records `lastBackupAt` in Setting table for UI display.
+4. `src/app/api/backup/import/route.ts` (NEW) — POST accepts JSON body. Validates structure (`body.tables` must exist). Upserts all 21 tables in dependency order (parent tables first, then Employee, then Employee-dependent tables). Per-table try/catch isolates errors; per-row try/catch counts successes. Drops relational fields (e.g. `department`, `role`, `manager`) before upsert since Prisma refuses nested writes on `update`. Returns `{imported: {employees:N, ...}, errors:[{table,message,count?}], meta:{version,exportedAt,restoredAt}}`. Creates AuditLog: `action="DATA_RESTORE"`, `description="Restored backup from {exportedAt} (version {version})"`. Users: never overwrites password with empty — falls back to a random UUID if backup row is missing password (defense-in-depth, though export already strips passwords).
+5. `src/app/api/backup/reset/route.ts` (NEW) — POST `?confirm=DELETE` clears ALL tables except Users and Company. Returns 400 if confirm≠"DELETE". Deletes in dependency order (children first, parents last) with per-table try/catch. Records AuditLog `action="DATA_RESET"`.
+
+Files Modified:
+6. `src/app/api/employees/[id]/route.ts` (PATCH handler) — Now fetches the current employee BEFORE updating (`db.employee.findUnique`), returns 404 if not found. After update, computes deltas for `basicSalary`, `allowances`, `deductions`, `tax`. If any changed, creates an Activity row with `type="SALARY_REVISION"`, `title="Salary Revised"`, and `description` = JSON string `{oldBasicSalary, newBasicSalary, oldAllowances, newAllowances, oldDeductions, newDeductions, oldTax, newTax, reason, changedBy:"HR_ADMIN"}`. Accepts optional `body.revisionReason` field (trimmed; null if empty). AuditLog description includes "(incl. salary revision)" suffix when salary changed.
+7. `src/components/hr/modules/employee-profile.tsx` — Imported `SalaryHistory` component. Wrapped Payroll tab content in `space-y-4` and appended `<SalaryHistory employeeId={emp.id} currentNetSalary={netSalary} joiningDate={emp.joiningDate} />` after the bank details grid. Updated `onSaved` callback to invalidate `["salary-revisions", id]` query key alongside `["employee", id]`.
+8. `src/components/hr/modules/employee-form-dialog.tsx` — Added `MessageSquareText` icon import. Added `revisionReason: ""` to initial form state and to both the reset-on-new-employee state and the load-on-edit state (reset to empty so the user enters a fresh reason each edit). Added a conditional `{isEdit && <Field>...</Field>}` block in the Payroll tab (after the computed-net-salary box) with a 2-row Textarea labelled "Reason for change (optional)" and helper text "Recorded in the employee's salary revision history if any payroll field changes." The full form (including `revisionReason`) is already JSON-stringified to the PATCH endpoint by the existing submit handler.
+9. `src/components/hr/modules/settings.tsx` — Added new tab key `backup` to TABS array with `Database` icon. Added imports for AlertDialog UI kit, Progress, and 8 new lucide icons (Database, Download, Upload, TriangleAlert, Loader2, ShieldCheck, Clock, plus existing Check). Wired `{tab === "backup" && <DataBackupTab />}`. Implemented `DataBackupTab()` component with three sections:
+   - **Export Backup**: button triggers `/api/backup/export` download via `downloadBlob`. Shows included-data checklist (employees, attendance, leave, payroll, documents, templates, departments/roles/designations, settings). Shows last backup date from `settings.lastBackupAt` (or "Never"). Security note: passwords excluded.
+   - **Import Backup**: button opens dynamic file picker for .json files. Amber warning box "This will overwrite existing data". AlertDialog confirmation "Are you sure? This cannot be undone." with file name shown. On confirm: parse JSON, validate `tables` key, POST to `/api/backup/import`, show progress bar (10→40→80→100), then display results grid (per-table counts) + error list if any.
+   - **Danger Zone**: rose-bordered card with "Reset all data" destructive button. AlertDialog requires user to type literal "DELETE" in an Input field to enable the action button; calls `/api/backup/reset?confirm=DELETE`. Toast on success.
+
+UI/UX notes:
+- Emerald primary palette throughout (no indigo/blue).
+- Timeline uses absolute-positioned vertical line with circular nodes containing direction icons (ArrowUpRight/ArrowDownRight/Minus).
+- Mobile responsive: summary tiles stack 1-col on mobile, 3-col on sm+. Timeline cards stretch full-width. Settings tab nav remains horizontal-scroll on mobile.
+- Loading skeletons in SalaryHistory. EmptyState when no revisions.
+- AlertDialog for confirmations (import overwrite + reset). Progress bar during import. Toast feedback via sonner.
+- AlertDialogDescription `asChild` with `<div>` for the reset dialog so the type-to-confirm Input renders properly inside the description.
+
+API smoke tests (against running dev server on port 3000 via 127.0.0.1):
+- `GET /api/salary-revisions?employeeId=EMP_ID` (no prior revisions) → 200, `{items:[],total:0}`.
+- `PATCH /api/employees/EMP_ID` with new basicSalary/allowances/deductions/tax + `revisionReason:"Annual increment 2025"` → 200.
+- `GET /api/salary-revisions?employeeId=EMP_ID` → 200, 1 item with correct old/new values and reason="Annual increment 2025".
+- `PATCH` again to restore original values → 200, second revision created.
+- `GET /api/backup/export` → 200, valid JSON, 227 KB, Content-Disposition header set, 21 tables (users=1, employees=20, attendance=140, payrolls=19, documentTemplates=16, generatedDocuments=10, auditLogs=44, etc.). Verified passwords stripped from users array.
+- `POST /api/backup/import` with the exported JSON → 200, all 21 tables imported successfully (359 records total), 0 errors, meta.exportedAt matches.
+- `POST /api/backup/reset` (without `?confirm=DELETE`) → 400 with descriptive error message.
+
+Lint status:
+- `cd /home/z/my-project && bun run lint 2>&1 | tail -20` → exit 1, BUT the only error is in `src/components/hr/modules/org-chart.tsx` line 160 (`react-hooks/set-state-in-effect`), a file created by another concurrent agent (not listed in my responsible files, not modified by me). My 9 files (5 created + 4 modified) produce zero lint errors and zero warnings — confirmed by grepping lint output for `salary-history|salary-revisions|backup/|employee-profile|employee-form-dialog|settings.tsx` → no matches.
+- `bunx tsc --noEmit` → 0 errors in my files (only pre-existing errors in `prisma/seed.ts`, `src/app/api/payroll/route.ts`, `src/hooks/use-keyboard-shortcuts.ts`, `src/lib/document-renderers.ts`, `examples/`, `skills/` — all noted by previous Task 5-C agent).
+
+Stage Summary:
+- Salary revision history is now fully tracked end-to-end: editing any payroll field (basicSalary/allowances/deductions/tax) on an employee automatically creates a timestamped Activity entry of type `SALARY_REVISION` with old/new values and an optional reason. The Employee Profile's Payroll tab shows a visually appealing vertical timeline with summary stats (current net, total increase, avg annual %). The Edit Employee dialog has a new "Reason for change" textarea (only visible in edit mode).
+- Data backup/restore is fully functional: HR can export the entire DB as a downloadable JSON file (passwords excluded), restore from a previously exported file via file-picker + confirmation dialog + progress bar + per-table result breakdown, and (in the Danger Zone) reset all data with type-"DELETE"-to-confirm safeguard. Reset preserves Users and Company. Every restore/reset is logged as an AuditLog entry.
+- 5 new files, 4 modified files. 0 lint errors in my files. No Prisma schema changes (used existing Activity model). Dev server not restarted. z-ai-web-dev-sdk not used (not needed for this task).
+
+---
+Task ID: 6-A
+Agent: subagent-6-A (Employee Onboarding Workflow + Org Chart Visualization)
+
+Task: Build (1) a checklist-based employee onboarding workflow (backend + frontend) using the Activity model workaround, and (2) an interactive org chart visualization (backend tree API + zoomable/pannable frontend tree).
+
+Work Log:
+- Read worklog.md (last 80 lines) + existing modules (employee-profile.tsx, employees.tsx) + shared components (PageHeader, KpiCard, StatusBadge, AvatarBadge, EmptyState) + lib/utils.ts + lib/db.ts + lib/store.ts + prisma/schema.prisma + nav-config.ts + ui/checkbox.tsx + ui/progress.tsx + the employees API + audit-log conventions established by sibling agents.
+- Created `/src/app/api/onboarding/route.ts`:
+  - GET `?employeeId=&status=PENDING|IN_PROGRESS|COMPLETED|SKIPPED`. Auto-seeds 10 default onboarding tasks on first GET (idempotent — `count === 0` check). Each task is stored as an Activity row with `type="ONBOARDING_TASK"` and the description field carries a JSON-encoded metadata blob `{ description, dueDate, assignedTo, status, notes, completedAt, sortOrder, isDefault }`. The 10 default tasks are: Collect ID/personal docs (HR), Set up official email (IT), Provide employee handbook (HR), Conduct office tour (HR), Set up workstation and equipment (IT), Introduce to team members (Manager), Complete tax forms (Finance), Set up payroll and bank details (Finance), Schedule orientation session (HR), First week check-in (Manager, dueDate = joiningDate + 7 days). Tasks are returned sorted by sortOrder. Handles legacy Activity rows (plain-text description) gracefully.
+  - POST `{ employeeId, title, description?, dueDate?, assignedTo? }` — validates employeeId + title, ensures defaults exist first (so custom tasks append after defaults), auto-assigns next sortOrder, writes an AuditLog entry (`ONBOARDING_TASK_CREATE`).
+- Created `/src/app/api/onboarding/[id]/route.ts`:
+  - PATCH `{ status?, notes?, dueDate?, completedAt?, assignedTo?, description? }` — validates status against the 4 allowed values, auto-sets `completedAt=now()` when transitioning to COMPLETED (and clears it when moving away). Writes `ONBOARDING_TASK_UPDATE` AuditLog entry.
+  - DELETE — removes the task + writes `ONBOARDING_TASK_DELETE` AuditLog entry. 404s if the Activity isn't an onboarding task.
+- Created `/src/components/hr/modules/onboarding.tsx`:
+  - Pure client component using TanStack Query + sonner toast + shadcn/ui.
+  - Top: progress ring (SVG `<circle>` with strokeDashoffset animation) showing % complete, plus "X of Y tasks completed" headline + a `<Progress>` bar + a 4-tile stat pill grid (Pending/In Progress/Completed/Skipped) + overdue task count badge.
+  - Filter row: All / Pending / Completed tabs (with live counts in parentheses).
+  - Checklist: each task is a Card with a clickable status-cycler checkbox (PENDING → IN_PROGRESS → COMPLETED → PENDING, with SKIPPED → PENDING), the status icon (CircleDashed/CircleDot/CheckCircle2/SkipForward) colored per state, title with strikethrough when COMPLETED/SKIPPED, "Custom" badge for non-default tasks, description, due date (red + "· overdue" when overdue), assigned-to label, completedAt timestamp, inline editable notes field (Textarea appears when clicked, "Add a note" placeholder when empty), Skip button, Reopen button (only when SKIPPED), Delete button (only on custom tasks). Custom emerald checkbox color overrides the default primary tone for COMPLETED.
+  - "Add Task" button → opens an AddTaskDialog with title (required), description, due date picker, assignedTo dropdown (HR/IT/Finance/Manager/Admin/—). POSTs to `/api/onboarding`, on success invalidates the query and toasts.
+  - Loading skeleton + error empty state.
+- Modified `/src/components/hr/modules/employee-profile.tsx`:
+  - Imported `Onboarding` from `./onboarding`.
+  - Added a new tab trigger `<TabsTrigger value="onboarding">Onboarding</TabsTrigger>` after the Activity tab.
+  - Added `<TabsContent value="onboarding"><Onboarding employeeId={id} /></TabsContent>` after the Activity tab content.
+- Created `/src/app/api/org-chart/route.ts`:
+  - GET returns the recursive reporting tree. Loads all ACTIVE/ON_LEAVE/PROBATION employees (excludes RESIGNED/TERMINATED) with department + role + designation. Builds a `childrenByParent` map keyed by `reportingManagerId`, detects cycles defensively (visited-set walk up the manager chain), treats orphaned-manager and cycle-forming employees as roots, recursively builds OrgNode tree (max depth 3) with full descendant count (`subordinateCount`) computed independently of the depth cap. Returns `{ tree, departments: [{name,color,count}], totalEmployees, totalRoots, maxDepth }`.
+- Created `/src/components/hr/modules/org-chart.tsx`:
+  - Pure client component. TanStack Query for the tree fetch (30s staleTime). State: `zoom` (0.4-2), `collapsed` Set<string>, `search` string, `isPanning` boolean.
+  - Toolbar: search input, "Expand all" / "Collapse all" buttons, zoom out / zoom % display / zoom in / reset zoom controls.
+  - Department legend: pills with color dot + name + count.
+  - Canvas: `overflow-auto` container with `cursor-grab/grabbing`, mouse-pointer-event panning (ignores clicks on buttons/links via `data-no-pan` attribute and `closest()` check). Inner div uses `transform: scale(zoom)` with `transform-origin: top-left`.
+  - Recursive `OrgNodeView` renders each node as a Card with: department color stripe on top, AvatarBadge, name, employee ID, designation, department dot+name, status badge (hidden when ACTIVE), and a footer showing `subordinateCount` + an Expand/Collapse chevron button (keyboard accessible, Enter/Space toggles).
+  - Connectors: a vertical line from parent down to a horizontal trunk, with the trunk clipped to span only between the centers of the first and last child (left/right halves for outermost children, full width for middle children) — standard CSS-only tree connector pattern using absolute-positioned `w-px`/`h-px` divs. Single-child subtrees skip the horizontal trunk.
+  - Default collapse state: collapses every node at depth ≥ 1 on first tree arrival (so the chart isn't overwhelming for large orgs). Uses the React-documented "adjust state during render" pattern (`if (currentSig !== treeSig) { setTreeSig(...); setCollapsed(...) }`) instead of `useEffect+setState` to avoid the `react-hooks/set-state-in-effect` lint error.
+  - Search: computes an "effective collapsed" set with `useMemo` that expands any ancestor of a matching node (so the match is actually visible). Matching nodes get a `border-primary ring-2 ring-primary/40` highlight. Matches against fullName / employeeId / designation / department / role.
+  - Clicking a node card calls `openEmployee(id)` from the store → navigates to that employee's profile.
+- Modified `/src/components/hr/modules/employees.tsx`:
+  - Added `Network` to lucide-react imports + `OrgChart` import.
+  - Changed view state type from `"list" | "grid"` to `"list" | "grid" | "org"`.
+  - Added a 3rd toggle button (Network icon) in the view-switcher group with proper title/aria-label.
+  - Wrapped Filters, Result count, Empty state, Loading skeleton, Pagination in `{view !== "org" && (...)}` conditionals so they don't show in org-chart view.
+  - Added `{view === "org" && <OrgChart />}` block (rendered between Loading and List view).
+- Smoke-tested all endpoints via curl against the running dev server (had to start it since it had died — `bun run dev` in background):
+  - `GET /api/onboarding?employeeId=<EMP020 id>` → 200, returned 10 default onboarding tasks with the correct titles, assignedTo values (HR/IT/HR/HR/IT/Manager/Finance/Finance/HR/Manager), and the "First week check-in" dueDate correctly computed from joiningDate + 7 days.
+  - `PATCH /api/onboarding/<id> {status:"IN_PROGRESS"}` → 200, status updated.
+  - `PATCH /api/onboarding/<id> {status:"COMPLETED", notes:"..."}` → 200, status updated + completedAt auto-set + notes saved.
+  - `POST /api/onboarding {employeeId, title, description, dueDate, assignedTo}` → 201, custom task created with sortOrder=10 (next after the 10 defaults), isDefault=false.
+  - `GET /api/onboarding?employeeId=...&status=COMPLETED` → 200, returned 1 task (filter works).
+  - `DELETE /api/onboarding/<custom task id>` → 200, `{ok:true}`.
+  - `GET /api/org-chart` → 200, returned `{tree:[20 roots with 0 subs each], departments:[8], totalEmployees:20, totalRoots:20, maxDepth:3}` (initial state has no reporting managers set).
+  - Assigned 2 employees to report to a 3rd via `PATCH /api/employees/<id> {reportingManagerId:...}`, re-fetched the org chart — confirmed the parent now shows `subs=2` with the 2 subordinates nested correctly, totalRoots dropped to 18.
+  - `GET /` → 200 (page renders cleanly).
+  - Reverted the test data (cleared the reporting-manager assignments, reset the test task back to PENDING).
+
+Issues Encountered:
+- ESLint error: `react-hooks/set-state-in-effect` on the initial `useEffect` that auto-collapsed deep nodes. Fixed by switching to the React-documented "adjust state during render" pattern (track previous tree-signature in state, compare during render, call setState only when signature changes).
+- Dev server had died (only `agent-browser` + `caddy` were running when I checked). Started it in the background with `nohup bun run dev` so I could smoke-test my endpoints.
+
+Lint status:
+- `cd /home/z/my-project && bun run lint 2>&1 | tail -10` → exit code 0, no errors, no warnings.
+- `bunx tsc --noEmit` → 0 errors in any of my files (pre-existing TS errors in prisma/seed.ts, payroll/route.ts, use-keyboard-shortcuts.ts, document-renderers.ts, examples/, skills/ remain unchanged).
+
+Stage Summary:
+- Two new high-impact HR features added end-to-end:
+  1. **Employee Onboarding Workflow** — every employee profile now has an "Onboarding" tab with a progress ring, 10 default checklist tasks (auto-seeded on first GET), and full lifecycle (PENDING → IN_PROGRESS → COMPLETED/SKIPPED + notes + due dates + custom task creation/deletion). Uses the Activity model workaround so no Prisma schema migration was required.
+  2. **Org Chart Visualization** — a 3rd view in the Employees module ("Org Chart" button next to List/Grid) that renders the reporting hierarchy as an interactive tree with department color stripes, zoom controls (40%-200%), drag-to-pan canvas, expand/collapse per node, search highlight with auto-expand of ancestor paths, and clickable nodes that jump to the employee profile.
+- 6 files created, 2 files modified, 0 lint errors, 0 TS errors in my files, no Prisma schema changes, dev server verified responding 200 on all new endpoints.
+
+---
+Task ID: 6-CRON-5
+Agent: cron-review-agent (round 5)
+Task: QA testing, add employee onboarding workflow, org chart visualization, salary revision history, data backup/restore.
+
+Work Log:
+- Read worklog.md (rounds 1-4 complete: 15 templates, approval workflow, bulk generation, 6 analytics charts, dark mode, keyboard shortcuts, CSV/Excel export, document print, employee photo upload, mobile responsiveness, leave calendar, attendance heatmap, payroll batch, email template editor, KPI sparklines, dashboard hero banner, leave balances, attendance CSV import, directory PDF, template compare, Performance + Recruitment rebuilt, framer-motion transitions).
+- Ran `bun run lint` — 0 errors, 0 warnings.
+- Started dev server, performed agent-browser QA. Dashboard 8/10 (VLM noted "empty chart" false positive — verified 24 bars + 8 slices in DOM).
+- Dispatched 2 parallel subagents: Task 6-A (onboarding + org chart), Task 6-B (salary revisions + backup/restore).
+
+Features Added (via subagents):
+- **Task 6-A: Employee Onboarding Workflow** — New `/api/onboarding` and `/api/onboarding/[id]` endpoints using Activity model workaround (type="ONBOARDING_TASK", JSON metadata in description). 10 default tasks auto-seeded on first GET (Collect ID, Set up email, Provide handbook, Office tour, Set up workstation, Introduce to team, Complete tax forms, Set up payroll, Schedule orientation, First week check-in with dueDate = joiningDate + 7 days). New `Onboarding` component with progress ring, checklist with status cycler (PENDING → IN_PROGRESS → COMPLETED), inline notes, skip/reopen, delete (custom only), filter tabs, Add Task dialog. Added as "Onboarding" tab in Employee Profile. VLM confirmed: 9/10.
+- **Task 6-A: Org Chart Visualization** — New `/api/org-chart` endpoint returns recursive reporting tree (max depth 3, cycle-safe). New `OrgChart` component with zoomable/pannable interactive tree, department color stripes, search highlight (auto-expands ancestors), expand/collapse, clickable nodes. Pure CSS tree connectors. Added as 3rd view toggle "Org Chart" in Employees module (alongside List and Grid). VLM confirmed: 8/10.
+- **Task 6-B: Salary Revision History** — New `/api/salary-revisions` endpoint returns history from Activity rows (type="SALARY_REVISION"). Modified `/api/employees/[id]` PATCH to auto-log salary changes (old/new values for basicSalary, allowances, deductions, tax + reason). New `SalaryHistory` component with vertical timeline, summary cards (Current Net, Total Increase, Avg Annual Increase %), per-revision nodes (emerald=up, rose=down) with old→new net salary, delta pill with %, per-component breakdown. Added to Employee Profile Payroll tab. Added "Reason for change" field to employee form dialog (edit mode only). VLM confirmed: 9/10.
+- **Task 6-B: Data Backup/Restore** — New `/api/backup/export` (GET downloads JSON of all 21 tables, strips User passwords, 239KB), `/api/backup/import` (POST upserts all tables in dependency order, per-row error isolation, DATA_RESTORE audit log), `/api/backup/reset` (POST clears all tables except Users+Company, requires confirm=DELETE). New "Data & Backup" tab in Settings with Export section (download + last-backup-date + included-data checklist), Import section (file picker + warning + AlertDialog confirm + progress + results), Danger Zone (reset with type-DELETE-to-confirm). VLM confirmed: 9/10.
+
+Verification:
+- `bun run lint` — 0 errors, 0 warnings.
+- API smoke tests: Onboarding 200, Org Chart 200, Salary Revisions 200 (with employeeId), Backup Export 200 (239KB valid JSON, 21 tables).
+- agent-browser + VLM verification:
+  - Org Chart: 8/10 — hierarchical tree with employee nodes, department colors, expand/collapse.
+  - Onboarding tab: 9/10 — progress ring (0% 0/10) + checklist of 10 tasks with status tags.
+  - Salary History: 9/10 — chronological timeline with green/red indicators, component breakdown, summary stats.
+  - Data & Backup: 9/10 — Export/Import/Danger Zone sections with clear visual hierarchy.
+
+Stage Summary:
+- Project now has: employee onboarding workflow with 10 default tasks, interactive org chart, salary revision history timeline, full data backup/restore with danger zone.
+- Total document templates: 15. Total modules: 11 (all fully functional). Total API endpoints: 75+.
+- All new features verified at 8-9/10 via VLM.
+- Remaining recommendations for next cron round:
+  1. Add real SMTP email sending (currently simulated).
+  2. Add notification preferences (email/SMS/in-app toggle per event).
+  3. Add multi-company/multi-tenant support.
+  4. Add custom dashboard widgets (drag-and-drop layout).
+  5. Add exit/offboarding workflow (checklist for departing employees).
+  6. Add HR analytics predictions (attrition risk, performance trends).
+  7. Add employee self-service portal (P2 — employees can view their own data).
+  8. Add biometric attendance integration.
+  9. Add WhatsApp/SMS notifications.
+  10. Add advanced payroll (tax slabs, PF, gratuity).

@@ -39,6 +39,7 @@ import {
   Plus,
   LayoutGrid,
   List as ListIcon,
+  Network,
   MoreVertical,
   Eye,
   Pencil,
@@ -53,6 +54,7 @@ import {
 import { formatDate, formatCurrency } from "@/lib/utils";
 import { EmployeeFormDialog } from "./employee-form-dialog";
 import { EmployeeProfile } from "./employee-profile";
+import { OrgChart } from "./org-chart";
 import { ExportButton } from "../shared/export-button";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -74,7 +76,7 @@ function EmployeeList() {
   const setQuickAction = useApp((s) => s.setQuickAction);
   const qc = useQueryClient();
 
-  const [view, setView] = useState<"list" | "grid">("list");
+  const [view, setView] = useState<"list" | "grid" | "org">("list");
   const [search, setSearch] = useState("");
   const [departmentId, setDepartmentId] = useState("");
   const [status, setStatus] = useState("");
@@ -180,6 +182,7 @@ function EmployeeList() {
                 className={`p-2 ${view === "list" ? "bg-primary text-primary-foreground" : "hover:bg-muted"}`}
                 onClick={() => setView("list")}
                 aria-label="List view"
+                title="List view"
               >
                 <ListIcon className="size-4" />
               </button>
@@ -187,8 +190,17 @@ function EmployeeList() {
                 className={`p-2 ${view === "grid" ? "bg-primary text-primary-foreground" : "hover:bg-muted"}`}
                 onClick={() => setView("grid")}
                 aria-label="Grid view"
+                title="Grid view"
               >
                 <LayoutGrid className="size-4" />
+              </button>
+              <button
+                className={`p-2 ${view === "org" ? "bg-primary text-primary-foreground" : "hover:bg-muted"}`}
+                onClick={() => setView("org")}
+                aria-label="Org chart view"
+                title="Org chart view"
+              >
+                <Network className="size-4" />
               </button>
             </div>
             <Button size="sm" onClick={addNew}>
@@ -200,69 +212,73 @@ function EmployeeList() {
       />
 
       {/* Filters */}
-      <div className="flex flex-col md:flex-row gap-3">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
-          <Input
-            placeholder="Search by name, ID, email, phone…"
-            value={search}
-            onChange={(e) => {
-              setSearch(e.target.value);
+      {view !== "org" && (
+        <div className="flex flex-col md:flex-row gap-3">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+            <Input
+              placeholder="Search by name, ID, email, phone…"
+              value={search}
+              onChange={(e) => {
+                setSearch(e.target.value);
+                setPage(1);
+              }}
+              className="pl-9"
+            />
+          </div>
+          <Select
+            value={departmentId || "ALL"}
+            onValueChange={(v) => {
+              setDepartmentId(v === "ALL" ? "" : v);
               setPage(1);
             }}
-            className="pl-9"
-          />
+          >
+            <SelectTrigger className="md:w-48">
+              <SelectValue placeholder="All departments" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="ALL">All departments</SelectItem>
+              {(departments?.items ?? departments ?? []).map((d: any) => (
+                <SelectItem key={d.id} value={d.id}>
+                  {d.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select
+            value={status || "ALL"}
+            onValueChange={(v) => {
+              setStatus(v === "ALL" ? "" : v);
+              setPage(1);
+            }}
+          >
+            <SelectTrigger className="md:w-40">
+              <SelectValue placeholder="All statuses" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="ALL">All statuses</SelectItem>
+              <SelectItem value="ACTIVE">Active</SelectItem>
+              <SelectItem value="ON_LEAVE">On Leave</SelectItem>
+              <SelectItem value="PROBATION">Probation</SelectItem>
+              <SelectItem value="RESIGNED">Resigned</SelectItem>
+              <SelectItem value="TERMINATED">Terminated</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
-        <Select
-          value={departmentId || "ALL"}
-          onValueChange={(v) => {
-            setDepartmentId(v === "ALL" ? "" : v);
-            setPage(1);
-          }}
-        >
-          <SelectTrigger className="md:w-48">
-            <SelectValue placeholder="All departments" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="ALL">All departments</SelectItem>
-            {(departments?.items ?? departments ?? []).map((d: any) => (
-              <SelectItem key={d.id} value={d.id}>
-                {d.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Select
-          value={status || "ALL"}
-          onValueChange={(v) => {
-            setStatus(v === "ALL" ? "" : v);
-            setPage(1);
-          }}
-        >
-          <SelectTrigger className="md:w-40">
-            <SelectValue placeholder="All statuses" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="ALL">All statuses</SelectItem>
-            <SelectItem value="ACTIVE">Active</SelectItem>
-            <SelectItem value="ON_LEAVE">On Leave</SelectItem>
-            <SelectItem value="PROBATION">Probation</SelectItem>
-            <SelectItem value="RESIGNED">Resigned</SelectItem>
-            <SelectItem value="TERMINATED">Terminated</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
+      )}
 
       {/* Result count */}
-      <div className="flex items-center justify-between text-sm">
-        <div className="text-muted-foreground">
-          Showing <span className="font-medium text-foreground">{employees.length}</span> of{" "}
-          <span className="font-medium text-foreground">{total}</span> employees
+      {view !== "org" && (
+        <div className="flex items-center justify-between text-sm">
+          <div className="text-muted-foreground">
+            Showing <span className="font-medium text-foreground">{employees.length}</span> of{" "}
+            <span className="font-medium text-foreground">{total}</span> employees
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Empty */}
-      {!isLoading && employees.length === 0 && (
+      {view !== "org" && !isLoading && employees.length === 0 && (
         <EmptyState
           icon={Users}
           title="No employees found"
@@ -277,13 +293,16 @@ function EmployeeList() {
       )}
 
       {/* Loading */}
-      {isLoading && (
+      {view !== "org" && isLoading && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {Array.from({ length: 6 }).map((_, i) => (
             <div key={i} className="h-28 rounded-xl bg-muted/40 animate-pulse" />
           ))}
         </div>
       )}
+
+      {/* Org Chart view */}
+      {view === "org" && <OrgChart />}
 
       {/* List view */}
       {!isLoading && view === "list" && employees.length > 0 && (
@@ -465,7 +484,7 @@ function EmployeeList() {
       )}
 
       {/* Pagination */}
-      {!isLoading && totalPages > 1 && (
+      {view !== "org" && !isLoading && totalPages > 1 && (
         <div className="flex items-center justify-between">
           <Button
             variant="outline"

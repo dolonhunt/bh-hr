@@ -1,0 +1,1445 @@
+     1→"use client";
+     2→
+     3→import { useEffect, useState } from "react";
+     4→import { useQuery, useQueryClient } from "@tanstack/react-query";
+     5→import { PageHeader } from "../shared/page-header";
+     6→import { Button } from "@/components/ui/button";
+     7→import { Input } from "@/components/ui/input";
+     8→import { Label } from "@/components/ui/label";
+     9→import { Textarea } from "@/components/ui/textarea";
+    10→import { Switch } from "@/components/ui/switch";
+    11→import { Card, CardContent } from "@/components/ui/card";
+    12→import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+    13→import {
+    14→  Select,
+    15→  SelectContent,
+    16→  SelectItem,
+    17→  SelectTrigger,
+    18→  SelectValue,
+    19→} from "@/components/ui/select";
+    20→import {
+    21→  Table,
+    22→  TableBody,
+    23→  TableCell,
+    24→  TableHead,
+    25→  TableHeader,
+    26→  TableRow,
+    27→} from "@/components/ui/table";
+    28→import {
+    29→  Dialog,
+    30→  DialogContent,
+    31→  DialogDescription,
+    32→  DialogFooter,
+    33→  DialogHeader,
+    34→  DialogTitle,
+    35→} from "@/components/ui/dialog";
+    36→import {
+    37→  DropdownMenu,
+    38→  DropdownMenuContent,
+    39→  DropdownMenuItem,
+    40→  DropdownMenuTrigger,
+    41→} from "@/components/ui/dropdown-menu";
+    42→import {
+    43→  Settings as SettingsIcon,
+    44→  Building2,
+    45→  Users,
+    46→  Briefcase,
+    47→  Award,
+    48→  CalendarDays,
+    49→  Mail,
+    50→  Hash,
+    51→  Plus,
+    52→  MoreVertical,
+    53→  Pencil,
+    54→  Archive,
+    55→  Save,
+    56→  Send,
+    57→  Check,
+    58→  Eye,
+    59→  EyeOff,
+    60→  MapPin,
+    61→  FileText,
+    62→} from "lucide-react";
+    63→import { toast } from "sonner";
+    64→import { cn } from "@/lib/utils";
+    65→import { StatusBadge } from "../shared/status-badge";
+    66→import { EmptyState } from "../shared/empty-state";
+    67→import { EmailTemplateEditor } from "./email-template-editor";
+    68→
+    69→const TABS = [
+    70→  { key: "organization", label: "Organization", icon: Building2 },
+    71→  { key: "departments", label: "Departments", icon: Building2 },
+    72→  { key: "roles", label: "Roles", icon: Briefcase },
+    73→  { key: "designations", label: "Designations", icon: Award },
+    74→  { key: "leave-types", label: "Leave Types", icon: CalendarDays },
+    75→  { key: "email", label: "Email Settings", icon: Mail },
+    76→  { key: "email-templates", label: "Email Templates", icon: FileText },
+    77→  { key: "numbering", label: "Document Numbering", icon: Hash },
+    78→] as const;
+    79→
+    80→type TabKey = (typeof TABS)[number]["key"];
+    81→
+    82→export function SettingsModule() {
+    83→  const [tab, setTab] = useState<TabKey>("organization");
+    84→
+    85→  return (
+    86→    <div className="space-y-6">
+    87→      <PageHeader
+    88→        title="Settings"
+    89→        description="Manage your organization, master data, email, and document configuration"
+    90→        icon={<SettingsIcon className="size-5" />}
+    91→      />
+    92→
+    93→      <div className="flex flex-col md:flex-row gap-6">
+    94→        {/* Vertical tab nav */}
+    95→        <nav className="md:w-56 flex-shrink-0">
+    96→          <div className="flex md:flex-col gap-1 overflow-x-auto md:overflow-visible pb-1 md:pb-0 -mx-1 px-1 md:mx-0 md:px-0">
+    97→            {TABS.map((t) => {
+    98→              const Icon = t.icon;
+    99→              return (
+   100→                <button
+   101→                  key={t.key}
+   102→                  onClick={() => setTab(t.key)}
+   103→                  className={cn(
+   104→                    "flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap",
+   105→                    tab === t.key
+   106→                      ? "bg-primary text-primary-foreground shadow-soft"
+   107→                      : "hover:bg-muted text-muted-foreground hover:text-foreground"
+   108→                  )}
+   109→                >
+   110→                  <Icon className="size-4 flex-shrink-0" />
+   111→                  {t.label}
+   112→                </button>
+   113→              );
+   114→            })}
+   115→          </div>
+   116→        </nav>
+   117→
+   118→        {/* Tab content */}
+   119→        <div className="flex-1 min-w-0">
+   120→          {tab === "organization" && <OrganizationTab />}
+   121→          {tab === "departments" && <DepartmentsTab />}
+   122→          {tab === "roles" && <RolesTab />}
+   123→          {tab === "designations" && <DesignationsTab />}
+   124→          {tab === "leave-types" && <LeaveTypesTab />}
+   125→          {tab === "email" && <EmailSettingsTab />}
+   126→          {tab === "email-templates" && <EmailTemplatesTab />}
+   127→          {tab === "numbering" && <DocumentNumberingTab />}
+   128→        </div>
+   129→      </div>
+   130→    </div>
+   131→  );
+   132→}
+   133→
+   134→// ============================== ORGANIZATION ==============================
+   135→function OrganizationTab() {
+   136→  const qc = useQueryClient();
+   137→  const [saving, setSaving] = useState(false);
+   138→  const [form, setForm] = useState<any>({
+   139→    name: "",
+   140→    legalName: "",
+   141→    address: "",
+   142→    city: "",
+   143→    state: "",
+   144→    country: "",
+   145→    zipCode: "",
+   146→    email: "",
+   147→    phone: "",
+   148→    website: "",
+   149→    logo: "",
+   150→    taxId: "",
+   151→  });
+   152→
+   153→  const { data, isLoading } = useQuery({
+   154→    queryKey: ["company"],
+   155→    queryFn: () => fetch("/api/company").then((r) => r.json()),
+   156→  });
+   157→
+   158→  useEffect(() => {
+   159→    if (data) {
+   160→      setForm({
+   161→        name: data.name ?? "",
+   162→        legalName: data.legalName ?? "",
+   163→        address: data.address ?? "",
+   164→        city: data.city ?? "",
+   165→        state: data.state ?? "",
+   166→        country: data.country ?? "",
+   167→        zipCode: data.zipCode ?? "",
+   168→        email: data.email ?? "",
+   169→        phone: data.phone ?? "",
+   170→        website: data.website ?? "",
+   171→        logo: data.logo ?? "",
+   172→        taxId: data.taxId ?? "",
+   173→      });
+   174→    }
+   175→  }, [data]);
+   176→
+   177→  async function save() {
+   178→    if (!form.name) {
+   179→      toast.error("Company name is required");
+   180→      return;
+   181→    }
+   182→    setSaving(true);
+   183→    try {
+   184→      const res = await fetch("/api/company", {
+   185→        method: "PATCH",
+   186→        headers: { "Content-Type": "application/json" },
+   187→        body: JSON.stringify(form),
+   188→      });
+   189→      if (!res.ok) throw new Error();
+   190→      toast.success("Company profile saved");
+   191→      qc.invalidateQueries({ queryKey: ["company"] });
+   192→    } catch {
+   193→      toast.error("Failed to save company");
+   194→    } finally {
+   195→      setSaving(false);
+   196→    }
+   197→  }
+   198→
+   199→  if (isLoading) {
+   200→    return (
+   201→      <Card className="border-border/60 shadow-soft">
+   202→        <CardContent className="p-6">
+   203→          <div className="h-96 rounded-lg bg-muted/40 animate-pulse" />
+   204→        </CardContent>
+   205→      </Card>
+   206→    );
+   207→  }
+   208→
+   209→  const fieldGroups = [
+   210→    {
+   211→      title: "Legal Details",
+   212→      icon: Building2,
+   213→      fields: [
+   214→        { key: "name", label: "Company Name *", full: true },
+   215→        { key: "legalName", label: "Legal Name" },
+   216→        { key: "taxId", label: "Tax ID / TIN" },
+   217→      ],
+   218→    },
+   219→    {
+   220→      title: "Contact Information",
+   221→      icon: Mail,
+   222→      fields: [
+   223→        { key: "email", label: "Email" },
+   224→        { key: "phone", label: "Phone" },
+   225→        { key: "website", label: "Website" },
+   226→        { key: "logo", label: "Logo URL", full: true },
+   227→      ],
+   228→    },
+   229→    {
+   230→      title: "Location",
+   231→      icon: MapPin,
+   232→      fields: [
+   233→        { key: "address", label: "Address", full: true, textarea: true },
+   234→        { key: "city", label: "City" },
+   235→        { key: "state", label: "State / Province" },
+   236→        { key: "country", label: "Country" },
+   237→        { key: "zipCode", label: "ZIP / Postal Code" },
+   238→      ],
+   239→    },
+   240→  ];
+   241→
+   242→  return (
+   243→    <div className="space-y-4">
+   244→      <Card className="border-border/60 shadow-soft">
+   245→        <CardContent className="p-6 space-y-5">
+   246→          {/* Header with logo preview */}
+   247→          <div className="flex items-start justify-between pb-4 border-b border-border/60 gap-4">
+   248→            <div>
+   249→              <div className="font-semibold text-base">Organization Profile</div>
+   250→              <p className="text-xs text-muted-foreground mt-0.5">
+   251→                These details appear on documents, emails, and reports.
+   252→              </p>
+   253→            </div>
+   254→            <div className="flex items-center gap-3">
+   255→              <div className="size-14 rounded-xl bg-primary/10 border border-border/60 flex items-center justify-center overflow-hidden flex-shrink-0">
+   256→                {form.logo ? (
+   257→                  <img
+   258→                    src={form.logo}
+   259→                    alt="Logo"
+   260→                    className="size-full object-contain p-1"
+   261→                    onError={(e) => {
+   262→                      (e.target as HTMLImageElement).style.display = "none";
+   263→                    }}
+   264→                  />
+   265→                ) : (
+   266→                  <Building2 className="size-6 text-primary" />
+   267→                )}
+   268→              </div>
+   269→            </div>
+   270→          </div>
+   271→
+   272→          {/* Grouped fields */}
+   273→          {fieldGroups.map((group) => {
+   274→            const GroupIcon = group.icon;
+   275→            return (
+   276→              <div key={group.title} className="space-y-3">
+   277→                <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
+   278→                  <div className="size-7 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
+   279→                    <GroupIcon className="size-4" />
+   280→                  </div>
+   281→                  {group.title}
+   282→                </div>
+   283→                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pl-9">
+   284→                  {group.fields.map((f) => (
+   285→                    <div
+   286→                      key={f.key}
+   287→                      className={cn("space-y-1.5", f.full && "sm:col-span-2")}
+   288→                    >
+   289→                      <Label className="text-xs text-muted-foreground">
+   290→                        {f.label}
+   291→                      </Label>
+   292→                      {f.textarea ? (
+   293→                        <Textarea
+   294→                          rows={2}
+   295→                          value={form[f.key]}
+   296→                          onChange={(e) =>
+   297→                            setForm({ ...form, [f.key]: e.target.value })
+   298→                          }
+   299→                        />
+   300→                      ) : (
+   301→                        <Input
+   302→                          value={form[f.key]}
+   303→                          onChange={(e) =>
+   304→                            setForm({ ...form, [f.key]: e.target.value })
+   305→                          }
+   306→                        />
+   307→                      )}
+   308→                    </div>
+   309→                  ))}
+   310→                </div>
+   311→              </div>
+   312→            );
+   313→          })}
+   314→        </CardContent>
+   315→      </Card>
+   316→
+   317→      {/* Sticky save bar */}
+   318→      <div className="sticky bottom-4 z-10 flex justify-end">
+   319→        <div className="inline-flex items-center gap-3 rounded-xl border border-border/60 bg-card/95 backdrop-blur-md shadow-card-hover px-4 py-2.5">
+   320→          <span className="text-xs text-muted-foreground hidden sm:inline">
+   321→            Changes apply to all generated documents
+   322→          </span>
+   323→          <Button onClick={save} disabled={saving} size="sm">
+   324→            {saving ? (
+   325→              "Saving…"
+   326→            ) : (
+   327→              <>
+   328→                <Save className="size-4 mr-1.5" /> Update Profile
+   329→              </>
+   330→            )}
+   331→          </Button>
+   332→        </div>
+   333→      </div>
+   334→    </div>
+   335→  );
+   336→}
+   337→
+   338→// ============================== DEPARTMENTS ==============================
+   339→function DepartmentsTab() {
+   340→  const qc = useQueryClient();
+   341→  const [edit, setEdit] = useState<any>(null);
+   342→  const [open, setOpen] = useState(false);
+   343→
+   344→  const { data, isLoading } = useQuery({
+   345→    queryKey: ["departments"],
+   346→    queryFn: () => fetch("/api/departments").then((r) => r.json()),
+   347→  });
+   348→
+   349→  const items = data?.items ?? [];
+   350→
+   351→  return (
+   352→    <Card className="border-border/60 shadow-soft">
+   353→      <CardContent className="p-6">
+   354→        <SimpleTableHeader
+   355→          title="Departments"
+   356→          description="Organize employees into functional units"
+   357→          onAdd={() => {
+   358→            setEdit(null);
+   359→            setOpen(true);
+   360→          }}
+   361→        />
+   362→        {isLoading ? (
+   363→          <LoadingRows />
+   364→        ) : items.length === 0 ? (
+   365→          <EmptyState
+   366→            icon={Building2}
+   367→            title="No departments"
+   368→            actionLabel="Add Department"
+   369→            onAction={() => setOpen(true)}
+   370→          />
+   371→        ) : (
+   372→          <Table>
+   373→            <TableHeader>
+   374→              <TableRow className="bg-muted/40 hover:bg-muted/40">
+   375→                <TableHead>Name</TableHead>
+   376→                <TableHead>Description</TableHead>
+   377→                <TableHead>Color</TableHead>
+   378→                <TableHead>Status</TableHead>
+   379→                <TableHead className="text-right">Actions</TableHead>
+   380→              </TableRow>
+   381→            </TableHeader>
+   382→            <TableBody>
+   383→              {items.map((d: any) => (
+   384→                <TableRow key={d.id}>
+   385→                  <TableCell className="font-medium">{d.name}</TableCell>
+   386→                  <TableCell className="text-sm text-muted-foreground">
+   387→                    {d.description ?? "—"}
+   388→                  </TableCell>
+   389→                  <TableCell>
+   390→                    <div className="flex items-center gap-2">
+   391→                      <span
+   392→                        className="size-4 rounded"
+   393→                        style={{ background: d.color ?? "#10b981" }}
+   394→                      />
+   395→                      <span className="text-xs font-mono">
+   396→                        {d.color ?? "—"}
+   397→                      </span>
+   398→                    </div>
+   399→                  </TableCell>
+   400→                  <TableCell>
+   401→                    <StatusBadge status={d.status ?? "ACTIVE"} />
+   402→                  </TableCell>
+   403→                  <TableCell className="text-right">
+   404→                    <RowMenu
+   405→                      onEdit={() => {
+   406→                        setEdit(d);
+   407→                        setOpen(true);
+   408→                      }}
+   409→                      onArchive={async () => {
+   410→                        if (!confirm(`Archive department "${d.name}"?`)) return;
+   411→                        const res = await fetch(`/api/departments/${d.id}`, {
+   412→                          method: "DELETE",
+   413→                        });
+   414→                        if (res.ok) {
+   415→                          toast.success("Department archived");
+   416→                          qc.invalidateQueries({ queryKey: ["departments"] });
+   417→                        } else {
+   418→                          toast.error("Failed to archive");
+   419→                        }
+   420→                      }}
+   421→                    />
+   422→                  </TableCell>
+   423→                </TableRow>
+   424→              ))}
+   425→            </TableBody>
+   426→          </Table>
+   427→        )}
+   428→      </CardContent>
+   429→
+   430→      {open && (
+   431→        <SimpleFormDialog
+   432→          title={edit ? "Edit Department" : "Add Department"}
+   433→          open={open}
+   434→          onOpenChange={setOpen}
+   435→          fields={[
+   436→            { key: "name", label: "Name *", required: true },
+   437→            { key: "description", label: "Description", textarea: true },
+   438→            { key: "color", label: "Color (hex)", type: "color" },
+   439→          ]}
+   440→          initial={edit ?? { name: "", description: "", color: "#10b981" }}
+   441→          onSubmit={async (form) => {
+   442→            const url = edit ? `/api/departments/${edit.id}` : "/api/departments";
+   443→            const method = edit ? "PATCH" : "POST";
+   444→            const res = await fetch(url, {
+   445→              method,
+   446→              headers: { "Content-Type": "application/json" },
+   447→              body: JSON.stringify(form),
+   448→            });
+   449→            if (!res.ok) throw new Error();
+   450→            qc.invalidateQueries({ queryKey: ["departments"] });
+   451→          }}
+   452→        />
+   453→      )}
+   454→    </Card>
+   455→  );
+   456→}
+   457→
+   458→// ============================== ROLES ==============================
+   459→function RolesTab() {
+   460→  const qc = useQueryClient();
+   461→  const [edit, setEdit] = useState<any>(null);
+   462→  const [open, setOpen] = useState(false);
+   463→
+   464→  const { data, isLoading } = useQuery({
+   465→    queryKey: ["roles"],
+   466→    queryFn: () => fetch("/api/roles").then((r) => r.json()),
+   467→  });
+   468→
+   469→  const items = data?.items ?? [];
+   470→
+   471→  return (
+   472→    <Card className="border-border/60 shadow-soft">
+   473→      <CardContent className="p-6">
+   474→        <SimpleTableHeader
+   475→          title="Roles"
+   476→          description="Define job roles used across the organization"
+   477→          onAdd={() => {
+   478→            setEdit(null);
+   479→            setOpen(true);
+   480→          }}
+   481→        />
+   482→        {isLoading ? (
+   483→          <LoadingRows />
+   484→        ) : items.length === 0 ? (
+   485→          <EmptyState
+   486→            icon={Briefcase}
+   487→            title="No roles"
+   488→            actionLabel="Add Role"
+   489→            onAction={() => setOpen(true)}
+   490→          />
+   491→        ) : (
+   492→          <Table>
+   493→            <TableHeader>
+   494→              <TableRow className="bg-muted/40 hover:bg-muted/40">
+   495→                <TableHead>Name</TableHead>
+   496→                <TableHead>Description</TableHead>
+   497→                <TableHead>Status</TableHead>
+   498→                <TableHead className="text-right">Actions</TableHead>
+   499→              </TableRow>
+   500→            </TableHeader>
+   501→            <TableBody>
+   502→              {items.map((r: any) => (
+   503→                <TableRow key={r.id}>
+   504→                  <TableCell className="font-medium">{r.name}</TableCell>
+   505→                  <TableCell className="text-sm text-muted-foreground">
+   506→                    {r.description ?? "—"}
+   507→                  </TableCell>
+   508→                  <TableCell>
+   509→                    <StatusBadge status={r.status ?? "ACTIVE"} />
+   510→                  </TableCell>
+   511→                  <TableCell className="text-right">
+   512→                    <RowMenu
+   513→                      onEdit={() => {
+   514→                        setEdit(r);
+   515→                        setOpen(true);
+   516→                      }}
+   517→                      onArchive={async () => {
+   518→                        if (!confirm(`Archive role "${r.name}"?`)) return;
+   519→                        const res = await fetch(`/api/roles/${r.id}`, {
+   520→                          method: "DELETE",
+   521→                        });
+   522→                        if (res.ok) {
+   523→                          toast.success("Role archived");
+   524→                          qc.invalidateQueries({ queryKey: ["roles"] });
+   525→                        } else {
+   526→                          toast.error("Failed to archive");
+   527→                        }
+   528→                      }}
+   529→                    />
+   530→                  </TableCell>
+   531→                </TableRow>
+   532→              ))}
+   533→            </TableBody>
+   534→          </Table>
+   535→        )}
+   536→      </CardContent>
+   537→
+   538→      {open && (
+   539→        <SimpleFormDialog
+   540→          title={edit ? "Edit Role" : "Add Role"}
+   541→          open={open}
+   542→          onOpenChange={setOpen}
+   543→          fields={[
+   544→            { key: "name", label: "Name *", required: true },
+   545→            { key: "description", label: "Description", textarea: true },
+   546→          ]}
+   547→          initial={edit ?? { name: "", description: "" }}
+   548→          onSubmit={async (form) => {
+   549→            const url = edit ? `/api/roles/${edit.id}` : "/api/roles";
+   550→            const method = edit ? "PATCH" : "POST";
+   551→            const res = await fetch(url, {
+   552→              method,
+   553→              headers: { "Content-Type": "application/json" },
+   554→              body: JSON.stringify(form),
+   555→            });
+   556→            if (!res.ok) throw new Error();
+   557→            qc.invalidateQueries({ queryKey: ["roles"] });
+   558→          }}
+   559→        />
+   560→      )}
+   561→    </Card>
+   562→  );
+   563→}
+   564→
+   565→// ============================== DESIGNATIONS ==============================
+   566→function DesignationsTab() {
+   567→  const qc = useQueryClient();
+   568→  const [edit, setEdit] = useState<any>(null);
+   569→  const [open, setOpen] = useState(false);
+   570→
+   571→  const { data: designations } = useQuery({
+   572→    queryKey: ["designations"],
+   573→    queryFn: () => fetch("/api/designations").then((r) => r.json()),
+   574→  });
+   575→
+   576→  const { data: departmentsData } = useQuery({
+   577→    queryKey: ["departments"],
+   578→    queryFn: () => fetch("/api/departments").then((r) => r.json()),
+   579→  });
+   580→
+   581→  const departments = departmentsData?.items ?? [];
+   582→  const items = designations?.items ?? [];
+   583→
+   584→  return (
+   585→    <Card className="border-border/60 shadow-soft">
+   586→      <CardContent className="p-6">
+   587→        <SimpleTableHeader
+   588→          title="Designations"
+   589→          description="Job titles employees can hold"
+   590→          onAdd={() => {
+   591→            setEdit(null);
+   592→            setOpen(true);
+   593→          }}
+   594→        />
+   595→        {isLoading(designations) ? (
+   596→          <LoadingRows />
+   597→        ) : items.length === 0 ? (
+   598→          <EmptyState
+   599→            icon={Award}
+   600→            title="No designations"
+   601→            actionLabel="Add Designation"
+   602→            onAction={() => setOpen(true)}
+   603→          />
+   604→        ) : (
+   605→          <Table>
+   606→            <TableHeader>
+   607→              <TableRow className="bg-muted/40 hover:bg-muted/40">
+   608→                <TableHead>Name</TableHead>
+   609→                <TableHead>Department</TableHead>
+   610→                <TableHead>Description</TableHead>
+   611→                <TableHead>Status</TableHead>
+   612→                <TableHead className="text-right">Actions</TableHead>
+   613→              </TableRow>
+   614→            </TableHeader>
+   615→            <TableBody>
+   616→              {items.map((d: any) => (
+   617→                <TableRow key={d.id}>
+   618→                  <TableCell className="font-medium">{d.name}</TableCell>
+   619→                  <TableCell className="text-sm text-muted-foreground">
+   620→                    {d.department?.name ?? "—"}
+   621→                  </TableCell>
+   622→                  <TableCell className="text-sm text-muted-foreground">
+   623→                    {d.description ?? "—"}
+   624→                  </TableCell>
+   625→                  <TableCell>
+   626→                    <StatusBadge status={d.status ?? "ACTIVE"} />
+   627→                  </TableCell>
+   628→                  <TableCell className="text-right">
+   629→                    <RowMenu
+   630→                      onEdit={() => {
+   631→                        setEdit(d);
+   632→                        setOpen(true);
+   633→                      }}
+   634→                      onArchive={async () => {
+   635→                        if (!confirm(`Archive designation "${d.name}"?`)) return;
+   636→                        const res = await fetch(`/api/designations/${d.id}`, {
+   637→                          method: "DELETE",
+   638→                        });
+   639→                        if (res.ok) {
+   640→                          toast.success("Designation archived");
+   641→                          qc.invalidateQueries({ queryKey: ["designations"] });
+   642→                        } else {
+   643→                          toast.error("Failed to archive");
+   644→                        }
+   645→                      }}
+   646→                    />
+   647→                  </TableCell>
+   648→                </TableRow>
+   649→              ))}
+   650→            </TableBody>
+   651→          </Table>
+   652→        )}
+   653→      </CardContent>
+   654→
+   655→      {open && (
+   656→        <SimpleFormDialog
+   657→          title={edit ? "Edit Designation" : "Add Designation"}
+   658→          open={open}
+   659→          onOpenChange={setOpen}
+   660→          fields={[
+   661→            { key: "name", label: "Name *", required: true },
+   662→            {
+   663→              key: "departmentId",
+   664→              label: "Department",
+   665→              type: "select",
+   666→              options: departments.map((d: any) => ({
+   667→                value: d.id,
+   668→                label: d.name,
+   669→              })),
+   670→              allowNone: true,
+   671→            },
+   672→            { key: "description", label: "Description", textarea: true },
+   673→          ]}
+   674→          initial={
+   675→            edit ?? { name: "", description: "", departmentId: "" }
+   676→          }
+   677→          onSubmit={async (form) => {
+   678→            const url = edit ? `/api/designations/${edit.id}` : "/api/designations";
+   679→            const method = edit ? "PATCH" : "POST";
+   680→            const res = await fetch(url, {
+   681→              method,
+   682→              headers: { "Content-Type": "application/json" },
+   683→              body: JSON.stringify(form),
+   684→            });
+   685→            if (!res.ok) throw new Error();
+   686→            qc.invalidateQueries({ queryKey: ["designations"] });
+   687→          }}
+   688→        />
+   689→      )}
+   690→    </Card>
+   691→  );
+   692→}
+   693→
+   694→function isLoading(data: any) {
+   695→  return data === undefined;
+   696→}
+   697→
+   698→// ============================== LEAVE TYPES ==============================
+   699→function LeaveTypesTab() {
+   700→  const qc = useQueryClient();
+   701→  const [edit, setEdit] = useState<any>(null);
+   702→  const [open, setOpen] = useState(false);
+   703→
+   704→  const { data, isLoading: loading } = useQuery({
+   705→    queryKey: ["leave-types"],
+   706→    queryFn: () => fetch("/api/leave-types").then((r) => r.json()),
+   707→  });
+   708→
+   709→  const items = data?.items ?? [];
+   710→
+   711→  return (
+   712→    <Card className="border-border/60 shadow-soft">
+   713→      <CardContent className="p-6">
+   714→        <SimpleTableHeader
+   715→          title="Leave Types"
+   716→          description="Categories of leave employees can apply for"
+   717→          onAdd={() => {
+   718→            setEdit(null);
+   719→            setOpen(true);
+   720→          }}
+   721→        />
+   722→        {loading ? (
+   723→          <LoadingRows />
+   724→        ) : items.length === 0 ? (
+   725→          <EmptyState
+   726→            icon={CalendarDays}
+   727→            title="No leave types"
+   728→            actionLabel="Add Leave Type"
+   729→            onAction={() => setOpen(true)}
+   730→          />
+   731→        ) : (
+   732→          <Table>
+   733→            <TableHeader>
+   734→              <TableRow className="bg-muted/40 hover:bg-muted/40">
+   735→                <TableHead>Name</TableHead>
+   736→                <TableHead>Code</TableHead>
+   737→                <TableHead>Default Days</TableHead>
+   738→                <TableHead>Paid</TableHead>
+   739→                <TableHead>Color</TableHead>
+   740→                <TableHead>Status</TableHead>
+   741→                <TableHead className="text-right">Actions</TableHead>
+   742→              </TableRow>
+   743→            </TableHeader>
+   744→            <TableBody>
+   745→              {items.map((lt: any) => (
+   746→                <TableRow key={lt.id}>
+   747→                  <TableCell className="font-medium">{lt.name}</TableCell>
+   748→                  <TableCell>
+   749→                    <span className="px-1.5 py-0.5 rounded font-mono text-xs bg-muted">
+   750→                      {lt.code}
+   751→                    </span>
+   752→                  </TableCell>
+   753→                  <TableCell className="tabular-nums">{lt.defaultDays}</TableCell>
+   754→                  <TableCell>
+   755→                    {lt.paid ? (
+   756→                      <span className="inline-flex items-center gap-1 text-xs text-emerald-600">
+   757→                        <Check className="size-3.5" /> Paid
+   758→                      </span>
+   759→                    ) : (
+   760→                      <span className="text-xs text-muted-foreground">Unpaid</span>
+   761→                    )}
+   762→                  </TableCell>
+   763→                  <TableCell>
+   764→                    <div className="flex items-center gap-2">
+   765→                      <span
+   766→                        className="size-4 rounded"
+   767→                        style={{ background: lt.color ?? "#10b981" }}
+   768→                      />
+   769→                      <span className="text-xs font-mono">
+   770→                        {lt.color ?? "—"}
+   771→                      </span>
+   772→                    </div>
+   773→                  </TableCell>
+   774→                  <TableCell>
+   775→                    <StatusBadge status={lt.status ?? "ACTIVE"} />
+   776→                  </TableCell>
+   777→                  <TableCell className="text-right">
+   778→                    <RowMenu
+   779→                      onEdit={() => {
+   780→                        setEdit(lt);
+   781→                        setOpen(true);
+   782→                      }}
+   783→                      onArchive={async () => {
+   784→                        if (!confirm(`Archive leave type "${lt.name}"?`)) return;
+   785→                        const res = await fetch(`/api/leave-types/${lt.id}`, {
+   786→                          method: "DELETE",
+   787→                        });
+   788→                        if (res.ok) {
+   789→                          toast.success("Leave type archived");
+   790→                          qc.invalidateQueries({ queryKey: ["leave-types"] });
+   791→                        } else {
+   792→                          toast.error("Failed to archive");
+   793→                        }
+   794→                      }}
+   795→                    />
+   796→                  </TableCell>
+   797→                </TableRow>
+   798→              ))}
+   799→            </TableBody>
+   800→          </Table>
+   801→        )}
+   802→      </CardContent>
+   803→
+   804→      {open && (
+   805→        <SimpleFormDialog
+   806→          title={edit ? "Edit Leave Type" : "Add Leave Type"}
+   807→          open={open}
+   808→          onOpenChange={setOpen}
+   809→          fields={[
+   810→            { key: "name", label: "Name *", required: true },
+   811→            { key: "code", label: "Code *", required: true },
+   812→            { key: "defaultDays", label: "Default Days", type: "number" },
+   813→            { key: "paid", label: "Paid", type: "switch" },
+   814→            { key: "color", label: "Color", type: "color" },
+   815→          ]}
+   816→          initial={
+   817→            edit ?? {
+   818→              name: "",
+   819→              code: "",
+   820→              defaultDays: 0,
+   821→              paid: true,
+   822→              color: "#10b981",
+   823→            }
+   824→          }
+   825→          onSubmit={async (form) => {
+   826→            const url = edit ? `/api/leave-types/${edit.id}` : "/api/leave-types";
+   827→            const method = edit ? "PATCH" : "POST";
+   828→            const res = await fetch(url, {
+   829→              method,
+   830→              headers: { "Content-Type": "application/json" },
+   831→              body: JSON.stringify({
+   832→                ...form,
+   833→                defaultDays: Number(form.defaultDays) || 0,
+   834→              }),
+   835→            });
+   836→            if (!res.ok) throw new Error();
+   837→            qc.invalidateQueries({ queryKey: ["leave-types"] });
+   838→          }}
+   839→        />
+   840→      )}
+   841→    </Card>
+   842→  );
+   843→}
+   844→
+   845→// ============================== EMAIL SETTINGS ==============================
+   846→function EmailSettingsTab() {
+   847→  const qc = useQueryClient();
+   848→  const [saving, setSaving] = useState(false);
+   849→  const [sendingTest, setSendingTest] = useState(false);
+   850→  const [showPassword, setShowPassword] = useState(false);
+   851→  const [testEmailOpen, setTestEmailOpen] = useState(false);
+   852→  const [form, setForm] = useState<any>({
+   853→    senderName: "",
+   854→    senderEmail: "",
+   855→    smtpHost: "",
+   856→    smtpPort: 587,
+   857→    username: "",
+   858→    password: "",
+   859→    encryption: "TLS",
+   860→  });
+   861→
+   862→  const { data } = useQuery({
+   863→    queryKey: ["settings"],
+   864→    queryFn: () => fetch("/api/settings").then((r) => r.json()),
+   865→  });
+   866→
+   867→  useEffect(() => {
+   868→    if (data?.emailSetting) {
+   869→      const es = data.emailSetting;
+   870→      setForm({
+   871→        senderName: es.senderName ?? "",
+   872→        senderEmail: es.senderEmail ?? "",
+   873→        smtpHost: es.smtpHost ?? "",
+   874→        smtpPort: es.smtpPort ?? 587,
+   875→        username: es.username ?? "",
+   876→        password: es.password ?? "",
+   877→        encryption: es.encryption ?? "TLS",
+   878→      });
+   879→    }
+   880→  }, [data]);
+   881→
+   882→  async function save() {
+   883→    setSaving(true);
+   884→    try {
+   885→      const res = await fetch("/api/settings", {
+   886→        method: "PATCH",
+   887→        headers: { "Content-Type": "application/json" },
+   888→        body: JSON.stringify({ emailSetting: form }),
+   889→      });
+   890→      if (!res.ok) throw new Error();
+   891→      toast.success("Email settings saved");
+   892→      qc.invalidateQueries({ queryKey: ["settings"] });
+   893→    } catch {
+   894→      toast.error("Failed to save settings");
+   895→    } finally {
+   896→      setSaving(false);
+   897→    }
+   898→  }
+   899→
+   900→  return (
+   901→    <Card className="border-border/60 shadow-soft">
+   902→      <CardContent className="p-6 space-y-4">
+   903→        <div className="flex items-center justify-between pb-3 border-b border-border/60">
+   904→          <div>
+   905→            <div className="font-semibold">Email Configuration</div>
+   906→            <p className="text-xs text-muted-foreground">
+   907→              Configure the SMTP server used to send HR documents.
+   908→            </p>
+   909→          </div>
+   910→          <Button variant="outline" size="sm" onClick={() => setTestEmailOpen(true)}>
+   911→            <Send className="size-4 mr-1.5" /> Send Test Email
+   912→          </Button>
+   913→        </div>
+   914→
+   915→        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+   916→          <div className="space-y-1.5">
+   917→            <Label>Sender Name</Label>
+   918→            <Input
+   919→              value={form.senderName}
+   920→              onChange={(e) => setForm({ ...form, senderName: e.target.value })}
+   921→            />
+   922→          </div>
+   923→          <div className="space-y-1.5">
+   924→            <Label>Sender Email</Label>
+   925→            <Input
+   926→              type="email"
+   927→              value={form.senderEmail}
+   928→              onChange={(e) => setForm({ ...form, senderEmail: e.target.value })}
+   929→            />
+   930→          </div>
+   931→          <div className="space-y-1.5">
+   932→            <Label>SMTP Host</Label>
+   933→            <Input
+   934→              value={form.smtpHost}
+   935→              onChange={(e) => setForm({ ...form, smtpHost: e.target.value })}
+   936→              placeholder="smtp.gmail.com"
+   937→            />
+   938→          </div>
+   939→          <div className="space-y-1.5">
+   940→            <Label>SMTP Port</Label>
+   941→            <Input
+   942→              type="number"
+   943→              value={form.smtpPort}
+   944→              onChange={(e) =>
+   945→                setForm({ ...form, smtpPort: Number(e.target.value) })
+   946→              }
+   947→            />
+   948→          </div>
+   949→          <div className="space-y-1.5">
+   950→            <Label>Username</Label>
+   951→            <Input
+   952→              value={form.username}
+   953→              onChange={(e) => setForm({ ...form, username: e.target.value })}
+   954→            />
+   955→          </div>
+   956→          <div className="space-y-1.5">
+   957→            <Label>Password</Label>
+   958→            <div className="relative">
+   959→              <Input
+   960→                type={showPassword ? "text" : "password"}
+   961→                value={form.password}
+   962→                onChange={(e) => setForm({ ...form, password: e.target.value })}
+   963→                placeholder="••••••••"
+   964→              />
+   965→              <button
+   966→                type="button"
+   967→                className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+   968→                onClick={() => setShowPassword(!showPassword)}
+   969→              >
+   970→                {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+   971→              </button>
+   972→            </div>
+   973→          </div>
+   974→          <div className="space-y-1.5 col-span-2">
+   975→            <Label>Encryption</Label>
+   976→            <Select
+   977→              value={form.encryption}
+   978→              onValueChange={(v) => setForm({ ...form, encryption: v })}
+   979→            >
+   980→              <SelectTrigger className="w-48">
+   981→                <SelectValue />
+   982→              </SelectTrigger>
+   983→              <SelectContent>
+   984→                <SelectItem value="NONE">None</SelectItem>
+   985→                <SelectItem value="SSL">SSL</SelectItem>
+   986→                <SelectItem value="TLS">TLS</SelectItem>
+   987→              </SelectContent>
+   988→            </Select>
+   989→          </div>
+   990→        </div>
+   991→
+   992→        <div className="flex justify-end pt-3 border-t border-border/60">
+   993→          <Button onClick={save} disabled={saving}>
+   994→            {saving ? "Saving…" : <><Save className="size-4 mr-1.5" /> Save Settings</>}
+   995→          </Button>
+   996→        </div>
+   997→      </CardContent>
+   998→
+   999→      {testEmailOpen && (
+  1000→        <TestEmailDialog
+  1001→          open={testEmailOpen}
+  1002→          defaultTo={form.senderEmail}
+  1003→          sending={sendingTest}
+  1004→          onOpenChange={setTestEmailOpen}
+  1005→          onSend={async (to) => {
+  1006→            setSendingTest(true);
+  1007→            try {
+  1008→              const res = await fetch("/api/settings/test-email", {
+  1009→                method: "POST",
+  1010→                headers: { "Content-Type": "application/json" },
+  1011→                body: JSON.stringify({ to }),
+  1012→              });
+  1013→              if (!res.ok) throw new Error();
+  1014→              toast.success("Test email simulated");
+  1015→              setTestEmailOpen(false);
+  1016→            } catch {
+  1017→              toast.error("Failed to send test email");
+  1018→            } finally {
+  1019→              setSendingTest(false);
+  1020→            }
+  1021→          }}
+  1022→        />
+  1023→      )}
+  1024→    </Card>
+  1025→  );
+  1026→}
+  1027→
+  1028→// ============================== EMAIL TEMPLATES ==============================
+  1029→function EmailTemplatesTab() {
+  1030→  return <EmailTemplateEditor />;
+  1031→}
+  1032→
+  1033→function TestEmailDialog({
+  1034→  open,
+  1035→  defaultTo,
+  1036→  sending,
+  1037→  onOpenChange,
+  1038→  onSend,
+  1039→}: {
+  1040→  open: boolean;
+  1041→  defaultTo: string;
+  1042→  sending: boolean;
+  1043→  onOpenChange: (v: boolean) => void;
+  1044→  onSend: (to: string) => void;
+  1045→}) {
+  1046→  const [to, setTo] = useState(defaultTo);
+  1047→
+  1048→  return (
+  1049→    <Dialog open={open} onOpenChange={onOpenChange}>
+  1050→      <DialogContent className="max-w-[95vw] sm:max-w-md">
+  1051→        <DialogHeader>
+  1052→          <DialogTitle>Send Test Email</DialogTitle>
+  1053→          <DialogDescription>
+  1054→            This will simulate sending a test email and create an EmailLog entry.
+  1055→          </DialogDescription>
+  1056→        </DialogHeader>
+  1057→        <div className="space-y-2">
+  1058→          <Label>Recipient Email</Label>
+  1059→          <Input
+  1060→            type="email"
+  1061→            value={to}
+  1062→            onChange={(e) => setTo(e.target.value)}
+  1063→          />
+  1064→        </div>
+  1065→        <DialogFooter>
+  1066→          <Button variant="outline" onClick={() => onOpenChange(false)}>
+  1067→            Cancel
+  1068→          </Button>
+  1069→          <Button onClick={() => onSend(to)} disabled={sending || !to}>
+  1070→            {sending ? "Sending…" : <><Send className="size-4 mr-1.5" /> Send Test</>}
+  1071→          </Button>
+  1072→        </DialogFooter>
+  1073→      </DialogContent>
+  1074→    </Dialog>
+  1075→  );
+  1076→}
+  1077→
+  1078→// ============================== DOCUMENT NUMBERING ==============================
+  1079→function DocumentNumberingTab() {
+  1080→  const qc = useQueryClient();
+  1081→  const [saving, setSaving] = useState(false);
+  1082→  const [form, setForm] = useState<any>({
+  1083→    name: "Default",
+  1084→    pattern: "{COMPANY}/{DEPARTMENT}/{DOCUMENT_TYPE}/{DATE}/{EMPLOYEE_ID}",
+  1085→    prefix: "NWL",
+  1086→    padding: 4,
+  1087→    nextSeq: 1,
+  1088→  });
+  1089→
+  1090→  const { data } = useQuery({
+  1091→    queryKey: ["settings"],
+  1092→    queryFn: () => fetch("/api/settings").then((r) => r.json()),
+  1093→  });
+  1094→
+  1095→  useEffect(() => {
+  1096→    if (data?.documentNumbering) {
+  1097→      const dn = data.documentNumbering;
+  1098→      setForm({
+  1099→        name: dn.name ?? "Default",
+  1100→        pattern: dn.pattern ?? "",
+  1101→        prefix: dn.prefix ?? "",
+  1102→        padding: dn.padding ?? 4,
+  1103→        nextSeq: dn.nextSeq ?? 1,
+  1104→      });
+  1105→    }
+  1106→  }, [data]);
+  1107→
+  1108→  // Live preview of next document number
+  1109→  const today = new Date();
+  1110→  const dateStr = `${today.getFullYear()}${String(today.getMonth() + 1).padStart(2, "0")}${String(today.getDate()).padStart(2, "0")}`;
+  1111→  const seqStr = String(form.nextSeq ?? 1).padStart(Number(form.padding) || 4, "0");
+  1112→  const preview = (form.pattern || "")
+  1113→    .replace(/\{COMPANY\}/g, form.prefix || "NWL")
+  1114→    .replace(/\{DEPARTMENT\}/g, "ENG")
+  1115→    .replace(/\{DOCUMENT_TYPE\}/g, "OFFER")
+  1116→    .replace(/\{DATE\}/g, dateStr)
+  1117→    .replace(/\{EMPLOYEE_ID\}/g, "EMP001")
+  1118→    .replace(/\{SEQ\}/g, seqStr);
+  1119→
+  1120→  async function save() {
+  1121→    setSaving(true);
+  1122→    try {
+  1123→      const res = await fetch("/api/settings", {
+  1124→        method: "PATCH",
+  1125→        headers: { "Content-Type": "application/json" },
+  1126→        body: JSON.stringify({ documentNumbering: form }),
+  1127→      });
+  1128→      if (!res.ok) throw new Error();
+  1129→      toast.success("Document numbering saved");
+  1130→      qc.invalidateQueries({ queryKey: ["settings"] });
+  1131→    } catch {
+  1132→      toast.error("Failed to save");
+  1133→    } finally {
+  1134→      setSaving(false);
+  1135→    }
+  1136→  }
+  1137→
+  1138→  const tokens = ["{COMPANY}", "{DEPARTMENT}", "{DOCUMENT_TYPE}", "{DATE}", "{EMPLOYEE_ID}", "{SEQ}"];
+  1139→
+  1140→  return (
+  1141→    <Card className="border-border/60 shadow-soft">
+  1142→      <CardContent className="p-6 space-y-4">
+  1143→        <div className="pb-3 border-b border-border/60">
+  1144→          <div className="font-semibold">Document Numbering</div>
+  1145→          <p className="text-xs text-muted-foreground">
+  1146→            Define how generated HR documents are numbered.
+  1147→          </p>
+  1148→        </div>
+  1149→
+  1150→        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+  1151→          <div className="space-y-1.5">
+  1152→            <Label>Name</Label>
+  1153→            <Input
+  1154→              value={form.name}
+  1155→              onChange={(e) => setForm({ ...form, name: e.target.value })}
+  1156→            />
+  1157→          </div>
+  1158→          <div className="space-y-1.5">
+  1159→            <Label>Prefix (Company Code)</Label>
+  1160→            <Input
+  1161→              value={form.prefix}
+  1162→              onChange={(e) => setForm({ ...form, prefix: e.target.value })}
+  1163→              placeholder="NWL"
+  1164→            />
+  1165→          </div>
+  1166→          <div className="col-span-2 space-y-1.5">
+  1167→            <Label>Pattern</Label>
+  1168→            <Input
+  1169→              value={form.pattern}
+  1170→              onChange={(e) => setForm({ ...form, pattern: e.target.value })}
+  1171→              className="font-mono text-xs"
+  1172→            />
+  1173→            <div className="flex flex-wrap gap-1.5 mt-1">
+  1174→              {tokens.map((t) => (
+  1175→                <button
+  1176→                  key={t}
+  1177→                  onClick={() =>
+  1178→                    setForm({ ...form, pattern: `${form.pattern}${t}` })
+  1179→                  }
+  1180→                  className="px-1.5 py-0.5 rounded bg-muted hover:bg-muted/70 text-[11px] font-mono"
+  1181→                >
+  1182→                  {t}
+  1183→                </button>
+  1184→              ))}
+  1185→            </div>
+  1186→          </div>
+  1187→          <div className="space-y-1.5">
+  1188→            <Label>Padding (digits)</Label>
+  1189→            <Input
+  1190→              type="number"
+  1191→              min={1}
+  1192→              max={10}
+  1193→              value={form.padding}
+  1194→              onChange={(e) =>
+  1195→                setForm({ ...form, padding: Number(e.target.value) })
+  1196→              }
+  1197→            />
+  1198→          </div>
+  1199→          <div className="space-y-1.5">
+  1200→            <Label>Next Sequence</Label>
+  1201→            <Input
+  1202→              type="number"
+  1203→              min={1}
+  1204→              value={form.nextSeq}
+  1205→              onChange={(e) =>
+  1206→                setForm({ ...form, nextSeq: Number(e.target.value) })
+  1207→              }
+  1208→            />
+  1209→          </div>
+  1210→        </div>
+  1211→
+  1212→        <div className="p-4 rounded-lg bg-emerald-500/5 border border-emerald-500/20">
+  1213→          <div className="text-xs text-muted-foreground uppercase tracking-wider mb-1">
+  1214→            Live Preview — Next Document Number
+  1215→          </div>
+  1216→          <div className="font-mono text-base font-semibold text-emerald-700 dark:text-emerald-300 break-all">
+  1217→            {preview || "—"}
+  1218→          </div>
+  1219→        </div>
+  1220→
+  1221→        <div className="flex justify-end pt-3 border-t border-border/60">
+  1222→          <Button onClick={save} disabled={saving}>
+  1223→            {saving ? "Saving…" : <><Save className="size-4 mr-1.5" /> Save</>}
+  1224→          </Button>
+  1225→        </div>
+  1226→      </CardContent>
+  1227→    </Card>
+  1228→  );
+  1229→}
+  1230→
+  1231→// ============================== Shared bits ==============================
+  1232→function SimpleTableHeader({
+  1233→  title,
+  1234→  description,
+  1235→  onAdd,
+  1236→}: {
+  1237→  title: string;
+  1238→  description: string;
+  1239→  onAdd: () => void;
+  1240→}) {
+  1241→  return (
+  1242→    <div className="flex items-center justify-between pb-4 mb-2 border-b border-border/60">
+  1243→      <div>
+  1244→        <div className="font-semibold">{title}</div>
+  1245→        <p className="text-xs text-muted-foreground">{description}</p>
+  1246→      </div>
+  1247→      <Button size="sm" onClick={onAdd}>
+  1248→        <Plus className="size-4 mr-1.5" /> Add
+  1249→      </Button>
+  1250→    </div>
+  1251→  );
+  1252→}
+  1253→
+  1254→function RowMenu({
+  1255→  onEdit,
+  1256→  onArchive,
+  1257→}: {
+  1258→  onEdit: () => void;
+  1259→  onArchive: () => void;
+  1260→}) {
+  1261→  return (
+  1262→    <DropdownMenu>
+  1263→      <DropdownMenuTrigger asChild>
+  1264→        <Button variant="ghost" size="icon" className="size-8">
+  1265→          <MoreVertical className="size-4" />
+  1266→        </Button>
+  1267→      </DropdownMenuTrigger>
+  1268→      <DropdownMenuContent align="end">
+  1269→        <DropdownMenuItem onClick={onEdit}>
+  1270→          <Pencil className="size-4 mr-2" /> Edit
+  1271→        </DropdownMenuItem>
+  1272→        <DropdownMenuItem
+  1273→          className="text-rose-600 focus:text-rose-700"
+  1274→          onClick={onArchive}
+  1275→        >
+  1276→          <Archive className="size-4 mr-2" /> Archive
+  1277→        </DropdownMenuItem>
+  1278→      </DropdownMenuContent>
+  1279→    </DropdownMenu>
+  1280→  );
+  1281→}
+  1282→
+  1283→function LoadingRows() {
+  1284→  return (
+  1285→    <div className="space-y-2">
+  1286→      {Array.from({ length: 4 }).map((_, i) => (
+  1287→        <div key={i} className="h-12 rounded-lg bg-muted/40 animate-pulse" />
+  1288→      ))}
+  1289→    </div>
+  1290→  );
+  1291→}
+  1292→
+  1293→interface Field {
+  1294→  key: string;
+  1295→  label: string;
+  1296→  required?: boolean;
+  1297→  textarea?: boolean;
+  1298→  type?: "text" | "number" | "color" | "switch" | "select";
+  1299→  options?: { value: string; label: string }[];
+  1300→  allowNone?: boolean;
+  1301→}
+  1302→
+  1303→function SimpleFormDialog({
+  1304→  title,
+  1305→  open,
+  1306→  onOpenChange,
+  1307→  fields,
+  1308→  initial,
+  1309→  onSubmit,
+  1310→}: {
+  1311→  title: string;
+  1312→  open: boolean;
+  1313→  onOpenChange: (v: boolean) => void;
+  1314→  fields: Field[];
+  1315→  initial: any;
+  1316→  onSubmit: (form: any) => Promise<void>;
+  1317→}) {
+  1318→  const [form, setForm] = useState<any>(initial);
+  1319→  const [saving, setSaving] = useState(false);
+  1320→
+  1321→  useEffect(() => {
+  1322→    setForm(initial);
+  1323→  }, [initial]);
+  1324→
+  1325→  async function submit() {
+  1326→    for (const f of fields) {
+  1327→      if (f.required && !form[f.key]) {
+  1328→        toast.error(`${f.label} is required`);
+  1329→        return;
+  1330→      }
+  1331→    }
+  1332→    setSaving(true);
+  1333→    try {
+  1334→      await onSubmit(form);
+  1335→      toast.success("Saved");
+  1336→      onOpenChange(false);
+  1337→    } catch {
+  1338→      toast.error("Failed to save");
+  1339→    } finally {
+  1340→      setSaving(false);
+  1341→    }
+  1342→  }
+  1343→
+  1344→  return (
+  1345→    <Dialog open={open} onOpenChange={onOpenChange}>
+  1346→      <DialogContent className="max-w-[95vw] sm:max-w-lg">
+  1347→        <DialogHeader>
+  1348→          <DialogTitle>{title}</DialogTitle>
+  1349→        </DialogHeader>
+  1350→        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+  1351→          {fields.map((f) => (
+  1352→            <div
+  1353→              key={f.key}
+  1354→              className={cn("space-y-1.5", f.textarea && "sm:col-span-2")}
+  1355→            >
+  1356→              <Label>{f.label}</Label>
+  1357→              {f.textarea ? (
+  1358→                <Textarea
+  1359→                  rows={2}
+  1360→                  value={form[f.key] ?? ""}
+  1361→                  onChange={(e) =>
+  1362→                    setForm({ ...form, [f.key]: e.target.value })
+  1363→                  }
+  1364→                />
+  1365→              ) : f.type === "select" ? (
+  1366→                <Select
+  1367→                  value={form[f.key] || (f.allowNone ? "NONE" : "")}
+  1368→                  onValueChange={(v) =>
+  1369→                    setForm({
+  1370→                      ...form,
+  1371→                      [f.key]: f.allowNone && v === "NONE" ? "" : v,
+  1372→                    })
+  1373→                  }
+  1374→                >
+  1375→                  <SelectTrigger>
+  1376→                    <SelectValue placeholder="Select…" />
+  1377→                  </SelectTrigger>
+  1378→                  <SelectContent>
+  1379→                    {f.allowNone && <SelectItem value="NONE">None</SelectItem>}
+  1380→                    {f.options?.map((o) => (
+  1381→                      <SelectItem key={o.value} value={o.value}>
+  1382→                        {o.label}
+  1383→                      </SelectItem>
+  1384→                    ))}
+  1385→                  </SelectContent>
+  1386→                </Select>
+  1387→              ) : f.type === "switch" ? (
+  1388→                <div className="flex items-center gap-2 pt-1">
+  1389→                  <Switch
+  1390→                    checked={!!form[f.key]}
+  1391→                    onCheckedChange={(v) => setForm({ ...form, [f.key]: v })}
+  1392→                  />
+  1393→                  <span className="text-sm text-muted-foreground">
+  1394→                    {form[f.key] ? "Enabled" : "Disabled"}
+  1395→                  </span>
+  1396→                </div>
+  1397→              ) : f.type === "color" ? (
+  1398→                <div className="flex items-center gap-2">
+  1399→                  <input
+  1400→                    type="color"
+  1401→                    value={form[f.key] ?? "#10b981"}
+  1402→                    onChange={(e) =>
+  1403→                      setForm({ ...form, [f.key]: e.target.value })
+  1404→                    }
+  1405→                    className="size-9 rounded-md border border-border cursor-pointer"
+  1406→                  />
+  1407→                  <Input
+  1408→                    value={form[f.key] ?? ""}
+  1409→                    onChange={(e) =>
+  1410→                      setForm({ ...form, [f.key]: e.target.value })
+  1411→                    }
+  1412→                    className="font-mono text-xs"
+  1413→                  />
+  1414→                </div>
+  1415→              ) : (
+  1416→                <Input
+  1417→                  type={f.type === "number" ? "number" : "text"}
+  1418→                  value={form[f.key] ?? ""}
+  1419→                  onChange={(e) =>
+  1420→                    setForm({
+  1421→                      ...form,
+  1422→                      [f.key]:
+  1423→                        f.type === "number"
+  1424→                          ? Number(e.target.value)
+  1425→                          : e.target.value,
+  1426→                    })
+  1427→                  }
+  1428→                />
+  1429→              )}
+  1430→            </div>
+  1431→          ))}
+  1432→        </div>
+  1433→        <DialogFooter>
+  1434→          <Button variant="outline" onClick={() => onOpenChange(false)}>
+  1435→            Cancel
+  1436→          </Button>
+  1437→          <Button onClick={submit} disabled={saving}>
+  1438→            {saving ? "Saving…" : "Save"}
+  1439→          </Button>
+  1440→        </DialogFooter>
+  1441→      </DialogContent>
+  1442→    </Dialog>
+  1443→  );
+  1444→}
+  1445→

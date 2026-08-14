@@ -37,6 +37,8 @@ import {
   User as UserIcon,
 } from "lucide-react";
 import { EmployeeFormDialog } from "./employee-form-dialog";
+import { SalaryHistory } from "./salary-history";
+import { Onboarding } from "./onboarding";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { formatDate, formatCurrency, relativeTime } from "@/lib/utils";
 
@@ -172,6 +174,7 @@ export function EmployeeProfile({ id }: { id: string }) {
             <TabsTrigger value="payroll">Payroll</TabsTrigger>
             <TabsTrigger value="documents">Documents</TabsTrigger>
             <TabsTrigger value="activity">Activity</TabsTrigger>
+            <TabsTrigger value="onboarding">Onboarding</TabsTrigger>
           </TabsList>
         </div>
 
@@ -500,7 +503,7 @@ export function EmployeeProfile({ id }: { id: string }) {
         </TabsContent>
 
         {/* Payroll */}
-        <TabsContent value="payroll" className="mt-4">
+        <TabsContent value="payroll" className="mt-4 space-y-4">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
             <Card className="border-border/60 shadow-soft">
               <CardHeader>
@@ -586,6 +589,13 @@ export function EmployeeProfile({ id }: { id: string }) {
               </CardContent>
             </Card>
           </div>
+
+          {/* Salary revision history */}
+          <SalaryHistory
+            employeeId={emp.id}
+            currentNetSalary={netSalary}
+            joiningDate={emp.joiningDate}
+          />
         </TabsContent>
 
         {/* Documents */}
@@ -692,13 +702,21 @@ export function EmployeeProfile({ id }: { id: string }) {
             </CardContent>
           </Card>
         </TabsContent>
+
+        {/* Onboarding */}
+        <TabsContent value="onboarding" className="mt-4">
+          <Onboarding employeeId={id} />
+        </TabsContent>
       </Tabs>
 
       <EmployeeFormDialog
         open={editOpen}
         onOpenChange={setEditOpen}
         employee={{ id }}
-        onSaved={() => qc.invalidateQueries({ queryKey: ["employee", id] })}
+        onSaved={() => {
+          qc.invalidateQueries({ queryKey: ["employee", id] });
+          qc.invalidateQueries({ queryKey: ["salary-revisions", id] });
+        }}
       />
     </div>
   );
