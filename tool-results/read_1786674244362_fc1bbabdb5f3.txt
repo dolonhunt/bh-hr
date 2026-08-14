@@ -1,0 +1,738 @@
+  1000→    }
+  1001→  }
+  1002→
+  1003→  async function reactivateEnrollment(e: Enrollment) {
+  1004→    try {
+  1005→      const r = await fetch(`/api/training/enrollments/${e.id}`, {
+  1006→        method: "PATCH",
+  1007→        headers: { "Content-Type": "application/json" },
+  1008→        body: JSON.stringify({ status: "ENROLLED" }),
+  1009→      });
+  1010→      if (!r.ok) throw new Error("Failed to reactivate enrollment");
+  1011→      toast.success(`Enrollment reactivated.`);
+  1012→      qc.invalidateQueries({ queryKey: ["training-enrollments"] });
+  1013→      qc.invalidateQueries({ queryKey: ["training-courses"] });
+  1014→    } catch (err: any) {
+  1015→      toast.error(err?.message || "Failed to reactivate enrollment.");
+  1016→    }
+  1017→  }
+  1018→
+  1019→  async function deleteEnrollment(e: Enrollment) {
+  1020→    if (!confirm(`Permanently delete this enrollment record?`)) return;
+  1021→    try {
+  1022→      const r = await fetch(`/api/training/enrollments/${e.id}`, {
+  1023→        method: "DELETE",
+  1024→      });
+  1025→      if (!r.ok) throw new Error("Failed to delete enrollment");
+  1026→      toast.success(`Enrollment deleted.`);
+  1027→      qc.invalidateQueries({ queryKey: ["training-enrollments"] });
+  1028→      qc.invalidateQueries({ queryKey: ["training-courses"] });
+  1029→    } catch (err: any) {
+  1030→      toast.error(err?.message || "Failed to delete enrollment.");
+  1031→    }
+  1032→  }
+  1033→
+  1034→  return (
+  1035→    <div className="space-y-6">
+  1036→      {/* Top action bar — Download All Certificates */}
+  1037→      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 rounded-lg border border-emerald-500/20 bg-emerald-500/5">
+  1038→        <div className="flex items-center gap-2.5 min-w-0">
+  1039→          <div className="flex-shrink-0 size-9 rounded-full bg-emerald-500/15 text-emerald-700 flex items-center justify-center">
+  1040→            <Award className="size-4" />
+  1041→          </div>
+  1042→          <div className="min-w-0">
+  1043→            <div className="text-sm font-medium text-foreground">
+  1044→              {completedEnrollments.length} completed enrollment
+  1045→              {completedEnrollments.length === 1 ? "" : "s"} ready for certification
+  1046→            </div>
+  1047→            <div className="text-xs text-muted-foreground">
+  1048→              Generate professional PDF certificates in one click.
+  1049→            </div>
+  1050→          </div>
+  1051→        </div>
+  1052→        <Button
+  1053→          size="sm"
+  1054→          variant="outline"
+  1055→          className="border-emerald-500/30 text-emerald-700 hover:bg-emerald-500/10 hover:text-emerald-800"
+  1056→          disabled={downloadingAll || completedEnrollments.length === 0}
+  1057→          onClick={downloadAllCertificates}
+  1058→        >
+  1059→          {downloadingAll ? (
+  1060→            <Loader2 className="size-4 mr-1.5 animate-spin" />
+  1061→          ) : (
+  1062→            <Award className="size-4 mr-1.5" />
+  1063→          )}
+  1064→          <span className="hidden sm:inline">Download All Certificates</span>
+  1065→          <span className="sm:hidden">Download All</span>
+  1066→        </Button>
+  1067→      </div>
+  1068→
+  1069→      {/* Filter bar */}
+  1070→      <div className="flex flex-col md:flex-row gap-3">
+  1071→        <div className="relative flex-1">
+  1072→          <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+  1073→          <Input
+  1074→            placeholder="Search by employee or course…"
+  1075→            value={search}
+  1076→            onChange={(e) => setSearch(e.target.value)}
+  1077→            className="pl-9"
+  1078→          />
+  1079→        </div>
+  1080→        <Select
+  1081→          value={status || "ALL"}
+  1082→          onValueChange={(v) => setStatus(v === "ALL" ? "" : v)}
+  1083→        >
+  1084→          <SelectTrigger className="md:w-44">
+  1085→            <SelectValue placeholder="All statuses" />
+  1086→          </SelectTrigger>
+  1087→          <SelectContent>
+  1088→            <SelectItem value="ALL">All statuses</SelectItem>
+  1089→            {ENROLLMENT_STATUSES.map((s) => (
+  1090→              <SelectItem key={s} value={s}>
+  1091→                {s.charAt(0) + s.slice(1).toLowerCase()}
+  1092→              </SelectItem>
+  1093→            ))}
+  1094→          </SelectContent>
+  1095→        </Select>
+  1096→      </div>
+  1097→
+  1098→      <div className="text-sm text-muted-foreground">
+  1099→        {isLoading ? (
+  1100→          <Skeleton className="h-4 w-40" />
+  1101→        ) : (
+  1102→          <span>
+  1103→            Showing{" "}
+  1104→            <span className="font-semibold text-foreground">{enrollments.length}</span>{" "}
+  1105→            enrollment{enrollments.length === 1 ? "" : "s"}
+  1106→            {(search || status) && " (filtered)"}
+  1107→          </span>
+  1108→        )}
+  1109→      </div>
+  1110→
+  1111→      {isLoading ? (
+  1112→        <Card className="p-0 overflow-hidden">
+  1113→          {Array.from({ length: 5 }).map((_, i) => (
+  1114→            <div
+  1115→              key={i}
+  1116→              className="flex items-center gap-3 p-3 border-b border-border/40"
+  1117→            >
+  1118→              <Skeleton className="size-9 rounded-full" />
+  1119→              <div className="flex-1 space-y-1.5">
+  1120→                <Skeleton className="h-3.5 w-1/3" />
+  1121→                <Skeleton className="h-2.5 w-1/4" />
+  1122→              </div>
+  1123→              <Skeleton className="h-6 w-20 rounded-full" />
+  1124→              <Skeleton className="h-8 w-16" />
+  1125→            </div>
+  1126→          ))}
+  1127→        </Card>
+  1128→      ) : isError ? (
+  1129→        <EmptyState
+  1130→          icon={X}
+  1131→          title="Failed to load enrollments"
+  1132→          description="Please try again."
+  1133→          actionLabel="Retry"
+  1134→          onAction={() =>
+  1135→            qc.invalidateQueries({ queryKey: ["training-enrollments"] })
+  1136→          }
+  1137→        />
+  1138→      ) : enrollments.length === 0 ? (
+  1139→        <EmptyState
+  1140→          icon={Users}
+  1141→          title={
+  1142→            search || status ? "No matching enrollments" : "No enrollments yet"
+  1143→          }
+  1144→          description={
+  1145→            search || status
+  1146→              ? "Try adjusting your filters."
+  1147→              : "Enroll employees into courses from the Courses tab."
+  1148→          }
+  1149→        />
+  1150→      ) : (
+  1151→        <Card className="p-0 overflow-hidden border-border/60">
+  1152→          <div className="overflow-x-auto max-h-[70vh] overflow-y-auto">
+  1153→            <Table>
+  1154→              <TableHeader className="sticky top-0 bg-card z-10">
+  1155→                <TableRow>
+  1156→                  <TableHead>Employee</TableHead>
+  1157→                  <TableHead>Course</TableHead>
+  1158→                  <TableHead className="hidden md:table-cell">Enrolled</TableHead>
+  1159→                  <TableHead className="hidden lg:table-cell">Completed</TableHead>
+  1160→                  <TableHead>Score</TableHead>
+  1161→                  <TableHead className="hidden xl:table-cell">Certificate</TableHead>
+  1162→                  <TableHead>Status</TableHead>
+  1163→                  <TableHead className="text-right">Actions</TableHead>
+  1164→                </TableRow>
+  1165→              </TableHeader>
+  1166→              <TableBody>
+  1167→                {enrollments.map((e) => (
+  1168→                  <TableRow key={e.id} className="hover:bg-muted/30">
+  1169→                    <TableCell>
+  1170→                      <div className="flex items-center gap-2.5 min-w-0">
+  1171→                        <AvatarBadge
+  1172→                          name={e.employeeName ?? "?"}
+  1173→                          photo={e.photo}
+  1174→                          size="sm"
+  1175→                        />
+  1176→                        <div className="min-w-0">
+  1177→                          <div className="text-sm font-medium truncate max-w-[140px]">
+  1178→                            {e.employeeName ?? "Unknown"}
+  1179→                          </div>
+  1180→                          <div className="text-[10px] text-muted-foreground font-mono">
+  1181→                            {e.employeeCode ?? "—"}
+  1182→                          </div>
+  1183→                        </div>
+  1184→                      </div>
+  1185→                    </TableCell>
+  1186→                    <TableCell>
+  1187→                      <div className="text-sm truncate max-w-[200px]" title={e.courseTitle}>
+  1188→                        {e.courseTitle}
+  1189→                      </div>
+  1190→                    </TableCell>
+  1191→                    <TableCell className="hidden md:table-cell text-xs text-muted-foreground">
+  1192→                      {formatDate(e.enrolledAt)}
+  1193→                    </TableCell>
+  1194→                    <TableCell className="hidden lg:table-cell text-xs text-muted-foreground">
+  1195→                      {e.completedAt ? formatDate(e.completedAt) : "—"}
+  1196→                    </TableCell>
+  1197→                    <TableCell>
+  1198→                      {e.score !== null ? (
+  1199→                        <Badge
+  1200→                          variant="outline"
+  1201→                          className={cn(
+  1202→                            "font-medium text-[11px]",
+  1203→                            e.score >= 80
+  1204→                              ? "bg-emerald-500/15 text-emerald-700 border-emerald-500/20"
+  1205→                              : e.score >= 50
+  1206→                                ? "bg-amber-500/15 text-amber-700 border-amber-500/20"
+  1207→                                : "bg-rose-500/15 text-rose-700 border-rose-500/20"
+  1208→                          )}
+  1209→                        >
+  1210→                          {e.score}%
+  1211→                        </Badge>
+  1212→                      ) : (
+  1213→                        <span className="text-muted-foreground text-xs">—</span>
+  1214→                      )}
+  1215→                    </TableCell>
+  1216→                    <TableCell className="hidden xl:table-cell">
+  1217→                      {e.certificate ? (
+  1218→                        <Badge variant="outline" className="text-[10px] gap-1">
+  1219→                          <Award className="size-3" />
+  1220→                          <span className="truncate max-w-[120px]" title={e.certificate}>
+  1221→                            {e.certificate}
+  1222→                          </span>
+  1223→                        </Badge>
+  1224→                      ) : (
+  1225→                        <span className="text-muted-foreground text-xs">—</span>
+  1226→                      )}
+  1227→                    </TableCell>
+  1228→                    <TableCell>
+  1229→                      <Badge
+  1230→                        variant="outline"
+  1231→                        className={cn(
+  1232→                          "font-medium border text-[11px]",
+  1233→                          ENROLLMENT_STATUS_COLOR[e.status]
+  1234→                        )}
+  1235→                      >
+  1236→                        {e.status.charAt(0) + e.status.slice(1).toLowerCase()}
+  1237→                      </Badge>
+  1238→                    </TableCell>
+  1239→                    <TableCell className="text-right">
+  1240→                      <div className="flex items-center justify-end gap-1">
+  1241→                        {e.status === "ENROLLED" && (
+  1242→                          <Button
+  1243→                            size="sm"
+  1244→                            variant="outline"
+  1245→                            className="h-8 gap-1.5"
+  1246→                            onClick={() => setCompleteEnrollment(e)}
+  1247→                          >
+  1248→                            <CheckCircle2 className="size-3.5" />
+  1249→                            <span className="hidden xl:inline">Complete</span>
+  1250→                          </Button>
+  1251→                        )}
+  1252→                        {e.status === "COMPLETED" && (
+  1253→                          <Button
+  1254→                            size="sm"
+  1255→                            variant="outline"
+  1256→                            className="h-8 gap-1.5 border-emerald-500/30 text-emerald-700 hover:bg-emerald-500/10 hover:text-emerald-800"
+  1257→                            disabled={certLoading[e.id]}
+  1258→                            onClick={() => downloadCertificate(e)}
+  1259→                            title="Download certificate PDF"
+  1260→                          >
+  1261→                            {certLoading[e.id] ? (
+  1262→                              <Loader2 className="size-3.5 animate-spin" />
+  1263→                            ) : (
+  1264→                              <Award className="size-3.5" />
+  1265→                            )}
+  1266→                            <span className="hidden xl:inline">Certificate</span>
+  1267→                          </Button>
+  1268→                        )}
+  1269→                        <DropdownMenu>
+  1270→                          <DropdownMenuTrigger asChild>
+  1271→                            <Button
+  1272→                              size="icon"
+  1273→                              variant="ghost"
+  1274→                              className="size-8"
+  1275→                              aria-label="Actions"
+  1276→                            >
+  1277→                              <MoreVertical className="size-4" />
+  1278→                            </Button>
+  1279→                          </DropdownMenuTrigger>
+  1280→                          <DropdownMenuContent align="end" className="w-44">
+  1281→                            {e.status === "ENROLLED" && (
+  1282→                              <DropdownMenuItem
+  1283→                                onClick={() => setCompleteEnrollment(e)}
+  1284→                              >
+  1285→                                <CheckCircle2 className="size-4 mr-2" /> Mark Complete
+  1286→                              </DropdownMenuItem>
+  1287→                            )}
+  1288→                            {e.status === "COMPLETED" && (
+  1289→                              <DropdownMenuItem
+  1290→                                onClick={() => downloadCertificate(e)}
+  1291→                                disabled={certLoading[e.id]}
+  1292→                              >
+  1293→                                {certLoading[e.id] ? (
+  1294→                                  <Loader2 className="size-4 mr-2 animate-spin" />
+  1295→                                ) : (
+  1296→                                  <Award className="size-4 mr-2" />
+  1297→                                )}
+  1298→                                Download Certificate
+  1299→                              </DropdownMenuItem>
+  1300→                            )}
+  1301→                            {e.status === "DROPPED" && (
+  1302→                              <DropdownMenuItem
+  1303→                                onClick={() => reactivateEnrollment(e)}
+  1304→                              >
+  1305→                                <UserCheck className="size-4 mr-2" /> Reactivate
+  1306→                              </DropdownMenuItem>
+  1307→                            )}
+  1308→                            {e.status === "ENROLLED" && (
+  1309→                              <DropdownMenuItem
+  1310→                                className="text-amber-600 focus:text-amber-700"
+  1311→                                onClick={() => dropEnrollment(e)}
+  1312→                              >
+  1313→                                <UserX className="size-4 mr-2" /> Drop
+  1314→                              </DropdownMenuItem>
+  1315→                            )}
+  1316→                            <DropdownMenuSeparator />
+  1317→                            <DropdownMenuItem
+  1318→                              className="text-rose-600 focus:text-rose-700"
+  1319→                              onClick={() => deleteEnrollment(e)}
+  1320→                            >
+  1321→                              <Trash2 className="size-4 mr-2" /> Delete
+  1322→                            </DropdownMenuItem>
+  1323→                          </DropdownMenuContent>
+  1324→                        </DropdownMenu>
+  1325→                      </div>
+  1326→                    </TableCell>
+  1327→                  </TableRow>
+  1328→                ))}
+  1329→              </TableBody>
+  1330→            </Table>
+  1331→          </div>
+  1332→        </Card>
+  1333→      )}
+  1334→
+  1335→      <CompleteDialog
+  1336→        enrollment={completeEnrollment}
+  1337→        onClose={() => setCompleteEnrollment(null)}
+  1338→        onSaved={() => {
+  1339→          qc.invalidateQueries({ queryKey: ["training-enrollments"] });
+  1340→          qc.invalidateQueries({ queryKey: ["training-courses"] });
+  1341→          setCompleteEnrollment(null);
+  1342→        }}
+  1343→      />
+  1344→    </div>
+  1345→  );
+  1346→}
+  1347→
+  1348→// =========================================================
+  1349→// Multi-select employee picker (for enroll dialog)
+  1350→// =========================================================
+  1351→
+  1352→function useEmployees(enabled: boolean) {
+  1353→  return useQuery({
+  1354→    queryKey: ["employees-select"],
+  1355→    queryFn: async () => {
+  1356→      const r = await fetch(`/api/employees?pageSize=500`);
+  1357→      return r.json();
+  1358→    },
+  1359→    enabled,
+  1360→  });
+  1361→}
+  1362→
+  1363→function MultiEmployeePicker({
+  1364→  employees,
+  1365→  selected,
+  1366→  onToggle,
+  1367→}: {
+  1368→  employees: EmployeeOption[];
+  1369→  selected: Set<string>;
+  1370→  onToggle: (id: string) => void;
+  1371→}) {
+  1372→  const [open, setOpen] = useState(false);
+  1373→  const [query, setQuery] = useState("");
+  1374→  const filtered = employees.filter(
+  1375→    (e) =>
+  1376→      e.fullName.toLowerCase().includes(query.toLowerCase()) ||
+  1377→      e.employeeId.toLowerCase().includes(query.toLowerCase()) ||
+  1378→      (e.department?.name ?? "").toLowerCase().includes(query.toLowerCase())
+  1379→  );
+  1380→
+  1381→  return (
+  1382→    <div className="space-y-2">
+  1383→      <Popover open={open} onOpenChange={setOpen}>
+  1384→        <PopoverTrigger asChild>
+  1385→          <Button
+  1386→            type="button"
+  1387→            variant="outline"
+  1388→            role="combobox"
+  1389→            aria-expanded={open}
+  1390→            className="w-full justify-between font-normal"
+  1391→          >
+  1392→            <span className="flex items-center gap-2">
+  1393→              <UserPlus className="size-4 text-muted-foreground" />
+  1394→              {selected.size === 0
+  1395→                ? "Select employees to enroll…"
+  1396→                : `${selected.size} employee${selected.size === 1 ? "" : "s"} selected`}
+  1397→            </span>
+  1398→            <ChevronsUpDown className="size-4 opacity-50 shrink-0" />
+  1399→          </Button>
+  1400→        </PopoverTrigger>
+  1401→        <PopoverContent
+  1402→          className="w-[var(--radix-popover-trigger-width)] p-0"
+  1403→          align="start"
+  1404→        >
+  1405→          <Command shouldFilter={false}>
+  1406→            <CommandInput
+  1407→              placeholder="Search name, ID, or department…"
+  1408→              value={query}
+  1409→              onValueChange={setQuery}
+  1410→            />
+  1411→            <CommandList className="max-h-72">
+  1412→              <CommandEmpty>No employee found.</CommandEmpty>
+  1413→              <CommandGroup>
+  1414→                {filtered.map((e) => {
+  1415→                  const isSelected = selected.has(e.id);
+  1416→                  return (
+  1417→                    <CommandItem
+  1418→                      key={e.id}
+  1419→                      value={`${e.fullName} ${e.employeeId}`}
+  1420→                      onSelect={() => onToggle(e.id)}
+  1421→                    >
+  1422→                      <AvatarBadge
+  1423→                        name={e.fullName}
+  1424→                        photo={e.photo}
+  1425→                        size="sm"
+  1426→                      />
+  1427→                      <div className="min-w-0 flex-1">
+  1428→                        <div className="truncate text-sm font-medium">
+  1429→                          {e.fullName}
+  1430→                        </div>
+  1431→                        <div className="text-xs text-muted-foreground font-mono">
+  1432→                          {e.employeeId} · {e.department?.name ?? "—"}
+  1433→                        </div>
+  1434→                      </div>
+  1435→                      {isSelected && (
+  1436→                        <Check className="size-4 text-primary shrink-0" />
+  1437→                      )}
+  1438→                    </CommandItem>
+  1439→                  );
+  1440→                })}
+  1441→              </CommandGroup>
+  1442→            </CommandList>
+  1443→          </Command>
+  1444→        </PopoverContent>
+  1445→      </Popover>
+  1446→
+  1447→      {/* Selected chips */}
+  1448→      {selected.size > 0 && (
+  1449→        <div className="flex flex-wrap gap-1.5 max-h-32 overflow-y-auto p-1 rounded-md border border-border/60 bg-muted/20">
+  1450→          {Array.from(selected).map((id) => {
+  1451→            const emp = employees.find((e) => e.id === id);
+  1452→            if (!emp) return null;
+  1453→            return (
+  1454→              <Badge
+  1455→                key={id}
+  1456→                variant="outline"
+  1457→                className="gap-1 py-1 pl-1.5 pr-1 bg-background"
+  1458→              >
+  1459→                <AvatarBadge
+  1460→                  name={emp.fullName}
+  1461→                  photo={emp.photo}
+  1462→                  size="sm"
+  1463→                  className="size-5 text-[8px]"
+  1464→                />
+  1465→                <span className="text-xs">{emp.fullName}</span>
+  1466→                <button
+  1467→                  type="button"
+  1468→                  onClick={() => onToggle(id)}
+  1469→                  className="ml-0.5 rounded-full hover:bg-muted p-0.5"
+  1470→                  aria-label={`Remove ${emp.fullName}`}
+  1471→                >
+  1472→                  <X className="size-3" />
+  1473→                </button>
+  1474→              </Badge>
+  1475→            );
+  1476→          })}
+  1477→        </div>
+  1478→      )}
+  1479→    </div>
+  1480→  );
+  1481→}
+  1482→
+  1483→// =========================================================
+  1484→// Enroll dialog (multi-select)
+  1485→// =========================================================
+  1486→
+  1487→function EnrollDialog({
+  1488→  course,
+  1489→  onClose,
+  1490→  onSaved,
+  1491→}: {
+  1492→  course: Course | null;
+  1493→  onClose: () => void;
+  1494→  onSaved: () => void;
+  1495→}) {
+  1496→  const { data: employeesData } = useEmployees(!!course);
+  1497→  const employees: EmployeeOption[] = useMemo(
+  1498→    () =>
+  1499→      (employeesData?.items ?? []).map((e: any) => ({
+  1500→        id: e.id,
+  1501→        employeeId: e.employeeId,
+  1502→        fullName: e.fullName,
+  1503→        photo: e.photo,
+  1504→        department: e.department,
+  1505→        designation: e.designation,
+  1506→      })) ?? [],
+  1507→    [employeesData]
+  1508→  );
+  1509→
+  1510→  const [selected, setSelected] = useState<Set<string>>(new Set());
+  1511→  const [saving, setSaving] = useState(false);
+  1512→
+  1513→  const resetKey = course?.id ?? "none";
+  1514→  const [lastKey, setLastKey] = useState(resetKey);
+  1515→  if (resetKey !== lastKey) {
+  1516→    setLastKey(resetKey);
+  1517→    setSelected(new Set());
+  1518→  }
+  1519→
+  1520→  function toggle(id: string) {
+  1521→    setSelected((prev) => {
+  1522→      const next = new Set(prev);
+  1523→      if (next.has(id)) next.delete(id);
+  1524→      else next.add(id);
+  1525→      return next;
+  1526→    });
+  1527→  }
+  1528→
+  1529→  async function submit() {
+  1530→    if (!course) return;
+  1531→    if (selected.size === 0) {
+  1532→      toast.error("Please select at least one employee.");
+  1533→      return;
+  1534→    }
+  1535→    setSaving(true);
+  1536→    try {
+  1537→      const r = await fetch(`/api/training/${course.id}/enroll`, {
+  1538→        method: "POST",
+  1539→        headers: { "Content-Type": "application/json" },
+  1540→        body: JSON.stringify({ employeeIds: Array.from(selected) }),
+  1541→      });
+  1542→      if (!r.ok) {
+  1543→        const e = await r.json().catch(() => ({}));
+  1544→        throw new Error(e?.error || "Failed to enroll employees");
+  1545→      }
+  1546→      const data = await r.json();
+  1547→      toast.success(
+  1548→        data.enrolled > 0
+  1549→          ? `Enrolled ${data.enrolled} employee${data.enrolled === 1 ? "" : "s"} in "${course.title}".`
+  1550→          : "No new enrollments (already enrolled)."
+  1551→      );
+  1552→      onSaved();
+  1553→    } catch (err: any) {
+  1554→      toast.error(err?.message || "Failed to enroll employees.");
+  1555→    } finally {
+  1556→      setSaving(false);
+  1557→    }
+  1558→  }
+  1559→
+  1560→  const isFull =
+  1561→    course && course.capacity > 0 && course.enrolledCount >= course.capacity;
+  1562→
+  1563→  return (
+  1564→    <Dialog
+  1565→      open={!!course}
+  1566→      onOpenChange={(o) => {
+  1567→        if (!saving && !o) onClose();
+  1568→      }}
+  1569→    >
+  1570→      <DialogContent className="sm:max-w-lg">
+  1571→        <DialogHeader>
+  1572→          <DialogTitle className="flex items-center gap-2">
+  1573→            <UserPlus className="size-5 text-primary" />
+  1574→            Enroll Employees
+  1575→          </DialogTitle>
+  1576→          <DialogDescription>
+  1577→            {course
+  1578→              ? `Select employees to enroll in "${course.title}".`
+  1579→              : ""}
+  1580→          </DialogDescription>
+  1581→        </DialogHeader>
+  1582→
+  1583→        {isFull && (
+  1584→          <div className="rounded-md bg-amber-500/10 border border-amber-500/30 text-amber-700 dark:text-amber-300 text-xs px-3 py-2">
+  1585→            This course is currently at capacity. Existing enrollments may be
+  1586→            reactivated, but no new active enrollments will be added.
+  1587→          </div>
+  1588→        )}
+  1589→
+  1590→        <div className="space-y-3">
+  1591→          {employeesData ? (
+  1592→            <MultiEmployeePicker
+  1593→              employees={employees}
+  1594→              selected={selected}
+  1595→              onToggle={toggle}
+  1596→            />
+  1597→          ) : (
+  1598→            <Skeleton className="h-10 w-full" />
+  1599→          )}
+  1600→
+  1601→          {course && (
+  1602→            <div className="rounded-md bg-muted/40 px-3 py-2 text-xs text-muted-foreground flex items-center justify-between">
+  1603→              <span>
+  1604→                Capacity: <span className="font-medium text-foreground">{course.capacity || "Unlimited"}</span>
+  1605→              </span>
+  1606→              <span>
+  1607→                Enrolled: <span className="font-medium text-foreground">{course.enrolledCount}</span>
+  1608→              </span>
+  1609→            </div>
+  1610→          )}
+  1611→        </div>
+  1612→
+  1613→        <DialogFooter>
+  1614→          <Button variant="outline" onClick={onClose} disabled={saving}>
+  1615→            Cancel
+  1616→          </Button>
+  1617→          <Button onClick={submit} disabled={saving} className="gap-1.5">
+  1618→            {saving && <Loader2 className="size-4 animate-spin" />}
+  1619→            Enroll {selected.size > 0 ? `(${selected.size})` : ""}
+  1620→          </Button>
+  1621→        </DialogFooter>
+  1622→      </DialogContent>
+  1623→    </Dialog>
+  1624→  );
+  1625→}
+  1626→
+  1627→// =========================================================
+  1628→// Complete dialog
+  1629→// =========================================================
+  1630→
+  1631→function CompleteDialog({
+  1632→  enrollment,
+  1633→  onClose,
+  1634→  onSaved,
+  1635→}: {
+  1636→  enrollment: Enrollment | null;
+  1637→  onClose: () => void;
+  1638→  onSaved: () => void;
+  1639→}) {
+  1640→  const [score, setScore] = useState<string>("");
+  1641→  const [certificate, setCertificate] = useState("");
+  1642→  const [saving, setSaving] = useState(false);
+  1643→
+  1644→  const resetKey = enrollment?.id ?? "none";
+  1645→  const [lastKey, setLastKey] = useState(resetKey);
+  1646→  if (resetKey !== lastKey) {
+  1647→    setLastKey(resetKey);
+  1648→    setScore(
+  1649→      enrollment && enrollment.score !== null ? String(enrollment.score) : ""
+  1650→    );
+  1651→    setCertificate(enrollment?.certificate ?? "");
+  1652→  }
+  1653→
+  1654→  async function submit() {
+  1655→    if (!enrollment) return;
+  1656→    setSaving(true);
+  1657→    try {
+  1658→      const body: any = { employeeId: enrollment.employeeId };
+  1659→      if (score !== "") body.score = Number(score);
+  1660→      if (certificate.trim()) body.certificate = certificate.trim();
+  1661→      const r = await fetch(
+  1662→        `/api/training/${enrollment.courseId}/complete`,
+  1663→        {
+  1664→          method: "POST",
+  1665→          headers: { "Content-Type": "application/json" },
+  1666→          body: JSON.stringify(body),
+  1667→        }
+  1668→      );
+  1669→      if (!r.ok) {
+  1670→        const e = await r.json().catch(() => ({}));
+  1671→        throw new Error(e?.error || "Failed to mark complete");
+  1672→      }
+  1673→      toast.success(`Marked as completed.`);
+  1674→      onSaved();
+  1675→    } catch (err: any) {
+  1676→      toast.error(err?.message || "Failed to mark complete.");
+  1677→    } finally {
+  1678→      setSaving(false);
+  1679→    }
+  1680→  }
+  1681→
+  1682→  return (
+  1683→    <Dialog
+  1684→      open={!!enrollment}
+  1685→      onOpenChange={(o) => {
+  1686→        if (!saving && !o) onClose();
+  1687→      }}
+  1688→    >
+  1689→      <DialogContent className="sm:max-w-md">
+  1690→        <DialogHeader>
+  1691→          <DialogTitle className="flex items-center gap-2">
+  1692→            <CheckCircle2 className="size-5 text-primary" />
+  1693→            Mark Enrollment Complete
+  1694→          </DialogTitle>
+  1695→          <DialogDescription>
+  1696→            {enrollment
+  1697→              ? `Record completion for ${enrollment.employeeName ?? "employee"} in "${enrollment.courseTitle}".`
+  1698→              : ""}
+  1699→          </DialogDescription>
+  1700→        </DialogHeader>
+  1701→        <div className="space-y-4">
+  1702→          <div className="space-y-1.5">
+  1703→            <Label htmlFor="complete-score">Score (%) — optional</Label>
+  1704→            <Input
+  1705→              id="complete-score"
+  1706→              type="number"
+  1707→              min={0}
+  1708→              max={100}
+  1709→              placeholder="e.g. 85"
+  1710→              value={score}
+  1711→              onChange={(e) => setScore(e.target.value)}
+  1712→            />
+  1713→          </div>
+  1714→          <div className="space-y-1.5">
+  1715→            <Label htmlFor="complete-cert">Certificate / credential ID — optional</Label>
+  1716→            <Input
+  1717→              id="complete-cert"
+  1718→              placeholder="e.g. CERT-2024-001"
+  1719→              value={certificate}
+  1720→              onChange={(e) => setCertificate(e.target.value)}
+  1721→            />
+  1722→          </div>
+  1723→        </div>
+  1724→        <DialogFooter>
+  1725→          <Button variant="outline" onClick={onClose} disabled={saving}>
+  1726→            Cancel
+  1727→          </Button>
+  1728→          <Button onClick={submit} disabled={saving} className="gap-1.5">
+  1729→            {saving && <Loader2 className="size-4 animate-spin" />}
+  1730→            Mark Complete
+  1731→          </Button>
+  1732→        </DialogFooter>
+  1733→      </DialogContent>
+  1734→    </Dialog>
+  1735→  );
+  1736→}
+  1737→

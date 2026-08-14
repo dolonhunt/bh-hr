@@ -30,6 +30,8 @@ import {
   ClipboardList,
   TrendingUp,
   AlertCircle,
+  CalendarPlus,
+  Download,
 } from "lucide-react";
 import { PageHeader } from "../shared/page-header";
 import { KpiCard } from "../shared/kpi-card";
@@ -329,12 +331,14 @@ function InterviewFilters({
   type,
   setType,
   onCreate,
+  extraAction,
 }: {
   search: string;
   setSearch: (v: string) => void;
   type: string;
   setType: (v: string) => void;
   onCreate: () => void;
+  extraAction?: React.ReactNode;
 }) {
   return (
     <div className="flex flex-col md:flex-row gap-3">
@@ -363,6 +367,7 @@ function InterviewFilters({
           ))}
         </SelectContent>
       </Select>
+      {extraAction}
       <Button size="sm" onClick={onCreate} className="gap-1.5 md:ml-1">
         <Plus className="size-4" />
         <span className="hidden sm:inline">Schedule Interview</span>
@@ -384,6 +389,8 @@ function UpcomingTab() {
   const [editInterview, setEditInterview] = useState<Interview | null>(null);
   const [completeInterview, setCompleteInterview] =
     useState<Interview | null>(null);
+  const [exportingAll, setExportingAll] = useState(false);
+  const [downloadingId, setDownloadingId] = useState<string>("");
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ["interviews", "list", search, type],
@@ -447,6 +454,58 @@ function UpcomingTab() {
     }
   }
 
+  async function downloadSingleIcs(i: Interview) {
+    setDownloadingId(i.id);
+    try {
+      const r = await fetch(`/api/interviews/${i.id}/ics`);
+      if (!r.ok) {
+        const err = await r.json().catch(() => ({}));
+        throw new Error(err.error || "Failed to generate calendar invite");
+      }
+      const blob = await r.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      const cd = r.headers.get("Content-Disposition") || "";
+      const match = cd.match(/filename="?([^";\n]+)"?/i);
+      a.download = match ? match[1] : `interview-${i.candidateName}.ics`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      toast.success(`Calendar invite downloaded for ${i.candidateName}.`);
+    } catch (err: any) {
+      toast.error(err?.message || "Calendar invite download failed.");
+    } finally {
+      setDownloadingId("");
+    }
+  }
+
+  async function downloadAllIcs() {
+    setExportingAll(true);
+    try {
+      const r = await fetch(`/api/interviews/ics-all`);
+      if (!r.ok) {
+        const err = await r.json().catch(() => ({}));
+        throw new Error(err.error || "No upcoming interviews to export.");
+      }
+      const blob = await r.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "all-interviews.ics";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      toast.success("Calendar file with all upcoming interviews downloaded.");
+    } catch (err: any) {
+      toast.error(err?.message || "Export failed.");
+    } finally {
+      setExportingAll(false);
+    }
+  }
+
   return (
     <div className="space-y-5">
       <InterviewFilters
@@ -458,6 +517,23 @@ function UpcomingTab() {
           setEditInterview(null);
           setFormOpen(true);
         }}
+        extraAction={
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={downloadAllIcs}
+            disabled={exportingAll || upcoming.length === 0}
+            title="Download .ics file with all upcoming interviews"
+          >
+            {exportingAll ? (
+              <Loader2 className="size-4 mr-1.5 animate-spin" />
+            ) : (
+              <Download className="size-4 mr-1.5" />
+            )}
+            <span className="hidden sm:inline">Export All (ICS)</span>
+            <span className="sm:hidden">All</span>
+          </Button>
+        }
       />
 
       {isLoading && (
@@ -502,6 +578,8 @@ function UpcomingTab() {
               }}
               onCancel={() => cancelInterview(i)}
               onDelete={() => deleteInterview(i)}
+              onAddToCalendar={() => downloadSingleIcs(i)}
+              downloadingIcs={downloadingId === i.id}
             />
           ))}
         </div>
@@ -532,12 +610,16 @@ function UpcomingCard({
   onEdit,
   onCancel,
   onDelete,
+  onAddToCalendar,
+  downloadingIcs,
 }: {
   interview: Interview;
   onComplete: () => void;
   onEdit: () => void;
   onCancel: () => void;
   onDelete: () => void;
+  onAddToCalendar: () => void;
+  downloadingIcs?: boolean;
 }) {
   const t = TYPE_META[interview.type];
   const TypeIcon = t.icon;
@@ -640,6 +722,21 @@ function UpcomingCard({
               </a>
             </Button>
           )}
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={onAddToCalendar}
+            disabled={downloadingIcs}
+            title="Add to calendar (.ics)"
+            className="gap-1.5"
+          >
+            {downloadingIcs ? (
+              <Loader2 className="size-3.5 animate-spin" />
+            ) : (
+              <CalendarPlus className="size-3.5" />
+            )}
+            <span className="hidden sm:inline">Calendar</span>
+          </Button>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" size="icon" className="size-8">

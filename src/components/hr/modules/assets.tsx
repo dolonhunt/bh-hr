@@ -46,6 +46,11 @@ import {
   Coins,
   LineChart as LineChartIcon,
   Info,
+  Wrench,
+  CalendarClock,
+  Building2,
+  ClipboardList,
+  CircleDot,
 } from "lucide-react";
 import { PageHeader } from "../shared/page-header";
 import { KpiCard } from "../shared/kpi-card";
@@ -122,6 +127,53 @@ const ASSET_TYPES = [
 
 const CONDITIONS = ["NEW", "GOOD", "FAIR", "DAMAGED"] as const;
 const STATUSES = ["AVAILABLE", "ASSIGNED", "RETURNED", "RETIRED"] as const;
+
+const MAINTENANCE_TYPES = [
+  { value: "REPAIR", label: "Repair" },
+  { value: "MAINTENANCE", label: "Maintenance" },
+  { value: "UPGRADE", label: "Upgrade" },
+  { value: "INSPECTION", label: "Inspection" },
+  { value: "REPLACEMENT", label: "Replacement" },
+] as const;
+
+const MAINTENANCE_STATUSES = [
+  "SCHEDULED",
+  "IN_PROGRESS",
+  "COMPLETED",
+  "CANCELLED",
+] as const;
+
+type MaintenanceTypeValue = (typeof MAINTENANCE_TYPES)[number]["value"];
+type MaintenanceStatusValue = (typeof MAINTENANCE_STATUSES)[number];
+
+const MAINTENANCE_TYPE_COLOR: Record<MaintenanceTypeValue, string> = {
+  REPAIR: "bg-rose-500/15 text-rose-700 dark:text-rose-300 border-rose-500/20",
+  MAINTENANCE:
+    "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/20",
+  UPGRADE: "bg-violet-500/15 text-violet-700 dark:text-violet-300 border-violet-500/20",
+  INSPECTION:
+    "bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/20",
+  REPLACEMENT:
+    "bg-teal-500/15 text-teal-700 dark:text-teal-300 border-teal-500/20",
+};
+
+const MAINTENANCE_STATUS_COLOR: Record<MaintenanceStatusValue, string> = {
+  SCHEDULED:
+    "bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/20",
+  IN_PROGRESS:
+    "bg-sky-500/15 text-sky-700 dark:text-sky-300 border-sky-500/20",
+  COMPLETED:
+    "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/20",
+  CANCELLED:
+    "bg-rose-500/15 text-rose-700 dark:text-rose-300 border-rose-500/20",
+};
+
+const MAINTENANCE_STATUS_NEXT: Record<MaintenanceStatusValue, MaintenanceStatusValue> = {
+  SCHEDULED: "IN_PROGRESS",
+  IN_PROGRESS: "COMPLETED",
+  COMPLETED: "COMPLETED",
+  CANCELLED: "CANCELLED",
+};
 
 type AssetType = (typeof ASSET_TYPES)[number]["value"];
 type AssetCondition = (typeof CONDITIONS)[number];
@@ -228,6 +280,46 @@ interface EmployeeOption {
   designation?: { name: string } | null;
 }
 
+interface MaintenanceRecord {
+  id: string;
+  assetId: string;
+  type: MaintenanceTypeValue;
+  description: string;
+  cost: number;
+  vendor: string | null;
+  startDate: string;
+  endDate: string | null;
+  status: MaintenanceStatusValue;
+  notes: string | null;
+  createdAt: string;
+}
+
+interface MaintenanceSummary {
+  totalCost: number;
+  activeCount: number;
+  completedCount: number;
+  cancelledCount: number;
+}
+
+interface AssetMaintenanceResponse {
+  items: MaintenanceRecord[];
+  total: number;
+  summary: MaintenanceSummary;
+}
+
+interface GlobalMaintenanceSummary extends MaintenanceSummary {
+  assetsWithMaintenanceCount: number;
+  damagedAssetCount: number;
+  typeDistribution: Record<string, number>;
+  topAssets: { assetId: string; cost: number }[];
+}
+
+interface GlobalMaintenanceResponse {
+  items: MaintenanceRecord[];
+  total: number;
+  summary: GlobalMaintenanceSummary;
+}
+
 // =========================================================
 // Main module
 // =========================================================
@@ -243,6 +335,7 @@ export function AssetsModule() {
   const [assignAsset, setAssignAsset] = useState<Asset | null>(null);
   const [returnAsset, setReturnAsset] = useState<Asset | null>(null);
   const [depreciationAsset, setDepreciationAsset] = useState<DepreciationRow | null>(null);
+  const [maintenanceAsset, setMaintenanceAsset] = useState<Asset | null>(null);
 
   const qc = useQueryClient();
   const { data, isLoading, isError } = useQuery({
@@ -263,6 +356,19 @@ export function AssetsModule() {
   const assigned = assets.filter((a) => a.status === "ASSIGNED").length;
   const available = assets.filter((a) => a.status === "AVAILABLE").length;
   const damaged = assets.filter((a) => a.condition === "DAMAGED").length;
+
+  // Global maintenance summary for the Maintenance KPI card (table + grid views only).
+  const maintenanceSummaryQ = useQuery({
+    queryKey: ["assets", "maintenance", "summary"],
+    queryFn: async () => {
+      const r = await fetch("/api/assets/maintenance");
+      if (!r.ok) throw new Error("Failed to load maintenance summary");
+      return r.json();
+    },
+    enabled: view !== "depreciation",
+  });
+  const maintenanceSummary: GlobalMaintenanceSummary | undefined =
+    maintenanceSummaryQ.data?.summary;
 
   function openCreate() {
     setEditAsset(null);
@@ -385,6 +491,18 @@ export function AssetsModule() {
         />
       </div>
 
+      {/* Maintenance summary card (hidden in depreciation view) */}
+      {view !== "depreciation" && (
+        <MaintenanceSummaryCard
+          summary={maintenanceSummary}
+          isLoading={maintenanceSummaryQ.isLoading}
+          isError={maintenanceSummaryQ.isError}
+          onRetry={() =>
+            qc.invalidateQueries({ queryKey: ["assets", "maintenance", "summary"] })
+          }
+        />
+      )}
+
       {/* Filter bar */}
       <div className="flex flex-col md:flex-row gap-3">
         <div className="relative flex-1">
@@ -483,6 +601,7 @@ export function AssetsModule() {
           onAssign={(a) => setAssignAsset(a)}
           onReturn={(a) => setReturnAsset(a)}
           onRetire={retireAsset}
+          onMaintenance={(a) => setMaintenanceAsset(a)}
         />
       ) : (
         <AssetsGrid
@@ -492,6 +611,7 @@ export function AssetsModule() {
           onAssign={(a) => setAssignAsset(a)}
           onReturn={(a) => setReturnAsset(a)}
           onRetire={retireAsset}
+          onMaintenance={(a) => setMaintenanceAsset(a)}
         />
       )}
 
@@ -531,6 +651,12 @@ export function AssetsModule() {
         asset={depreciationAsset}
         onClose={() => setDepreciationAsset(null)}
       />
+
+      {/* Maintenance history dialog */}
+      <MaintenanceHistoryDialog
+        asset={maintenanceAsset}
+        onClose={() => setMaintenanceAsset(null)}
+      />
     </div>
   );
 }
@@ -546,6 +672,7 @@ function AssetsTable({
   onAssign,
   onReturn,
   onRetire,
+  onMaintenance,
 }: {
   assets: Asset[];
   onEdit: (a: Asset) => void;
@@ -553,6 +680,7 @@ function AssetsTable({
   onAssign: (a: Asset) => void;
   onReturn: (a: Asset) => void;
   onRetire: (a: Asset) => void;
+  onMaintenance: (a: Asset) => void;
 }) {
   return (
     <Card className="p-0 overflow-hidden border-border/60">
@@ -648,6 +776,16 @@ function AssetsTable({
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex items-center justify-end gap-1">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-8 gap-1.5"
+                        onClick={() => onMaintenance(a)}
+                        title="View maintenance history"
+                      >
+                        <Wrench className="size-3.5" />
+                        <span className="hidden xl:inline">Maintenance</span>
+                      </Button>
                       {a.status === "AVAILABLE" && (
                         <Button
                           size="sm"
@@ -684,6 +822,9 @@ function AssetsTable({
                         <DropdownMenuContent align="end" className="w-44">
                           <DropdownMenuItem onClick={() => onEdit(a)}>
                             <Pencil className="size-4 mr-2" /> Edit
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => onMaintenance(a)}>
+                            <Wrench className="size-4 mr-2" /> Maintenance History
                           </DropdownMenuItem>
                           {a.status !== "RETIRED" && (
                             <DropdownMenuItem onClick={() => onRetire(a)}>
@@ -722,6 +863,7 @@ function AssetsGrid({
   onAssign,
   onReturn,
   onRetire,
+  onMaintenance,
 }: {
   assets: Asset[];
   onEdit: (a: Asset) => void;
@@ -729,6 +871,7 @@ function AssetsGrid({
   onAssign: (a: Asset) => void;
   onReturn: (a: Asset) => void;
   onRetire: (a: Asset) => void;
+  onMaintenance: (a: Asset) => void;
 }) {
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
@@ -803,6 +946,16 @@ function AssetsGrid({
             )}
 
             <div className="flex items-center gap-1.5 mt-auto pt-2">
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-8 gap-1.5"
+                onClick={() => onMaintenance(a)}
+                title="Maintenance history"
+              >
+                <Wrench className="size-3.5" />
+                <span className="hidden sm:inline">Maint.</span>
+              </Button>
               {a.status === "AVAILABLE" && (
                 <Button
                   size="sm"
@@ -837,6 +990,9 @@ function AssetsGrid({
                 <DropdownMenuContent align="end" className="w-44">
                   <DropdownMenuItem onClick={() => onEdit(a)}>
                     <Pencil className="size-4 mr-2" /> Edit
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => onMaintenance(a)}>
+                    <Wrench className="size-4 mr-2" /> Maintenance History
                   </DropdownMenuItem>
                   {a.status !== "RETIRED" && (
                     <DropdownMenuItem onClick={() => onRetire(a)}>
@@ -1999,5 +2155,704 @@ function MetaTile({ label, value }: { label: string; value: string }) {
       </div>
       <div className="text-sm font-medium mt-0.5 truncate">{value}</div>
     </div>
+  );
+}
+
+// =========================================================
+// Maintenance summary card (global, shown above the table/grid)
+// =========================================================
+
+function MaintenanceSummaryCard({
+  summary,
+  isLoading,
+  isError,
+  onRetry,
+}: {
+  summary: GlobalMaintenanceSummary | undefined;
+  isLoading: boolean;
+  isError: boolean;
+  onRetry: () => void;
+}) {
+  if (isError) {
+    return (
+      <Card className="p-4 border-border/60 bg-muted/10">
+        <div className="flex items-center gap-3 text-sm text-muted-foreground">
+          <AlertTriangle className="size-4 text-rose-500" />
+          <span>Failed to load maintenance summary.</span>
+          <Button size="sm" variant="outline" className="ml-auto" onClick={onRetry}>
+            Retry
+          </Button>
+        </div>
+      </Card>
+    );
+  }
+
+  const totalCost = summary?.totalCost ?? 0;
+  const activeCount = summary?.activeCount ?? 0;
+  const damagedCount = summary?.damagedAssetCount ?? 0;
+  const topSpenders = summary?.topAssets ?? [];
+
+  return (
+    <Card className="p-4 sm:p-5 border-border/60 shadow-soft">
+      <div className="flex items-start justify-between gap-3 mb-4">
+        <div className="flex items-center gap-2.5 min-w-0">
+          <div className="size-9 sm:size-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center flex-shrink-0">
+            <Wrench className="size-5" />
+          </div>
+          <div className="min-w-0">
+            <div className="text-base sm:text-lg font-bold tracking-tight">
+              Maintenance &amp; Repair Summary
+            </div>
+            <div className="text-xs text-muted-foreground">
+              Portfolio-wide service history across all assets.
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+        <div className="rounded-xl border border-border/60 p-3 bg-emerald-500/5">
+          <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-muted-foreground">
+            <Coins className="size-3.5 text-emerald-600" />
+            Total Maintenance Cost
+          </div>
+          {isLoading ? (
+            <Skeleton className="h-7 w-24 mt-2" />
+          ) : (
+            <div className="text-lg sm:text-xl font-bold mt-1 tabular-nums text-emerald-700 dark:text-emerald-300">
+              {formatCurrency(totalCost)}
+            </div>
+          )}
+          <div className="text-[10px] text-muted-foreground mt-0.5">
+            Sum of completed work
+          </div>
+        </div>
+
+        <div className="rounded-xl border border-border/60 p-3 bg-amber-500/5">
+          <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-muted-foreground">
+            <CircleDot className="size-3.5 text-amber-600" />
+            Active Maintenance
+          </div>
+          {isLoading ? (
+            <Skeleton className="h-7 w-12 mt-2" />
+          ) : (
+            <div className="text-lg sm:text-xl font-bold mt-1 tabular-nums text-amber-700 dark:text-amber-300">
+              {activeCount}
+            </div>
+          )}
+          <div className="text-[10px] text-muted-foreground mt-0.5">
+            Scheduled + in progress
+          </div>
+        </div>
+
+        <div className="rounded-xl border border-border/60 p-3 bg-rose-500/5">
+          <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-muted-foreground">
+            <AlertTriangle className="size-3.5 text-rose-600" />
+            Assets Needing Maintenance
+          </div>
+          {isLoading ? (
+            <Skeleton className="h-7 w-12 mt-2" />
+          ) : (
+            <div className="text-lg sm:text-xl font-bold mt-1 tabular-nums text-rose-700 dark:text-rose-300">
+              {damagedCount}
+            </div>
+          )}
+          <div className="text-[10px] text-muted-foreground mt-0.5">
+            Damaged condition
+          </div>
+        </div>
+
+        <div className="rounded-xl border border-border/60 p-3 bg-primary/5">
+          <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-muted-foreground">
+            <ClipboardList className="size-3.5 text-primary" />
+            Total Records
+          </div>
+          {isLoading ? (
+            <Skeleton className="h-7 w-12 mt-2" />
+          ) : (
+            <div className="text-lg sm:text-xl font-bold mt-1 tabular-nums text-primary">
+              {summary?.completedCount ?? 0}
+              <span className="text-xs text-muted-foreground font-normal">
+                {" "}
+                / {summary ? summary.completedCount + summary.activeCount + summary.cancelledCount : 0}
+              </span>
+            </div>
+          )}
+          <div className="text-[10px] text-muted-foreground mt-0.5">
+            Completed / all records
+          </div>
+        </div>
+      </div>
+
+      {/* Top spenders mini list */}
+      {!isLoading && topSpenders.length > 0 && (
+        <div className="mt-4">
+          <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2">
+            Top maintenance spenders
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {topSpenders.map((t) => (
+              <div
+                key={t.assetId}
+                className="inline-flex items-center gap-1.5 rounded-full bg-muted/60 border border-border/60 px-2.5 py-1 text-xs"
+                title={t.assetId}
+              >
+                <span className="font-mono text-muted-foreground">
+                  #{t.assetId.slice(-6)}
+                </span>
+                <span className="font-semibold text-emerald-700 dark:text-emerald-300 tabular-nums">
+                  {formatCurrency(t.cost)}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </Card>
+  );
+}
+
+// =========================================================
+// Maintenance History Dialog
+// =========================================================
+
+function useAssetMaintenance(assetId: string | null) {
+  return useQuery({
+    queryKey: ["assets", "maintenance", "list", assetId],
+    queryFn: async () => {
+      if (!assetId) return null;
+      const r = await fetch(`/api/assets/${assetId}/maintenance`);
+      if (!r.ok) throw new Error("Failed to load maintenance records");
+      return r.json();
+    },
+    enabled: !!assetId,
+  });
+}
+
+function MaintenanceHistoryDialog({
+  asset,
+  onClose,
+}: {
+  asset: Asset | null;
+  onClose: () => void;
+}) {
+  const qc = useQueryClient();
+  const [showAdd, setShowAdd] = useState(false);
+  const [savingId, setSavingId] = useState<string | null>(null);
+
+  const { data, isLoading, isError } = useAssetMaintenance(asset?.id ?? null);
+  const records: MaintenanceRecord[] = data?.items ?? [];
+  const summary: MaintenanceSummary | undefined = data?.summary;
+
+  useEffect(() => {
+    if (!asset) setShowAdd(false);
+  }, [asset]);
+
+  function invalidateAll() {
+    qc.invalidateQueries({ queryKey: ["assets", "maintenance", "list", asset?.id] });
+    qc.invalidateQueries({ queryKey: ["assets", "maintenance", "summary"] });
+  }
+
+  async function cycleStatus(rec: MaintenanceRecord) {
+    if (rec.status === "CANCELLED") return;
+    const next = MAINTENANCE_STATUS_NEXT[rec.status];
+    setSavingId(rec.id);
+    try {
+      const body: any = { status: next };
+      if (next === "COMPLETED" && !rec.endDate) {
+        body.endDate = new Date().toISOString().slice(0, 10);
+      }
+      const r = await fetch(
+        `/api/assets/${asset?.id}/maintenance/${rec.id}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        }
+      );
+      if (!r.ok) {
+        const e = await r.json().catch(() => ({}));
+        throw new Error(e?.error || "Failed to update status");
+      }
+      toast.success(
+        `Status updated to ${next.replace(/_/g, " ").toLowerCase()}.`
+      );
+      invalidateAll();
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to update status.");
+    } finally {
+      setSavingId(null);
+    }
+  }
+
+  async function cancelRecord(rec: MaintenanceRecord) {
+    if (!confirm("Cancel this maintenance record?")) return;
+    setSavingId(rec.id);
+    try {
+      const r = await fetch(
+        `/api/assets/${asset?.id}/maintenance/${rec.id}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ status: "CANCELLED" }),
+        }
+      );
+      if (!r.ok) {
+        const e = await r.json().catch(() => ({}));
+        throw new Error(e?.error || "Failed to cancel record");
+      }
+      toast.success("Maintenance record cancelled.");
+      invalidateAll();
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to cancel record.");
+    } finally {
+      setSavingId(null);
+    }
+  }
+
+  async function deleteRecord(rec: MaintenanceRecord) {
+    if (!confirm("Permanently delete this maintenance record?")) return;
+    setSavingId(rec.id);
+    try {
+      const r = await fetch(
+        `/api/assets/${asset?.id}/maintenance/${rec.id}`,
+        { method: "DELETE" }
+      );
+      if (!r.ok) {
+        const e = await r.json().catch(() => ({}));
+        throw new Error(e?.error || "Failed to delete record");
+      }
+      toast.success("Maintenance record deleted.");
+      invalidateAll();
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to delete record.");
+    } finally {
+      setSavingId(null);
+    }
+  }
+
+  return (
+    <Dialog
+      open={!!asset}
+      onOpenChange={(o) => {
+        if (!o) onClose();
+      }}
+    >
+      <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Wrench className="size-5 text-primary" />
+            Maintenance History
+          </DialogTitle>
+          <DialogDescription>
+            {asset
+              ? `Service and repair records for "${asset.name}" (${asset.serialNumber || "—"}).`
+              : ""}
+          </DialogDescription>
+        </DialogHeader>
+
+        {!asset ? null : isLoading ? (
+          <div className="space-y-3">
+            <Skeleton className="h-20 w-full" />
+            <Skeleton className="h-40 w-full" />
+          </div>
+        ) : isError ? (
+          <EmptyState
+            icon={AlertTriangle}
+            title="Failed to load maintenance records"
+            description="Please close and try again."
+          />
+        ) : (
+          <div className="space-y-4">
+            {/* Inline summary tiles */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+              <MaintenanceSummaryTile
+                label="Total Cost"
+                value={formatCurrency(summary?.totalCost ?? 0)}
+                tone="emerald"
+              />
+              <MaintenanceSummaryTile
+                label="Active"
+                value={String(summary?.activeCount ?? 0)}
+                tone="amber"
+              />
+              <MaintenanceSummaryTile
+                label="Completed"
+                value={String(summary?.completedCount ?? 0)}
+                tone="primary"
+              />
+              <MaintenanceSummaryTile
+                label="Cancelled"
+                value={String(summary?.cancelledCount ?? 0)}
+                tone="rose"
+              />
+            </div>
+
+            {/* Add Maintenance button */}
+            <div className="flex justify-end">
+              <Button size="sm" className="gap-1.5" onClick={() => setShowAdd(true)}>
+                <Plus className="size-4" />
+                Add Maintenance
+              </Button>
+            </div>
+
+            {/* List */}
+            {records.length === 0 ? (
+              <EmptyState
+                icon={Wrench}
+                title="No maintenance records yet"
+                description="Log repairs, upgrades, inspections, and routine maintenance to track the asset's service history."
+                actionLabel="Add First Record"
+                onAction={() => setShowAdd(true)}
+              />
+            ) : (
+              <div className="space-y-3 max-h-[45vh] overflow-y-auto pr-1 -mr-1">
+                {records.map((rec) => {
+                  const next = MAINTENANCE_STATUS_NEXT[rec.status];
+                  const canAdvance =
+                    rec.status !== "CANCELLED" && next !== rec.status;
+                  return (
+                    <div
+                      key={rec.id}
+                      className="rounded-xl border border-border/60 p-3 sm:p-4 bg-card hover:bg-muted/30 transition-colors"
+                    >
+                      <div className="flex items-start justify-between gap-3 flex-wrap">
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <Badge
+                            variant="outline"
+                            className={cn(
+                              "font-medium border text-[11px] px-2 py-0.5",
+                              MAINTENANCE_TYPE_COLOR[rec.type]
+                            )}
+                          >
+                            {rec.type.charAt(0) +
+                              rec.type.slice(1).toLowerCase()}
+                          </Badge>
+                          <div className="min-w-0">
+                            <div className="text-sm font-medium truncate max-w-[260px]">
+                              {rec.description}
+                            </div>
+                            <div className="flex items-center gap-2 text-[11px] text-muted-foreground mt-0.5 flex-wrap">
+                              <span className="inline-flex items-center gap-1">
+                                <CalendarClock className="size-3" />
+                                {formatDate(rec.startDate)}
+                                {rec.endDate
+                                  ? ` → ${formatDate(rec.endDate)}`
+                                  : " → ongoing"}
+                              </span>
+                              {rec.vendor && (
+                                <span className="inline-flex items-center gap-1">
+                                  <Building2 className="size-3" />
+                                  {rec.vendor}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          <div className="text-right">
+                            <div className="text-sm font-bold tabular-nums">
+                              {formatCurrency(rec.cost)}
+                            </div>
+                          </div>
+                          <Badge
+                            variant="outline"
+                            className={cn(
+                              "font-medium border text-[11px] px-2 py-0.5",
+                              MAINTENANCE_STATUS_COLOR[rec.status]
+                            )}
+                          >
+                            {rec.status
+                              .charAt(0)
+                              .concat(rec.status.slice(1).toLowerCase().replace(/_/g, " "))}
+                          </Badge>
+                        </div>
+                      </div>
+
+                      {rec.notes && (
+                        <div className="mt-2 text-xs text-muted-foreground bg-muted/40 rounded-md p-2">
+                          <span className="font-medium text-foreground">Notes:</span>{" "}
+                          {rec.notes}
+                        </div>
+                      )}
+
+                      <div className="flex items-center justify-end gap-1.5 mt-2.5">
+                        {canAdvance && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-7 gap-1 text-xs"
+                            disabled={savingId === rec.id}
+                            onClick={() => cycleStatus(rec)}
+                          >
+                            {savingId === rec.id ? (
+                              <Loader2 className="size-3 animate-spin" />
+                            ) : (
+                              <CircleDot className="size-3" />
+                            )}
+                            {next === "IN_PROGRESS"
+                              ? "Start"
+                              : next === "COMPLETED"
+                                ? "Complete"
+                                : "Advance"}
+                          </Button>
+                        )}
+                        {rec.status !== "CANCELLED" &&
+                          rec.status !== "COMPLETED" && (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-7 text-xs text-amber-600 hover:text-amber-700 hover:bg-amber-500/10"
+                              disabled={savingId === rec.id}
+                              onClick={() => cancelRecord(rec)}
+                            >
+                              Cancel
+                            </Button>
+                          )}
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-7 text-xs text-rose-600 hover:text-rose-700 hover:bg-rose-500/10"
+                          disabled={savingId === rec.id}
+                          onClick={() => deleteRecord(rec)}
+                        >
+                          <Trash2 className="size-3" /> Delete
+                        </Button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {showAdd && (
+              <AddMaintenanceDialog
+                asset={asset}
+                onClose={() => setShowAdd(false)}
+                onSaved={() => {
+                  setShowAdd(false);
+                  invalidateAll();
+                }}
+              />
+            )}
+          </div>
+        )}
+
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>
+            Close
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function MaintenanceSummaryTile({
+  label,
+  value,
+  tone,
+}: {
+  label: string;
+  value: string;
+  tone: "primary" | "emerald" | "rose" | "amber";
+}) {
+  const toneClass =
+    tone === "primary"
+      ? "bg-primary/10 text-primary"
+      : tone === "emerald"
+        ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300"
+        : tone === "rose"
+          ? "bg-rose-500/15 text-rose-700 dark:text-rose-300"
+          : "bg-amber-500/15 text-amber-700 dark:text-amber-300";
+  return (
+    <div className="rounded-lg border border-border/60 p-2.5 bg-card">
+      <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
+        {label}
+      </div>
+      <div className={cn("text-base font-bold mt-1 tabular-nums", toneClass)}>
+        {value}
+      </div>
+    </div>
+  );
+}
+
+// =========================================================
+// Add Maintenance Dialog
+// =========================================================
+
+function AddMaintenanceDialog({
+  asset,
+  onClose,
+  onSaved,
+}: {
+  asset: Asset;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const [type, setType] = useState<MaintenanceTypeValue>("MAINTENANCE");
+  const [description, setDescription] = useState("");
+  const [cost, setCost] = useState("");
+  const [vendor, setVendor] = useState("");
+  const [startDate, setStartDate] = useState(
+    new Date().toISOString().slice(0, 10)
+  );
+  const [endDate, setEndDate] = useState("");
+  const [notes, setNotes] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  async function submit() {
+    if (!description.trim()) {
+      toast.error("Description is required.");
+      return;
+    }
+    const costNum = Number(cost);
+    if (cost.trim() !== "" && (isNaN(costNum) || costNum < 0)) {
+      toast.error("Cost must be a non-negative number.");
+      return;
+    }
+    setSaving(true);
+    try {
+      const body: any = {
+        type,
+        description: description.trim(),
+        cost: cost.trim() === "" ? 0 : costNum,
+        vendor: vendor.trim() || null,
+        startDate,
+      };
+      if (endDate) body.endDate = endDate;
+      if (notes.trim()) body.notes = notes.trim();
+
+      const r = await fetch(`/api/assets/${asset.id}/maintenance`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (!r.ok) {
+        const e = await r.json().catch(() => ({}));
+        throw new Error(e?.error || "Failed to create maintenance record");
+      }
+      toast.success("Maintenance record created.");
+      onSaved();
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to create maintenance record.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Dialog
+      open
+      onOpenChange={(o) => {
+        if (!saving && !o) onClose();
+      }}
+    >
+      <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Wrench className="size-5 text-primary" />
+            Add Maintenance Record
+          </DialogTitle>
+          <DialogDescription>
+            Log a repair, inspection, upgrade, or routine service for &quot;{asset.name}&quot;.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label htmlFor="m-type">Type *</Label>
+              <Select value={type} onValueChange={(v) => setType(v as MaintenanceTypeValue)}>
+                <SelectTrigger id="m-type">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {MAINTENANCE_TYPES.map((t) => (
+                    <SelectItem key={t.value} value={t.value}>
+                      {t.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="m-cost">Cost (৳)</Label>
+              <Input
+                id="m-cost"
+                type="number"
+                min="0"
+                step="100"
+                placeholder="0"
+                value={cost}
+                onChange={(e) => setCost(e.target.value)}
+              />
+            </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="m-desc">Description *</Label>
+            <Textarea
+              id="m-desc"
+              placeholder="What work was performed?"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              rows={3}
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="m-vendor">Vendor / Service provider</Label>
+            <Input
+              id="m-vendor"
+              placeholder="e.g. TechFix BD, Apple Service Center"
+              value={vendor}
+              onChange={(e) => setVendor(e.target.value)}
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label htmlFor="m-start">Start date *</Label>
+              <Input
+                id="m-start"
+                type="date"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="m-end">Expected end date</Label>
+              <Input
+                id="m-end"
+                type="date"
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+              />
+            </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="m-notes">Notes</Label>
+            <Textarea
+              id="m-notes"
+              placeholder="Optional notes, symptoms, warranty info, etc."
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              rows={2}
+            />
+          </div>
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose} disabled={saving}>
+            Cancel
+          </Button>
+          <Button onClick={submit} disabled={saving} className="gap-1.5">
+            {saving && <Loader2 className="size-4 animate-spin" />}
+            Create Record
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

@@ -35,6 +35,8 @@ import {
   Building2,
   Receipt,
   ShieldCheck,
+  FileDown,
+  Sparkles,
 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { printDocument } from "@/lib/print";
@@ -105,6 +107,9 @@ export function PayslipDialog({
 
   // Preview sub-dialog state
   const [previewOpen, setPreviewOpen] = useState(false);
+
+  // Enhanced PDF download state
+  const [downloadingPdf, setDownloadingPdf] = useState(false);
 
   const { data: employeesData } = useQuery({
     queryKey: ["employees-for-payslip"],
@@ -188,10 +193,61 @@ export function PayslipDialog({
       setGeneratedDoc(doc);
       toast.success("Payslip generated successfully.");
       onSaved?.();
+
+      // Auto-fetch the advanced breakdown so the success state can show it.
+      if (!breakdown) {
+        try {
+          const calcRes = await fetch("/api/payroll/calculate", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ employeeId, month }),
+          });
+          if (calcRes.ok) {
+            const calcData = await calcRes.json();
+            setBreakdown(calcData);
+          }
+        } catch {
+          // non-fatal — breakdown just won't be shown
+        }
+      }
     } catch (err: any) {
       toast.error(err.message || "Generation failed");
     } finally {
       setGenerating(false);
+    }
+  }
+
+  async function downloadEnhancedPdf() {
+    if (!employeeId || !month) {
+      toast.error("Employee and month are required.");
+      return;
+    }
+    setDownloadingPdf(true);
+    try {
+      const r = await fetch(
+        `/api/payroll/payslip-pdf?employeeId=${encodeURIComponent(employeeId)}&month=${encodeURIComponent(month)}`
+      );
+      if (!r.ok) {
+        const err = await r.json().catch(() => ({}));
+        throw new Error(err.error || "Failed to generate PDF");
+      }
+      const blob = await r.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      // Try to grab filename from Content-Disposition header
+      const cd = r.headers.get("Content-Disposition") || "";
+      const match = cd.match(/filename="?([^";\n]+)"?/i);
+      a.download = match ? match[1] : `payslip-${month}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      toast.success("Enhanced payslip PDF downloaded.");
+    } catch (err: any) {
+      toast.error(err.message || "PDF download failed");
+    } finally {
+      setDownloadingPdf(false);
     }
   }
 
@@ -583,6 +639,76 @@ export function PayslipDialog({
                   </div>
                 </div>
 
+                {/* Breakdown preview (if available) */}
+                {breakdown && (
+                  <div className="rounded-lg border border-border bg-card overflow-hidden">
+                    <div className="px-3 py-2 bg-emerald-500/10 border-b border-emerald-500/20 flex items-center gap-2">
+                      <Sparkles className="size-4 text-emerald-700" />
+                      <span className="text-sm font-medium text-emerald-800">
+                        Advanced Payroll Breakdown
+                      </span>
+                      {breakdown.taxSlab && (
+                        <span className="ml-auto text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-700 border border-emerald-500/20">
+                          {Math.round(breakdown.taxSlab.rate * 100)}% slab
+                        </span>
+                      )}
+                    </div>
+                    <div className="grid grid-cols-2 divide-x divide-border">
+                      <div className="p-3 space-y-1.5">
+                        <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-1">
+                          Earnings
+                        </div>
+                        <MiniBreakdownRow label="Basic" value={formatCurrency(breakdown.basicSalary)} />
+                        <MiniBreakdownRow label="HRA" value={formatCurrency(breakdown.hra)} muted />
+                        <MiniBreakdownRow label="Special Allow." value={formatCurrency(breakdown.specialAllowance)} muted />
+                        <div className="flex justify-between items-center pt-1.5 mt-1 border-t border-border text-xs">
+                          <span className="font-semibold">Gross</span>
+                          <span className="font-bold tabular-nums text-emerald-700">
+                            {formatCurrency(breakdown.grossSalary)}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="p-3 space-y-1.5">
+                        <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-1">
+                          Deductions
+                        </div>
+                        <MiniBreakdownRow label="PF" value={`-${formatCurrency(breakdown.pf)}`} danger />
+                        <MiniBreakdownRow label="Prof. Tax" value={`-${formatCurrency(breakdown.professionalTax)}`} danger />
+                        <MiniBreakdownRow label="TDS" value={`-${formatCurrency(breakdown.tds)}`} danger />
+                        <div className="flex justify-between items-center pt-1.5 mt-1 border-t border-border text-xs">
+                          <span className="font-semibold">Total</span>
+                          <span className="font-bold tabular-nums text-rose-600">
+                            -{formatCurrency(breakdown.totalDeductions)}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="px-3 py-2 bg-emerald-500/10 border-t border-emerald-500/20 flex items-center justify-between gap-2">
+                      <span className="text-sm font-semibold text-emerald-800">
+                        Net Salary (Take-home)
+                      </span>
+                      <span className="text-lg font-bold tabular-nums text-emerald-700">
+                        {formatCurrency(breakdown.netSalary)}
+                      </span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Enhanced PDF download — primary action */}
+                <Button
+                  size="sm"
+                  className="w-full"
+                  onClick={downloadEnhancedPdf}
+                  disabled={downloadingPdf}
+                >
+                  {downloadingPdf ? (
+                    <Loader2 className="size-4 mr-2 animate-spin" />
+                  ) : (
+                    <FileDown className="size-4 mr-2" />
+                  )}
+                  Download PDF (Enhanced)
+                </Button>
+
                 <div className="grid grid-cols-2 gap-2">
                   <Button
                     variant="outline"
@@ -616,7 +742,7 @@ export function PayslipDialog({
                     size="sm"
                     onClick={() => downloadUrl("pdf")}
                   >
-                    <Download className="size-4 mr-2" /> PDF
+                    <Download className="size-4 mr-2" /> PDF (basic)
                   </Button>
                   <Button
                     size="sm"
@@ -630,8 +756,10 @@ export function PayslipDialog({
                 <div className="rounded-md bg-muted/30 p-3 text-xs text-muted-foreground">
                   <div className="flex items-center gap-1.5">
                     <FileText className="size-3.5" />
-                    The DOCX/PDF download and email send endpoints are served by
-                    the Documents module.
+                    The enhanced PDF uses the advanced payroll breakdown
+                    (HRA, PF, progressive-slab TDS, gratuity). DOCX/PDF
+                    basic and email send endpoints are served by the Documents
+                    module.
                   </div>
                 </div>
               </div>
@@ -804,6 +932,32 @@ function BreakdownRow({
           {label}
         </span>
       </div>
+      <span
+        className={`font-mono tabular-nums flex-shrink-0 ${danger ? "text-rose-600" : muted ? "text-muted-foreground" : "text-foreground font-medium"}`}
+      >
+        {value}
+      </span>
+    </div>
+  );
+}
+
+// Small breakdown row used in the success-state mini breakdown preview
+function MiniBreakdownRow({
+  label,
+  value,
+  muted,
+  danger,
+}: {
+  label: string;
+  value: string;
+  muted?: boolean;
+  danger?: boolean;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-2 text-xs">
+      <span className={`${muted ? "text-muted-foreground" : "text-foreground"} truncate`}>
+        {label}
+      </span>
       <span
         className={`font-mono tabular-nums flex-shrink-0 ${danger ? "text-rose-600" : muted ? "text-muted-foreground" : "text-foreground font-medium"}`}
       >

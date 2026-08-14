@@ -1,8 +1,18 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Cell,
+  ResponsiveContainer,
+  Tooltip as RechartsTooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
 import {
   GraduationCap,
   BookOpen,
@@ -24,6 +34,11 @@ import {
   Check,
   UserPlus,
   X,
+  Star,
+  MessageSquare,
+  ThumbsUp,
+  Sparkles,
+  TrendingUp,
 } from "lucide-react";
 import { PageHeader } from "../shared/page-header";
 import { KpiCard } from "../shared/kpi-card";
@@ -84,7 +99,7 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command";
-import { cn, formatDate } from "@/lib/utils";
+import { cn, formatDate, relativeTime } from "@/lib/utils";
 
 // =========================================================
 // Constants & types
@@ -167,17 +182,46 @@ interface EmployeeOption {
   designation?: { name: string } | null;
 }
 
+interface Feedback {
+  id: string;
+  courseId: string;
+  employeeId: string;
+  employeeName: string | null;
+  rating: number;
+  content: string;
+  whatWorked: string | null;
+  whatCouldImprove: string | null;
+  wouldRecommend: boolean;
+  submittedAt: string;
+}
+
+interface FeedbackSummary {
+  totalResponses: number;
+  avgRating: number;
+  recommendCount: number;
+  recommendPct: number;
+  distribution: { rating: number; count: number }[];
+}
+
+interface FeedbackResponse {
+  items: Feedback[];
+  total: number;
+  summary: FeedbackSummary;
+}
+
+const RATING_BAR_COLORS = ["#ef4444", "#f97316", "#eab308", "#84cc16", "#10b981"];
+
 // =========================================================
 // Main module
 // =========================================================
 
 export function TrainingModule() {
-  const [tab, setTab] = useState<"courses" | "enrollments">("courses");
+  const [tab, setTab] = useState<"courses" | "enrollments" | "feedback">("courses");
 
   return (
     <Tabs
       value={tab}
-      onValueChange={(v) => setTab(v as "courses" | "enrollments")}
+      onValueChange={(v) => setTab(v as "courses" | "enrollments" | "feedback")}
       className="space-y-6"
     >
       <PageHeader
@@ -204,12 +248,19 @@ export function TrainingModule() {
           <Users className="size-4" />
           Enrollments
         </TabsTrigger>
+        <TabsTrigger value="feedback" className="gap-1.5">
+          <MessageSquare className="size-4" />
+          Feedback
+        </TabsTrigger>
       </TabsList>
       <TabsContent value="courses">
         <CoursesTab />
       </TabsContent>
       <TabsContent value="enrollments">
         <EnrollmentsTab />
+      </TabsContent>
+      <TabsContent value="feedback">
+        <FeedbackTab />
       </TabsContent>
     </Tabs>
   );
@@ -907,6 +958,9 @@ function EnrollmentsTab() {
   // a certificate PDF (so we can show a spinner on the specific button).
   const [certLoading, setCertLoading] = useState<Record<string, boolean>>({});
   const [downloadingAll, setDownloadingAll] = useState(false);
+  // Pre-fill the feedback dialog for a specific completed enrollment
+  // (set when the user clicks "Feedback" on a row).
+  const [feedbackEnrollment, setFeedbackEnrollment] = useState<Enrollment | null>(null);
 
   const { data, isLoading, isError } = useEnrollments(search, status);
   const enrollments: Enrollment[] = data?.items ?? [];
@@ -1266,6 +1320,18 @@ function EnrollmentsTab() {
                             <span className="hidden xl:inline">Certificate</span>
                           </Button>
                         )}
+                        {e.status === "COMPLETED" && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-8 gap-1.5"
+                            onClick={() => setFeedbackEnrollment(e)}
+                            title="Submit feedback"
+                          >
+                            <MessageSquare className="size-3.5" />
+                            <span className="hidden xl:inline">Feedback</span>
+                          </Button>
+                        )}
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
                             <Button
@@ -1296,6 +1362,13 @@ function EnrollmentsTab() {
                                   <Award className="size-4 mr-2" />
                                 )}
                                 Download Certificate
+                              </DropdownMenuItem>
+                            )}
+                            {e.status === "COMPLETED" && (
+                              <DropdownMenuItem
+                                onClick={() => setFeedbackEnrollment(e)}
+                              >
+                                <MessageSquare className="size-4 mr-2" /> Submit Feedback
                               </DropdownMenuItem>
                             )}
                             {e.status === "DROPPED" && (
@@ -1339,6 +1412,20 @@ function EnrollmentsTab() {
           qc.invalidateQueries({ queryKey: ["training-enrollments"] });
           qc.invalidateQueries({ queryKey: ["training-courses"] });
           setCompleteEnrollment(null);
+        }}
+      />
+
+      {/* Quick submit-feedback dialog launched from a completed enrollment row */}
+      <SubmitFeedbackDialog
+        course={feedbackEnrollment ? {
+          id: feedbackEnrollment.courseId,
+          title: feedbackEnrollment.courseTitle,
+        } : null}
+        presetEmployeeId={feedbackEnrollment?.employeeId ?? null}
+        onClose={() => setFeedbackEnrollment(null)}
+        onSaved={() => {
+          qc.invalidateQueries({ queryKey: ["training-feedback"] });
+          setFeedbackEnrollment(null);
         }}
       />
     </div>
@@ -1734,3 +1821,673 @@ function CompleteDialog({
     </Dialog>
   );
 }
+
+// =========================================================
+// Feedback Tab — post-course surveys
+// =========================================================
+
+function useCoursesForFeedback() {
+  return useQuery({
+    queryKey: ["training-courses", "feedback-list"],
+    queryFn: async () => {
+      const r = await fetch(`/api/training?pageSize=500`);
+      if (!r.ok) throw new Error("Failed to load courses");
+      return r.json();
+    },
+  });
+}
+
+function useCourseFeedback(courseId: string | null) {
+  return useQuery({
+    queryKey: ["training-feedback", courseId],
+    queryFn: async () => {
+      if (!courseId) return null;
+      const r = await fetch(`/api/training/${courseId}/feedback`);
+      if (!r.ok) throw new Error("Failed to load feedback");
+      return r.json();
+    },
+    enabled: !!courseId,
+  });
+}
+
+function FeedbackTab() {
+  const qc = useQueryClient();
+  const coursesQ = useCoursesForFeedback();
+  const courses: Course[] = coursesQ.data?.items ?? [];
+  // `userSelectedCourseId` is the explicit user choice ("" = not yet chosen).
+  // The effective selectedCourseId falls back to the first course when available
+  // so the tab shows feedback immediately instead of an empty state.
+  const [userSelectedCourseId, setUserSelectedCourseId] = useState<string>("");
+  const selectedCourseId = userSelectedCourseId || courses[0]?.id || "";
+  const [submitOpen, setSubmitOpen] = useState(false);
+  const [presetEmployeeId, setPresetEmployeeId] = useState<string | null>(null);
+
+  const selectedCourse = useMemo(
+    () => courses.find((c) => c.id === selectedCourseId) ?? null,
+    [courses, selectedCourseId]
+  );
+
+  const feedbackQ = useCourseFeedback(selectedCourseId || null);
+  const feedback: Feedback[] = feedbackQ.data?.items ?? [];
+  const summary: FeedbackSummary | undefined = feedbackQ.data?.summary;
+
+  function openSubmit(employeeId?: string) {
+    setPresetEmployeeId(employeeId ?? null);
+    setSubmitOpen(true);
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Course selector + submit button */}
+      <div className="flex flex-col md:flex-row md:items-center gap-3">
+        <div className="flex-1 min-w-0">
+          <Label htmlFor="feedback-course" className="sr-only">
+            Select course
+          </Label>
+          <Select
+            value={selectedCourseId || "NONE"}
+            onValueChange={(v) => setUserSelectedCourseId(v === "NONE" ? "" : v)}
+          >
+            <SelectTrigger id="feedback-course" className="md:max-w-md">
+              <SelectValue placeholder="Select a course to view feedback…" />
+            </SelectTrigger>
+            <SelectContent>
+              {courses.length === 0 ? (
+                <SelectItem value="NONE" disabled>
+                  No courses available
+                </SelectItem>
+              ) : (
+                courses.map((c) => (
+                  <SelectItem key={c.id} value={c.id}>
+                    {c.title}
+                    <span className="ml-2 text-xs text-muted-foreground">
+                      ({c.category})
+                    </span>
+                  </SelectItem>
+                ))
+              )}
+            </SelectContent>
+          </Select>
+        </div>
+        <Button
+          size="sm"
+          className="gap-1.5"
+          disabled={!selectedCourseId}
+          onClick={() => openSubmit()}
+        >
+          <Plus className="size-4" />
+          Submit Feedback
+        </Button>
+      </div>
+
+      {coursesQ.isLoading ? (
+        <Skeleton className="h-8 w-full md:max-w-md" />
+      ) : null}
+
+      {!selectedCourseId ? (
+        <EmptyState
+          icon={MessageSquare}
+          title="Select a course to view feedback"
+          description="Pick a course from the dropdown above to see what employees had to say after completing it."
+        />
+      ) : feedbackQ.isLoading ? (
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 md:gap-4">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <Skeleton key={i} className="h-28 w-full rounded-xl" />
+            ))}
+          </div>
+          <Skeleton className="h-64 w-full rounded-xl" />
+          <Skeleton className="h-40 w-full rounded-xl" />
+        </div>
+      ) : feedbackQ.isError ? (
+        <EmptyState
+          icon={X}
+          title="Failed to load feedback"
+          description="Please try again."
+          actionLabel="Retry"
+          onAction={() =>
+            qc.invalidateQueries({
+              queryKey: ["training-feedback", selectedCourseId],
+            })
+          }
+        />
+      ) : (
+        <div className="space-y-5">
+          {/* KPI row */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 md:gap-4">
+            <KpiCard
+              label="Avg Rating"
+              value={
+                summary ? (
+                  <span className="inline-flex items-center gap-1.5">
+                    {summary.avgRating.toFixed(1)}
+                    <StarRating value={Math.round(summary.avgRating)} size={14} />
+                  </span>
+                ) : (
+                  "—"
+                )
+              }
+              icon={Star}
+              iconClass="bg-amber-500/15 text-amber-600"
+              footer={
+                <span className="text-muted-foreground">
+                  {summary?.totalResponses ?? 0} response
+                  {(summary?.totalResponses ?? 0) === 1 ? "" : "s"}
+                </span>
+              }
+            />
+            <KpiCard
+              label="Would Recommend"
+              value={summary ? `${summary.recommendPct}%` : "—"}
+              icon={ThumbsUp}
+              iconClass="bg-emerald-500/15 text-emerald-600"
+              footer={
+                <span className="text-muted-foreground">
+                  {summary?.recommendCount ?? 0} of{" "}
+                  {summary?.totalResponses ?? 0} recommend
+                </span>
+              }
+            />
+            <KpiCard
+              label="Total Responses"
+              value={summary?.totalResponses ?? 0}
+              icon={MessageSquare}
+              iconClass="bg-primary/10 text-primary"
+              footer={
+                <span className="text-muted-foreground">
+                  {selectedCourse?.title ?? "Selected course"}
+                </span>
+              }
+            />
+          </div>
+
+          {/* Rating distribution */}
+          {summary && summary.totalResponses > 0 ? (
+            <Card className="p-4 sm:p-5 border-border/60">
+              <div className="flex items-center justify-between mb-3">
+                <div>
+                  <div className="text-sm font-semibold">Rating Distribution</div>
+                  <div className="text-xs text-muted-foreground">
+                    How employees rated this course
+                  </div>
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  N = {summary.totalResponses}
+                </div>
+              </div>
+              <div className="h-56">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart
+                    data={summary.distribution}
+                    margin={{ top: 8, right: 12, bottom: 0, left: -10 }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" className="stroke-muted/30" vertical={false} />
+                    <XAxis
+                      dataKey="rating"
+                      tick={{ fontSize: 12 }}
+                      tickFormatter={(v) => `${v}★`}
+                      className="text-muted-foreground"
+                    />
+                    <YAxis
+                      allowDecimals={false}
+                      tick={{ fontSize: 11 }}
+                      width={32}
+                      className="text-muted-foreground"
+                    />
+                    <RechartsTooltip
+                      cursor={{ fill: "rgba(16, 185, 129, 0.08)" }}
+                      contentStyle={{
+                        borderRadius: 8,
+                        fontSize: 12,
+                        border: "1px solid hsl(var(--border))",
+                      }}
+                      formatter={(value: number) => [
+                        `${value} response${value === 1 ? "" : "s"}`,
+                        `Rating`,
+                      ]}
+                      labelFormatter={(label) => `${label} star`}
+                    />
+                    <Bar dataKey="count" radius={[6, 6, 0, 0]} maxBarSize={64}>
+                      {summary.distribution.map((entry) => (
+                        <Cell
+                          key={entry.rating}
+                          fill={RATING_BAR_COLORS[entry.rating - 1]}
+                        />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </Card>
+          ) : (
+            <EmptyState
+              icon={Sparkles}
+              title="No feedback yet"
+              description="Once employees complete this course, their feedback will appear here with rating distribution and individual responses."
+              actionLabel="Submit First Feedback"
+              onAction={() => openSubmit()}
+            />
+          )}
+
+          {/* Feedback list */}
+          {feedback.length > 0 && (
+            <div>
+              <div className="flex items-center justify-between mb-3">
+                <div className="text-sm font-semibold">
+                  Individual Responses
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  {feedback.length} response{feedback.length === 1 ? "" : "s"}
+                </div>
+              </div>
+              <div className="space-y-3 max-h-[70vh] overflow-y-auto pr-1 -mr-1">
+                {feedback.map((f) => (
+                  <FeedbackCard key={f.id} feedback={f} />
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {submitOpen && selectedCourse && (
+        <SubmitFeedbackDialog
+          course={selectedCourse}
+          presetEmployeeId={presetEmployeeId}
+          onClose={() => {
+            setSubmitOpen(false);
+            setPresetEmployeeId(null);
+          }}
+          onSaved={() => {
+            qc.invalidateQueries({
+              queryKey: ["training-feedback", selectedCourseId],
+            });
+            setSubmitOpen(false);
+            setPresetEmployeeId(null);
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+function FeedbackCard({ feedback: f }: { feedback: Feedback }) {
+  return (
+    <Card className="p-4 border-border/60 hover:shadow-soft transition-shadow">
+      <div className="flex items-start gap-3">
+        <AvatarBadge
+          name={f.employeeName ?? "?"}
+          size="md"
+        />
+        <div className="min-w-0 flex-1">
+          <div className="flex items-start justify-between gap-3 flex-wrap">
+            <div className="min-w-0">
+              <div className="font-medium text-sm truncate">
+                {f.employeeName ?? "Anonymous"}
+              </div>
+              <div className="text-[11px] text-muted-foreground">
+                {relativeTime(f.submittedAt)}
+              </div>
+            </div>
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <StarRating value={f.rating} />
+              <Badge
+                variant="outline"
+                className={cn(
+                  "text-[10px] px-2 py-0.5 gap-1",
+                  f.wouldRecommend
+                    ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/20"
+                    : "bg-rose-500/15 text-rose-700 dark:text-rose-300 border-rose-500/20"
+                )}
+              >
+                <ThumbsUp className="size-3" />
+                {f.wouldRecommend ? "Recommends" : "Doesn't recommend"}
+              </Badge>
+            </div>
+          </div>
+
+          <p className="text-sm mt-2 text-foreground/90 leading-relaxed">
+            {f.content}
+          </p>
+
+          {(f.whatWorked || f.whatCouldImprove) && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-3">
+              {f.whatWorked && (
+                <div className="rounded-md bg-emerald-500/5 border border-emerald-500/20 p-2.5">
+                  <div className="text-[10px] uppercase tracking-wider text-emerald-700 dark:text-emerald-300 font-semibold flex items-center gap-1 mb-1">
+                    <Sparkles className="size-3" />
+                    What worked well
+                  </div>
+                  <div className="text-xs text-foreground/80">
+                    {f.whatWorked}
+                  </div>
+                </div>
+              )}
+              {f.whatCouldImprove && (
+                <div className="rounded-md bg-amber-500/5 border border-amber-500/20 p-2.5">
+                  <div className="text-[10px] uppercase tracking-wider text-amber-700 dark:text-amber-300 font-semibold flex items-center gap-1 mb-1">
+                    <TrendingUp className="size-3" />
+                    Could improve
+                  </div>
+                  <div className="text-xs text-foreground/80">
+                    {f.whatCouldImprove}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    </Card>
+  );
+}
+
+function StarRating({
+  value,
+  size = 16,
+}: {
+  value: number;
+  size?: number;
+}) {
+  return (
+    <div className="inline-flex items-center gap-0.5" aria-label={`${value} out of 5 stars`}>
+      {Array.from({ length: 5 }).map((_, i) => (
+        <Star
+          key={i}
+          style={{ width: size, height: size }}
+          className={cn(
+            i < value
+              ? "fill-amber-400 text-amber-400"
+              : "fill-transparent text-muted-foreground/40"
+          )}
+        />
+      ))}
+    </div>
+  );
+}
+
+// =========================================================
+// Submit Feedback Dialog
+// =========================================================
+
+function SubmitFeedbackDialog({
+  course,
+  presetEmployeeId,
+  onClose,
+  onSaved,
+}: {
+  course: { id: string; title: string } | null;
+  presetEmployeeId: string | null;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  // Fetch completed enrollments for this course to populate the employee picker.
+  const enrollmentsQ = useQuery({
+    queryKey: ["training-feedback", "eligible-employees", course?.id],
+    queryFn: async () => {
+      if (!course) return { items: [] };
+      const r = await fetch(`/api/training/${course.id}/enroll`);
+      if (!r.ok) throw new Error("Failed to load enrollments");
+      return r.json();
+    },
+    enabled: !!course,
+  });
+
+  const eligibleEmployees: EmployeeOption[] = useMemo(() => {
+    const items: Enrollment[] = enrollmentsQ.data?.items ?? [];
+    return items
+      .filter((e) => e.status === "COMPLETED")
+      .map((e) => ({
+        id: e.employeeId,
+        employeeId: e.employeeCode ?? e.employeeId,
+        fullName: e.employeeName ?? "Unknown",
+        photo: e.photo,
+        department: null,
+        designation: null,
+      }));
+  }, [enrollmentsQ.data]);
+
+  const [employeeId, setEmployeeId] = useState<string>(presetEmployeeId ?? "");
+  const [rating, setRating] = useState<number>(5);
+  const [content, setContent] = useState("");
+  const [whatWorked, setWhatWorked] = useState("");
+  const [whatCouldImprove, setWhatCouldImprove] = useState("");
+  const [wouldRecommend, setWouldRecommend] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (presetEmployeeId) setEmployeeId(presetEmployeeId);
+  }, [presetEmployeeId]);
+
+  // Reset state when dialog opens for a new course
+  useEffect(() => {
+    if (course) {
+      setRating(5);
+      setContent("");
+      setWhatWorked("");
+      setWhatCouldImprove("");
+      setWouldRecommend(true);
+      if (!presetEmployeeId) setEmployeeId("");
+    }
+  }, [course?.id, presetEmployeeId]);
+
+  async function submit() {
+    if (!course) return;
+    if (!employeeId) {
+      toast.error("Please select an employee.");
+      return;
+    }
+    if (!content.trim()) {
+      toast.error("Please provide overall feedback.");
+      return;
+    }
+    setSaving(true);
+    try {
+      const body: any = {
+        employeeId,
+        rating,
+        content: content.trim(),
+        wouldRecommend,
+      };
+      if (whatWorked.trim()) body.whatWorked = whatWorked.trim();
+      if (whatCouldImprove.trim()) body.whatCouldImprove = whatCouldImprove.trim();
+
+      const r = await fetch(`/api/training/${course.id}/feedback`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (!r.ok) {
+        const e = await r.json().catch(() => ({}));
+        throw new Error(e?.error || "Failed to submit feedback");
+      }
+      toast.success("Feedback submitted. Thank you!");
+      onSaved();
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to submit feedback.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Dialog
+      open={!!course}
+      onOpenChange={(o) => {
+        if (!saving && !o) onClose();
+      }}
+    >
+      <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <MessageSquare className="size-5 text-primary" />
+            Submit Course Feedback
+          </DialogTitle>
+          <DialogDescription>
+            {course
+              ? `Share your thoughts on "${course.title}". Your feedback helps improve future sessions.`
+              : ""}
+          </DialogDescription>
+        </DialogHeader>
+
+        {enrollmentsQ.isLoading ? (
+          <Skeleton className="h-10 w-full" />
+        ) : eligibleEmployees.length === 0 ? (
+          <div className="rounded-md bg-amber-500/10 border border-amber-500/30 text-amber-700 dark:text-amber-300 text-xs px-3 py-2">
+            No employees have completed this course yet. Feedback can only be
+            submitted by employees who have a COMPLETED enrollment.
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {/* Employee select */}
+            <div className="space-y-1.5">
+              <Label>Employee *</Label>
+              <Select
+                value={employeeId}
+                onValueChange={setEmployeeId}
+                disabled={!!presetEmployeeId}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select your name…" />
+                </SelectTrigger>
+                <SelectContent>
+                  {eligibleEmployees.map((e) => (
+                    <SelectItem key={e.id} value={e.id}>
+                      {e.fullName} ({e.employeeId})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-[11px] text-muted-foreground">
+                Only employees who completed this course can submit feedback.
+              </p>
+            </div>
+
+            {/* Rating */}
+            <div className="space-y-1.5">
+              <Label>Rating *</Label>
+              <div className="flex items-center gap-1.5">
+                {Array.from({ length: 5 }).map((_, i) => {
+                  const v = i + 1;
+                  return (
+                    <button
+                      key={v}
+                      type="button"
+                      onClick={() => setRating(v)}
+                      className="p-0.5 rounded hover:bg-muted/60 transition-colors"
+                      aria-label={`${v} star${v === 1 ? "" : "s"}`}
+                    >
+                      <Star
+                        className={cn(
+                          "size-7 transition-colors",
+                          v <= rating
+                            ? "fill-amber-400 text-amber-400"
+                            : "fill-transparent text-muted-foreground/40"
+                        )}
+                      />
+                    </button>
+                  );
+                })}
+                <span className="ml-2 text-sm font-medium">
+                  {rating} / 5
+                </span>
+              </div>
+            </div>
+
+            {/* Overall feedback */}
+            <div className="space-y-1.5">
+              <Label htmlFor="fb-content">Overall feedback *</Label>
+              <Textarea
+                id="fb-content"
+                placeholder="Share your overall experience with the course…"
+                value={content}
+                onChange={(e) => setContent(e.target.value)}
+                rows={3}
+              />
+            </div>
+
+            {/* What worked */}
+            <div className="space-y-1.5">
+              <Label htmlFor="fb-worked">
+                What worked well?{" "}
+                <span className="text-muted-foreground font-normal">(optional)</span>
+              </Label>
+              <Textarea
+                id="fb-worked"
+                placeholder="Specific exercises, examples, or aspects that were effective…"
+                value={whatWorked}
+                onChange={(e) => setWhatWorked(e.target.value)}
+                rows={2}
+              />
+            </div>
+
+            {/* What could improve */}
+            <div className="space-y-1.5">
+              <Label htmlFor="fb-improve">
+                What could be improved?{" "}
+                <span className="text-muted-foreground font-normal">(optional)</span>
+              </Label>
+              <Textarea
+                id="fb-improve"
+                placeholder="Suggestions for future iterations of this course…"
+                value={whatCouldImprove}
+                onChange={(e) => setWhatCouldImprove(e.target.value)}
+                rows={2}
+              />
+            </div>
+
+            {/* Would recommend */}
+            <div className="space-y-1.5">
+              <Label>Would you recommend this course?</Label>
+              <div className="flex items-center gap-2">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={wouldRecommend ? "default" : "outline"}
+                  className={cn(
+                    "gap-1.5",
+                    wouldRecommend &&
+                      "bg-emerald-600 hover:bg-emerald-700 text-white"
+                  )}
+                  onClick={() => setWouldRecommend(true)}
+                >
+                  <ThumbsUp className="size-3.5" />
+                  Yes, recommend
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={!wouldRecommend ? "default" : "outline"}
+                  className={cn(
+                    "gap-1.5",
+                    !wouldRecommend && "bg-rose-600 hover:bg-rose-700 text-white"
+                  )}
+                  onClick={() => setWouldRecommend(false)}
+                >
+                  <X className="size-3.5" />
+                  Not really
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose} disabled={saving}>
+            Cancel
+          </Button>
+          <Button
+            onClick={submit}
+            disabled={saving || eligibleEmployees.length === 0}
+            className="gap-1.5"
+          >
+            {saving && <Loader2 className="size-4 animate-spin" />}
+            Submit Feedback
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+

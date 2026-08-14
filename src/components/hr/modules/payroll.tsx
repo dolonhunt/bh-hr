@@ -56,6 +56,8 @@ import {
   Save,
   Loader2,
   RotateCcw,
+  Landmark,
+  FileSpreadsheet,
 } from "lucide-react";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { toast } from "sonner";
@@ -98,6 +100,7 @@ export function PayrollModule() {
   const [presetEmployee, setPresetEmployee] = useState<string | null>(null);
   const [batchOpen, setBatchOpen] = useState(false);
   const [taxConfigOpen, setTaxConfigOpen] = useState(false);
+  const [bankFileLoading, setBankFileLoading] = useState<"" | "csv" | "nacha">("");
 
   const { data: departments } = useQuery({
     queryKey: ["departments"],
@@ -176,6 +179,47 @@ export function PayrollModule() {
     setPayslipOpen(true);
   }
 
+  async function downloadBankFile(format: "csv" | "nacha") {
+    if (!month) {
+      toast.error("Select a payroll month first.");
+      return;
+    }
+    setBankFileLoading(format);
+    try {
+      const r = await fetch(
+        `/api/payroll/bank-file?month=${encodeURIComponent(month)}&format=${format}`
+      );
+      if (!r.ok) {
+        const err = await r.json().catch(() => ({}));
+        throw new Error(err.error || "Failed to generate bank file");
+      }
+      const blob = await r.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      const cd = r.headers.get("Content-Disposition") || "";
+      const match = cd.match(/filename="?([^";\n]+)"?/i);
+      a.download = match
+        ? match[1]
+        : `bank-transfer-${month}.${format === "csv" ? "csv" : "nacha"}`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      const count = r.headers.get("X-Employee-Count");
+      const n = count ? parseInt(count, 10) : 0;
+      toast.success(
+        n > 0
+          ? `Bank file generated for ${n} employee${n === 1 ? "" : "s"}.`
+          : "Bank file generated."
+      );
+    } catch (err: any) {
+      toast.error(err?.message || "Bank file generation failed");
+    } finally {
+      setBankFileLoading("");
+    }
+  }
+
   async function approve(p: any) {
     try {
       const r = await fetch(`/api/payroll/${p.id}`, {
@@ -223,6 +267,60 @@ export function PayrollModule() {
                 search,
               }}
             />
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={bankFileLoading !== ""}
+                  title="Download bank transfer file for direct deposit"
+                >
+                  {bankFileLoading !== "" ? (
+                    <Loader2 className="size-4 mr-1.5 animate-spin" />
+                  ) : (
+                    <Landmark className="size-4 mr-1.5" />
+                  )}
+                  <span className="hidden sm:inline">
+                    {bankFileLoading !== ""
+                      ? bankFileLoading === "csv"
+                        ? "Generating CSV…"
+                        : "Generating NACHA…"
+                      : "Bank File"}
+                  </span>
+                  <span className="sm:hidden">
+                    {bankFileLoading !== "" ? "…" : "Bank"}
+                  </span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-48">
+                <DropdownMenuItem
+                  className="gap-2 cursor-pointer"
+                  onClick={() => downloadBankFile("csv")}
+                  disabled={bankFileLoading !== ""}
+                >
+                  <FileSpreadsheet className="size-4 text-emerald-600" />
+                  <div className="min-w-0">
+                    <div className="text-xs font-medium">CSV Format</div>
+                    <div className="text-[10px] text-muted-foreground">
+                      Standard bank transfer CSV
+                    </div>
+                  </div>
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  className="gap-2 cursor-pointer"
+                  onClick={() => downloadBankFile("nacha")}
+                  disabled={bankFileLoading !== ""}
+                >
+                  <Landmark className="size-4 text-teal-600" />
+                  <div className="min-w-0">
+                    <div className="text-xs font-medium">NACHA Format</div>
+                    <div className="text-[10px] text-muted-foreground">
+                      US fixed-width (94-char)
+                    </div>
+                  </div>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
             <Button
               size="sm"
               variant="outline"

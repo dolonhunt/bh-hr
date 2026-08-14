@@ -1,0 +1,815 @@
+     1→     1→"use client";
+     2→     2→
+     3→     3→import { useEffect, useState } from "react";
+     4→     4→import {
+     5→     5→  Dialog,
+     6→     6→  DialogContent,
+     7→     7→  DialogDescription,
+     8→     8→  DialogFooter,
+     9→     9→  DialogHeader,
+    10→    10→  DialogTitle,
+    11→    11→} from "@/components/ui/dialog";
+    12→    12→import { Button } from "@/components/ui/button";
+    13→    13→import { Input } from "@/components/ui/input";
+    14→    14→import { Label } from "@/components/ui/label";
+    15→    15→import { Textarea } from "@/components/ui/textarea";
+    16→    16→import {
+    17→    17→  Select,
+    18→    18→  SelectContent,
+    19→    19→  SelectItem,
+    20→    20→  SelectTrigger,
+    21→    21→  SelectValue,
+    22→    22→} from "@/components/ui/select";
+    23→    23→import { toast } from "sonner";
+    24→    24→import {
+    25→    25→  Loader2,
+    26→    26→  Wallet,
+    27→    27→  FileText,
+    28→    28→  Download,
+    29→    29→  Mail,
+    30→    30→  Eye,
+    31→    31→  CheckCircle2,
+    32→    32→  Printer,
+    33→    33→  Calculator,
+    34→    34→  TrendingDown,
+    35→    35→  Building2,
+    36→    36→  Receipt,
+    37→    37→  ShieldCheck,
+    38→    38→} from "lucide-react";
+    39→    39→import { useQuery } from "@tanstack/react-query";
+    40→    40→import { printDocument } from "@/lib/print";
+    41→    41→import { formatCurrency } from "@/lib/utils";
+    42→    42→
+    43→    43→// =========================================================
+    44→    44→// Types
+    45→    45→// =========================================================
+    46→    46→
+    47→    47→interface TdsBreakdownRow {
+    48→    48→  slabId: string;
+    49→    49→  slabLabel: string;
+    50→    50→  rate: number;
+    51→    51→  taxableAmountInSlab: number;
+    52→    52→  taxForSlab: number;
+    53→    53→}
+    54→    54→
+    55→    55→interface PayrollBreakdown {
+    56→    56→  basicSalary: number;
+    57→    57→  hra: number;
+    58→    58→  specialAllowance: number;
+    59→    59→  grossSalary: number;
+    60→    60→  pf: number;
+    61→    61→  professionalTax: number;
+    62→    62→  tds: number;
+    63→    63→  tdsBreakdown: TdsBreakdownRow[];
+    64→    64→  gratuity: number;
+    65→    65→  customDeductions: number;
+    66→    66→  totalDeductions: number;
+    67→    67→  netSalary: number;
+    68→    68→  taxSlab: { id: string; label: string; rate: number; min: number; max: number | null } | null;
+    69→    69→  annualIncome: number;
+    70→    70→  annualTax: number;
+    71→    71→}
+    72→    72→
+    73→    73→interface Props {
+    74→    74→  open: boolean;
+    75→    75→  onOpenChange: (v: boolean) => void;
+    76→    76→  presetEmployeeId?: string | null;
+    77→    77→  onSaved?: () => void;
+    78→    78→}
+    79→    79→
+    80→    80→export function PayslipDialog({
+    81→    81→  open,
+    82→    82→  onOpenChange,
+    83→    83→  presetEmployeeId,
+    84→    84→  onSaved,
+    85→    85→}: Props) {
+    86→    86→  const now = new Date();
+    87→    87→  const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+    88→    88→  const [employeeId, setEmployeeId] = useState<string>(presetEmployeeId || "");
+    89→    89→  const [month, setMonth] = useState(currentMonth);
+    90→    90→  const [generating, setGenerating] = useState(false);
+    91→    91→  const [generatedDoc, setGeneratedDoc] = useState<any | null>(null);
+    92→    92→
+    93→    93→  // "Calculate Payroll" step state
+    94→    94→  const [breakdown, setBreakdown] = useState<PayrollBreakdown | null>(null);
+    95→    95→  const [calculating, setCalculating] = useState(false);
+    96→    96→
+    97→    97→  // Email sub-dialog state
+    98→    98→  const [emailOpen, setEmailOpen] = useState(false);
+    99→    99→  const [emailTo, setEmailTo] = useState("");
+   100→   100→  const [emailCc, setEmailCc] = useState("");
+   101→   101→  const [emailBcc, setEmailBcc] = useState("");
+   102→   102→  const [emailSubject, setEmailSubject] = useState("");
+   103→   103→  const [emailBody, setEmailBody] = useState("");
+   104→   104→  const [sendingEmail, setSendingEmail] = useState(false);
+   105→   105→
+   106→   106→  // Preview sub-dialog state
+   107→   107→  const [previewOpen, setPreviewOpen] = useState(false);
+   108→   108→
+   109→   109→  const { data: employeesData } = useQuery({
+   110→   110→    queryKey: ["employees-for-payslip"],
+   111→   111→    queryFn: () => fetch(`/api/employees?pageSize=200`).then((r) => r.json()),
+   112→   112→    enabled: open,
+   113→   113→  });
+   114→   114→  const employees = employeesData?.items ?? [];
+   115→   115→
+   116→   116→  const selectedEmp = employees.find((e: any) => e.id === employeeId);
+   117→   117→
+   118→   118→  useEffect(() => {
+   119→   119→    if (open) {
+   120→   120→      setEmployeeId(presetEmployeeId || "");
+   121→   121→      setMonth(currentMonth);
+   122→   122→      setGeneratedDoc(null);
+   123→   123→      setBreakdown(null);
+   124→   124→    }
+   125→   125→  }, [open, presetEmployeeId]);
+   126→   126→
+   127→   127→  // Pre-fill email when generated doc changes
+   128→   128→  useEffect(() => {
+   129→   129→    if (generatedDoc) {
+   130→   130→      const emp = employees.find((e: any) => e.id === generatedDoc.employeeId);
+   131→   131→      setEmailTo(emp?.officialEmail || emp?.personalEmail || "");
+   132→   132→      const dataJson = (() => {
+   133→   133→        try {
+   134→   134→          return JSON.parse(generatedDoc.dataJson);
+   135→   135→        } catch {
+   136→   136→          return {};
+   137→   137→        }
+   138→   138→      })();
+   139→   139→      setEmailSubject(dataJson.emailSubject || `Payslip - ${generatedDoc.month}`);
+   140→   140→      setEmailBody(dataJson.emailBody || "");
+   141→   141→    }
+   142→   142→  }, [generatedDoc, employees]);
+   143→   143→
+   144→   144→  async function handleCalculate() {
+   145→   145→    if (!employeeId || !month) {
+   146→   146→      toast.error("Employee and month are required.");
+   147→   147→      return;
+   148→   148→    }
+   149→   149→    setCalculating(true);
+   150→   150→    try {
+   151→   151→      const r = await fetch("/api/payroll/calculate", {
+   152→   152→        method: "POST",
+   153→   153→        headers: { "Content-Type": "application/json" },
+   154→   154→        body: JSON.stringify({ employeeId, month }),
+   155→   155→      });
+   156→   156→      if (!r.ok) {
+   157→   157→        const err = await r.json().catch(() => ({}));
+   158→   158→        throw new Error(err.error || "Failed to calculate payroll");
+   159→   159→      }
+   160→   160→      const data = await r.json();
+   161→   161→      setBreakdown(data);
+   162→   162→      toast.success("Payroll breakdown calculated.");
+   163→   163→    } catch (err: any) {
+   164→   164→      toast.error(err.message || "Calculation failed");
+   165→   165→      setBreakdown(null);
+   166→   166→    } finally {
+   167→   167→      setCalculating(false);
+   168→   168→    }
+   169→   169→  }
+   170→   170→
+   171→   171→  async function handleGenerate() {
+   172→   172→    if (!employeeId || !month) {
+   173→   173→      toast.error("Employee and month are required.");
+   174→   174→      return;
+   175→   175→    }
+   176→   176→    setGenerating(true);
+   177→   177→    try {
+   178→   178→      const r = await fetch("/api/payroll/generate-payslip", {
+   179→   179→        method: "POST",
+   180→   180→        headers: { "Content-Type": "application/json" },
+   181→   181→        body: JSON.stringify({ employeeId, month }),
+   182→   182→      });
+   183→   183→      if (!r.ok) {
+   184→   184→        const err = await r.json().catch(() => ({}));
+   185→   185→        throw new Error(err.error || "Failed to generate payslip");
+   186→   186→      }
+   187→   187→      const doc = await r.json();
+   188→   188→      setGeneratedDoc(doc);
+   189→   189→      toast.success("Payslip generated successfully.");
+   190→   190→      onSaved?.();
+   191→   191→    } catch (err: any) {
+   192→   192→      toast.error(err.message || "Generation failed");
+   193→   193→    } finally {
+   194→   194→      setGenerating(false);
+   195→   195→    }
+   196→   196→  }
+   197→   197→
+   198→   198→  function downloadUrl(format: "docx" | "pdf") {
+   199→   199→    if (!generatedDoc) return;
+   200→   200→    window.open(
+   201→   201→      `/api/documents/${generatedDoc.id}/download?format=${format}`,
+   202→   202→      "_blank"
+   203→   203→    );
+   204→   204→  }
+   205→   205→
+   206→   206→  async function handleSendEmail() {
+   207→   207→    if (!generatedDoc) return;
+   208→   208→    if (!emailTo) {
+   209→   209→      toast.error("Recipient email is required.");
+   210→   210→      return;
+   211→   211→    }
+   212→   212→    setSendingEmail(true);
+   213→   213→    try {
+   214→   214→      const r = await fetch(`/api/documents/${generatedDoc.id}/send-email`, {
+   215→   215→        method: "POST",
+   216→   216→        headers: { "Content-Type": "application/json" },
+   217→   217→        body: JSON.stringify({
+   218→   218→          recipientTo: emailTo,
+   219→   219→          recipientCc: emailCc || null,
+   220→   220→          recipientBcc: emailBcc || null,
+   221→   221→          subject: emailSubject,
+   222→   222→          body: emailBody,
+   223→   223→        }),
+   224→   224→      });
+   225→   225→      if (!r.ok) {
+   226→   226→        const err = await r.json().catch(() => ({}));
+   227→   227→        throw new Error(err.error || "Failed to send email");
+   228→   228→      }
+   229→   229→      toast.success("Email queued for delivery.");
+   230→   230→      setEmailOpen(false);
+   231→   231→    } catch (err: any) {
+   232→   232→      toast.error(err.message || "Send failed");
+   233→   233→    } finally {
+   234→   234→      setSendingEmail(false);
+   235→   235→    }
+   236→   236→  }
+   237→   237→
+   238→   238→  function reset() {
+   239→   239→    setGeneratedDoc(null);
+   240→   240→    setBreakdown(null);
+   241→   241→    setEmailOpen(false);
+   242→   242→    setPreviewOpen(false);
+   243→   243→    onOpenChange(false);
+   244→   244→  }
+   245→   245→
+   246→   246→  return (
+   247→   247→    <>
+   248→   248→      <Dialog open={open} onOpenChange={(o) => !o && reset()}>
+   249→   249→        <DialogContent className="max-w-[95vw] sm:max-w-2xl p-0 gap-0">
+   250→   250→          <DialogHeader className="px-6 py-4 border-b border-border">
+   251→   251→            <DialogTitle className="flex items-center gap-2">
+   252→   252→              <Wallet className="size-5 text-primary" />
+   253→   253→              Generate Payslip
+   254→   254→            </DialogTitle>
+   255→   255→            <DialogDescription>
+   256→   256→              Auto-creates a payroll record (if missing) and generates a payslip
+   257→   257→              document. Use <span className="font-medium">Calculate Payroll</span> to preview the breakdown first.
+   258→   258→            </DialogDescription>
+   259→   259→          </DialogHeader>
+   260→   260→
+   261→   261→          {!generatedDoc ? (
+   262→   262→            <>
+   263→   263→              <div className="px-6 py-4 space-y-4">
+   264→   264→                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+   265→   265→                  <div>
+   266→   266→                    <Label className="text-xs font-medium text-muted-foreground mb-1.5 block">
+   267→   267→                      Employee *
+   268→   268→                    </Label>
+   269→   269→                    {presetEmployeeId && selectedEmp ? (
+   270→   270→                      <div className="rounded-md border border-border bg-muted/30 px-3 py-2 text-sm">
+   271→   271→                        <span className="font-medium">
+   272→   272→                          {selectedEmp.fullName}
+   273→   273→                        </span>
+   274→   274→                        <span className="text-muted-foreground ml-2 font-mono text-xs">
+   275→   275→                          {selectedEmp.employeeId}
+   276→   276→                        </span>
+   277→   277→                      </div>
+   278→   278→                    ) : (
+   279→   279→                      <Select
+   280→   280→                        value={employeeId}
+   281→   281→                        onValueChange={(v) => {
+   282→   282→                          setEmployeeId(v);
+   283→   283→                          setBreakdown(null);
+   284→   284→                        }}
+   285→   285→                      >
+   286→   286→                        <SelectTrigger>
+   287→   287→                          <SelectValue placeholder="Select employee" />
+   288→   288→                        </SelectTrigger>
+   289→   289→                        <SelectContent>
+   290→   290→                          {employees.map((emp: any) => (
+   291→   291→                            <SelectItem key={emp.id} value={emp.id}>
+   292→   292→                              {emp.fullName} · {emp.employeeId}
+   293→   293→                            </SelectItem>
+   294→   294→                          ))}
+   295→   295→                        </SelectContent>
+   296→   296→                      </Select>
+   297→   297→                    )}
+   298→   298→                  </div>
+   299→   299→                  <div>
+   300→   300→                    <Label className="text-xs font-medium text-muted-foreground mb-1.5 block">
+   301→   301→                      Pay Period (Month) *
+   302→   302→                    </Label>
+   303→   303→                    <Input
+   304→   304→                      type="month"
+   305→   305→                      value={month}
+   306→   306→                      onChange={(e) => {
+   307→   307→                        setMonth(e.target.value);
+   308→   308→                        setBreakdown(null);
+   309→   309→                      }}
+   310→   310→                    />
+   311→   311→                  </div>
+   312→   312→                </div>
+   313→   313→
+   314→   314→                {/* Calculate Payroll action */}
+   315→   315→                {selectedEmp && !breakdown && (
+   316→   316→                  <div className="rounded-md border border-emerald-500/30 bg-emerald-500/5 p-3 flex items-center justify-between gap-3">
+   317→   317→                    <div className="flex items-center gap-2 min-w-0">
+   318→   318→                      <Calculator className="size-4 text-emerald-700 flex-shrink-0" />
+   319→   319→                      <div className="text-xs text-muted-foreground min-w-0">
+   320→   320→                        <span className="font-medium text-foreground">Calculate Payroll</span>
+   321→   321→                        <span className="hidden sm:inline"> — preview HRA, PF, TDS, gratuity & net salary before generating the payslip.</span>
+   322→   322→                      </div>
+   323→   323→                    </div>
+   324→   324→                    <Button
+   325→   325→                      size="sm"
+   326→   326→                      variant="outline"
+   327→   327→                      className="border-emerald-500/30 text-emerald-700 hover:bg-emerald-500/10 hover:text-emerald-800 flex-shrink-0"
+   328→   328→                      onClick={handleCalculate}
+   329→   329→                      disabled={calculating}
+   330→   330→                    >
+   331→   331→                      {calculating ? (
+   332→   332→                        <Loader2 className="size-4 mr-1.5 animate-spin" />
+   333→   333→                      ) : (
+   334→   334→                        <Calculator className="size-4 mr-1.5" />
+   335→   335→                      )}
+   336→   336→                      Calculate
+   337→   337→                    </Button>
+   338→   338→                  </div>
+   339→   339→                )}
+   340→   340→
+   341→   341→                {/* Breakdown display */}
+   342→   342→                {breakdown && (
+   343→   343→                  <div className="rounded-lg border border-border bg-card overflow-hidden">
+   344→   344→                    {/* Header */}
+   345→   345→                    <div className="px-3 py-2 bg-muted/40 border-b border-border flex items-center justify-between gap-2">
+   346→   346→                      <div className="flex items-center gap-2 min-w-0">
+   347→   347→                        <Receipt className="size-4 text-primary flex-shrink-0" />
+   348→   348→                        <span className="text-sm font-medium truncate">
+   349→   349→                          Payroll Breakdown
+   350→   350→                        </span>
+   351→   351→                      </div>
+   352→   352→                      <div className="flex items-center gap-2 flex-shrink-0">
+   353→   353→                        {breakdown.taxSlab && (
+   354→   354→                          <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-700 border border-emerald-500/20">
+   355→   355→                            Slab: {breakdown.taxSlab.label} ({Math.round(breakdown.taxSlab.rate * 100)}%)
+   356→   356→                          </span>
+   357→   357→                        )}
+   358→   358→                        <Button
+   359→   359→                          size="sm"
+   360→   360→                          variant="ghost"
+   361→   361→                          className="h-7 px-2 text-xs"
+   362→   362→                          onClick={() => setBreakdown(null)}
+   363→   363→                        >
+   364→   364→                          Clear
+   365→   365→                        </Button>
+   366→   366→                      </div>
+   367→   367→                    </div>
+   368→   368→
+   369→   369→                    <div className="grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-border">
+   370→   370→                      {/* Earnings */}
+   371→   371→                      <div className="p-3 space-y-1.5">
+   372→   372→                        <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-1">
+   373→   373→                          Earnings
+   374→   374→                        </div>
+   375→   375→                        <BreakdownRow
+   376→   376→                          icon={<Wallet className="size-3.5" />}
+   377→   377→                          label="Basic Salary"
+   378→   378→                          value={formatCurrency(breakdown.basicSalary)}
+   379→   379→                        />
+   380→   380→                        <BreakdownRow
+   381→   381→                          icon={<Building2 className="size-3.5" />}
+   382→   382→                          label="House Rent Allowance (50%)"
+   383→   383→                          value={formatCurrency(breakdown.hra)}
+   384→   384→                          muted
+   385→   385→                        />
+   386→   386→                        <BreakdownRow
+   387→   387→                          icon={<Wallet className="size-3.5" />}
+   388→   388→                          label="Special Allowance"
+   389→   389→                          value={formatCurrency(breakdown.specialAllowance)}
+   390→   390→                          muted
+   391→   391→                        />
+   392→   392→                        {breakdown.customDeductions < 0 && (
+   393→   393→                          <BreakdownRow
+   394→   394→                            icon={<Wallet className="size-3.5" />}
+   395→   395→                            label="Additional Allowances"
+   396→   396→                            value={formatCurrency(-breakdown.customDeductions)}
+   397→   397→                            muted
+   398→   398→                          />
+   399→   399→                        )}
+   400→   400→                        <div className="flex justify-between items-center pt-1.5 mt-1 border-t border-border">
+   401→   401→                          <span className="text-xs font-semibold">Gross Salary</span>
+   402→   402→                          <span className="text-sm font-bold tabular-nums text-emerald-700">
+   403→   403→                            {formatCurrency(breakdown.grossSalary)}
+   404→   404→                          </span>
+   405→   405→                        </div>
+   406→   406→                      </div>
+   407→   407→
+   408→   408→                      {/* Deductions */}
+   409→   409→                      <div className="p-3 space-y-1.5">
+   410→   410→                        <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-1">
+   411→   411→                          Deductions
+   412→   412→                        </div>
+   413→   413→                        <BreakdownRow
+   414→   414→                          icon={<ShieldCheck className="size-3.5" />}
+   415→   415→                          label="Provident Fund (12%)"
+   416→   416→                          value={`- ${formatCurrency(breakdown.pf)}`}
+   417→   417→                          danger
+   418→   418→                        />
+   419→   419→                        <BreakdownRow
+   420→   420→                          icon={<Receipt className="size-3.5" />}
+   421→   421→                          label="Professional Tax"
+   422→   422→                          value={`- ${formatCurrency(breakdown.professionalTax)}`}
+   423→   423→                          danger
+   424→   424→                        />
+   425→   425→                        <BreakdownRow
+   426→   426→                          icon={<TrendingDown className="size-3.5" />}
+   427→   427→                          label="TDS (Income Tax)"
+   428→   428→                          value={`- ${formatCurrency(breakdown.tds)}`}
+   429→   429→                          danger
+   430→   430→                        />
+   431→   431→                        {breakdown.customDeductions > 0 && (
+   432→   432→                          <BreakdownRow
+   433→   433→                            icon={<TrendingDown className="size-3.5" />}
+   434→   434→                            label="Custom Deductions"
+   435→   435→                            value={`- ${formatCurrency(breakdown.customDeductions)}`}
+   436→   436→                            danger
+   437→   437→                          />
+   438→   438→                        )}
+   439→   439→                        <div className="flex justify-between items-center pt-1.5 mt-1 border-t border-border">
+   440→   440→                          <span className="text-xs font-semibold">Total Deductions</span>
+   441→   441→                          <span className="text-sm font-bold tabular-nums text-rose-600">
+   442→   442→                            - {formatCurrency(breakdown.totalDeductions)}
+   443→   443→                          </span>
+   444→   444→                        </div>
+   445→   445→                      </div>
+   446→   446→                    </div>
+   447→   447→
+   448→   448→                    {/* Net Salary */}
+   449→   449→                    <div className="px-3 py-2.5 bg-emerald-500/10 border-t border-emerald-500/20 flex items-center justify-between gap-2">
+   450→   450→                      <div className="flex items-center gap-2 min-w-0">
+   451→   451→                        <Wallet className="size-4 text-emerald-700 flex-shrink-0" />
+   452→   452→                        <span className="text-sm font-semibold text-emerald-800">
+   453→   453→                          Net Salary (Take-home)
+   454→   454→                        </span>
+   455→   455→                      </div>
+   456→   456→                      <span className="text-lg font-bold tabular-nums text-emerald-700">
+   457→   457→                        {formatCurrency(breakdown.netSalary)}
+   458→   458→                      </span>
+   459→   459→                    </div>
+   460→   460→
+   461→   461→                    {/* TDS Breakdown */}
+   462→   462→                    {breakdown.tdsBreakdown.length > 0 && (
+   463→   463→                      <details className="border-t border-border">
+   464→   464→                        <summary className="px-3 py-2 text-xs font-medium cursor-pointer hover:bg-muted/30 select-none flex items-center gap-1.5">
+   465→   465→                          <Calculator className="size-3.5" />
+   466→   466→                          TDS Slab Breakdown
+   467→   467→                          <span className="ml-auto text-muted-foreground font-mono">
+   468→   468→                            Annual: {formatCurrency(breakdown.annualIncome)} · Tax: {formatCurrency(breakdown.annualTax)}
+   469→   469→                          </span>
+   470→   470→                        </summary>
+   471→   471→                        <div className="px-3 pb-3 space-y-1">
+   472→   472→                          {breakdown.tdsBreakdown.map((row) => (
+   473→   473→                            <div
+   474→   474→                              key={row.slabId}
+   475→   475→                              className="flex items-center justify-between text-xs py-1 border-b border-border/50 last:border-0"
+   476→   476→                            >
+   477→   477→                              <div className="min-w-0">
+   478→   478→                                <div className="font-medium truncate">
+   479→   479→                                  {row.slabLabel}
+   480→   480→                                </div>
+   481→   481→                                <div className="text-[10px] text-muted-foreground">
+   482→   482→                                  Taxable: {formatCurrency(row.taxableAmountInSlab)}
+   483→   483→                                </div>
+   484→   484→                              </div>
+   485→   485→                              <div className="flex items-center gap-3 flex-shrink-0">
+   486→   486→                                <span className="text-muted-foreground font-mono">
+   487→   487→                                  {Math.round(row.rate * 100)}%
+   488→   488→                                </span>
+   489→   489→                                <span className="font-semibold tabular-nums text-rose-600">
+   490→   490→                                  {formatCurrency(row.taxForSlab)}
+   491→   491→                                </span>
+   492→   492→                              </div>
+   493→   493→                            </div>
+   494→   494→                          ))}
+   495→   495→                        </div>
+   496→   496→                      </details>
+   497→   497→                    )}
+   498→   498→
+   499→   499→                    {/* Employer Contribution (informational) */}
+   500→   500→                    <div className="px-3 py-2 bg-muted/20 border-t border-border flex items-center justify-between text-xs">
+   501→   501→                      <div className="flex items-center gap-1.5">
+   502→   502→                        <Building2 className="size-3.5 text-muted-foreground" />
+   503→   503→                        <span className="text-muted-foreground">
+   504→   504→                          Employer Contribution — Gratuity (4.81% of basic)
+   505→   505→                        </span>
+   506→   506→                      </div>
+   507→   507→                      <span className="font-mono tabular-nums text-muted-foreground">
+   508→   508→                        {formatCurrency(breakdown.gratuity)} (informational)
+   509→   509→                      </span>
+   510→   510→                    </div>
+   511→   511→                  </div>
+   512→   512→                )}
+   513→   513→
+   514→   514→                {/* Fallback basic info if no breakdown yet */}
+   515→   515→                {!breakdown && selectedEmp && (
+   516→   516→                  <div className="rounded-md bg-muted/40 p-3 text-xs space-y-1">
+   517→   517→                    <div className="flex justify-between">
+   518→   518→                      <span className="text-muted-foreground">Basic Salary</span>
+   519→   519→                      <span className="font-medium tabular-nums">
+   520→   520→                        ৳{selectedEmp.basicSalary.toLocaleString()}
+   521→   521→                      </span>
+   522→   522→                    </div>
+   523→   523→                    <div className="flex justify-between">
+   524→   524→                      <span className="text-muted-foreground">Allowances</span>
+   525→   525→                      <span className="font-medium tabular-nums">
+   526→   526→                        ৳{selectedEmp.allowances.toLocaleString()}
+   527→   527→                      </span>
+   528→   528→                    </div>
+   529→   529→                    <div className="flex justify-between">
+   530→   530→                      <span className="text-muted-foreground">Deductions</span>
+   531→   531→                      <span className="font-medium tabular-nums">
+   532→   532→                        ৳{selectedEmp.deductions.toLocaleString()}
+   533→   533→                      </span>
+   534→   534→                    </div>
+   535→   535→                    <div className="flex justify-between">
+   536→   536→                      <span className="text-muted-foreground">Tax (employee record)</span>
+   537→   537→                      <span className="font-medium tabular-nums">
+   538→   538→                        ৳{selectedEmp.tax.toLocaleString()}
+   539→   539→                      </span>
+   540→   540→                    </div>
+   541→   541→                    <div className="flex justify-between border-t border-border pt-1 mt-1">
+   542→   542→                      <span className="font-medium">Net (simple)</span>
+   543→   543→                      <span className="font-bold tabular-nums">
+   544→   544→                        ৳
+   545→   545→                        {(
+   546→   546→                          selectedEmp.basicSalary +
+   547→   547→                          selectedEmp.allowances -
+   548→   548→                          selectedEmp.deductions -
+   549→   549→                          selectedEmp.tax
+   550→   550→                        ).toLocaleString()}
+   551→   551→                      </span>
+   552→   552→                    </div>
+   553→   553→                  </div>
+   554→   554→                )}
+   555→   555→              </div>
+   556→   556→
+   557→   557→              <DialogFooter className="px-6 py-4 border-t border-border">
+   558→   558→                <Button variant="outline" onClick={reset}>
+   559→   559→                  Cancel
+   560→   560→                </Button>
+   561→   561→                <Button onClick={handleGenerate} disabled={generating}>
+   562→   562→                  {generating && (
+   563→   563→                    <Loader2 className="size-4 mr-2 animate-spin" />
+   564→   564→                  )}
+   565→   565→                  Generate Payslip
+   566→   566→                </Button>
+   567→   567→              </DialogFooter>
+   568→   568→            </>
+   569→   569→          ) : (
+   570→   570→            <>
+   571→   571→              <div className="px-6 py-4 space-y-4">
+   572→   572→                {/* Success state */}
+   573→   573→                <div className="flex flex-col items-center text-center py-2">
+   574→   574→                  <div className="size-12 rounded-full bg-emerald-500/15 text-emerald-600 flex items-center justify-center mb-2">
+   575→   575→                    <CheckCircle2 className="size-6" />
+   576→   576→                  </div>
+   577→   577→                  <div className="font-semibold">Payslip Generated</div>
+   578→   578→                  <div className="text-xs text-muted-foreground mt-1">
+   579→   579→                    Document number:{" "}
+   580→   580→                    <span className="font-mono font-medium text-foreground">
+   581→   581→                      {generatedDoc.documentNumber}
+   582→   582→                    </span>
+   583→   583→                  </div>
+   584→   584→                </div>
+   585→   585→
+   586→   586→                <div className="grid grid-cols-2 gap-2">
+   587→   587→                  <Button
+   588→   588→                    variant="outline"
+   589→   589→                    size="sm"
+   590→   590→                    onClick={() => setPreviewOpen(true)}
+   591→   591→                  >
+   592→   592→                    <Eye className="size-4 mr-2" /> Preview
+   593→   593→                  </Button>
+   594→   594→                  <Button
+   595→   595→                    variant="outline"
+   596→   596→                    size="sm"
+   597→   597→                    onClick={() =>
+   598→   598→                      printDocument({
+   599→   599→                        title: generatedDoc.title || generatedDoc.documentNumber || "Payslip",
+   600→   600→                        html: generatedDoc.content ?? "",
+   601→   601→                        docNumber: generatedDoc.documentNumber,
+   602→   602→                      })
+   603→   603→                    }
+   604→   604→                  >
+   605→   605→                    <Printer className="size-4 mr-2" /> Print
+   606→   606→                  </Button>
+   607→   607→                  <Button
+   608→   608→                    variant="outline"
+   609→   609→                    size="sm"
+   610→   610→                    onClick={() => downloadUrl("docx")}
+   611→   611→                  >
+   612→   612→                    <Download className="size-4 mr-2" /> DOCX
+   613→   613→                  </Button>
+   614→   614→                  <Button
+   615→   615→                    variant="outline"
+   616→   616→                    size="sm"
+   617→   617→                    onClick={() => downloadUrl("pdf")}
+   618→   618→                  >
+   619→   619→                    <Download className="size-4 mr-2" /> PDF
+   620→   620→                  </Button>
+   621→   621→                  <Button
+   622→   622→                    size="sm"
+   623→   623→                    className="col-span-2"
+   624→   624→                    onClick={() => setEmailOpen(true)}
+   625→   625→                  >
+   626→   626→                    <Mail className="size-4 mr-2" /> Send Email
+   627→   627→                  </Button>
+   628→   628→                </div>
+   629→   629→
+   630→   630→                <div className="rounded-md bg-muted/30 p-3 text-xs text-muted-foreground">
+   631→   631→                  <div className="flex items-center gap-1.5">
+   632→   632→                    <FileText className="size-3.5" />
+   633→   633→                    The DOCX/PDF download and email send endpoints are served by
+   634→   634→                    the Documents module.
+   635→   635→                  </div>
+   636→   636→                </div>
+   637→   637→              </div>
+   638→   638→
+   639→   639→              <DialogFooter className="px-6 py-4 border-t border-border">
+   640→   640→                <Button variant="outline" onClick={reset}>
+   641→   641→                  Close
+   642→   642→                </Button>
+   643→   643→                <Button
+   644→   644→                  variant="outline"
+   645→   645→                  onClick={() => setGeneratedDoc(null)}
+   646→   646→                >
+   647→   647→                  Generate Another
+   648→   648→                </Button>
+   649→   649→              </DialogFooter>
+   650→   650→            </>
+   651→   651→          )}
+   652→   652→        </DialogContent>
+   653→   653→      </Dialog>
+   654→   654→
+   655→   655→      {/* Preview sub-dialog */}
+   656→   656→      <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
+   657→   657→        <DialogContent className="max-w-[95vw] sm:max-w-2xl max-h-[85vh] overflow-hidden p-0 gap-0">
+   658→   658→          <DialogHeader className="px-4 sm:px-6 py-4 border-b border-border">
+   659→   659→            <div className="flex items-start justify-between gap-3">
+   660→   660→              <div className="min-w-0 flex-1">
+   661→   661→                <DialogTitle className="truncate">Payslip Preview</DialogTitle>
+   662→   662→                <DialogDescription className="truncate">
+   663→   663→                  {generatedDoc?.title}
+   664→   664→                </DialogDescription>
+   665→   665→              </div>
+   666→   666→              {generatedDoc && (
+   667→   667→                <Button
+   668→   668→                  variant="outline"
+   669→   669→                  size="sm"
+   670→   670→                  className="flex-shrink-0"
+   671→   671→                  onClick={() =>
+   672→   672→                    printDocument({
+   673→   673→                      title: generatedDoc.title || generatedDoc.documentNumber || "Payslip",
+   674→   674→                      html: generatedDoc.content ?? "",
+   675→   675→                      docNumber: generatedDoc.documentNumber,
+   676→   676→                    })
+   677→   677→                  }
+   678→   678→                >
+   679→   679→                  <Printer className="size-4 mr-1.5" /> Print
+   680→   680→                </Button>
+   681→   681→              )}
+   682→   682→            </div>
+   683→   683→          </DialogHeader>
+   684→   684→          <div className="overflow-y-auto max-h-[65vh] bg-white">
+   685→   685→            <div
+   686→   686→              className="p-4 sm:p-6 prose prose-sm max-w-none"
+   687→   687→              dangerouslySetInnerHTML={{
+   688→   688→                __html: generatedDoc?.content ?? "",
+   689→   689→              }}
+   690→   690→            />
+   691→   691→          </div>
+   692→   692→        </DialogContent>
+   693→   693→      </Dialog>
+   694→   694→
+   695→   695→      {/* Email sub-dialog */}
+   696→   696→      <Dialog open={emailOpen} onOpenChange={setEmailOpen}>
+   697→   697→        <DialogContent className="max-w-[95vw] sm:max-w-lg p-0 gap-0">
+   698→   698→          <DialogHeader className="px-6 py-4 border-b border-border">
+   699→   699→            <DialogTitle className="flex items-center gap-2">
+   700→   700→              <Mail className="size-5 text-primary" />
+   701→   701→              Send Payslip by Email
+   702→   702→            </DialogTitle>
+   703→   703→            <DialogDescription>
+   704→   704→              Attach the generated payslip and send to the employee.
+   705→   705→            </DialogDescription>
+   706→   706→          </DialogHeader>
+   707→   707→
+   708→   708→          <div className="px-6 py-4 space-y-3">
+   709→   709→            <div>
+   710→   710→              <Label className="text-xs font-medium text-muted-foreground mb-1.5 block">
+   711→   711→                To *
+   712→   712→              </Label>
+   713→   713→              <Input
+   714→   714→                type="email"
+   715→   715→                value={emailTo}
+   716→   716→                onChange={(e) => setEmailTo(e.target.value)}
+   717→   717→                placeholder="employee@company.com"
+   718→   718→              />
+   719→   719→            </div>
+   720→   720→            <div className="grid grid-cols-2 gap-3">
+   721→   721→              <div>
+   722→   722→                <Label className="text-xs font-medium text-muted-foreground mb-1.5 block">
+   723→   723→                  CC
+   724→   724→                </Label>
+   725→   725→                <Input
+   726→   726→                  value={emailCc}
+   727→   727→                  onChange={(e) => setEmailCc(e.target.value)}
+   728→   728→                  placeholder="cc@example.com"
+   729→   729→                />
+   730→   730→              </div>
+   731→   731→              <div>
+   732→   732→                <Label className="text-xs font-medium text-muted-foreground mb-1.5 block">
+   733→   733→                  BCC
+   734→   734→                </Label>
+   735→   735→                <Input
+   736→   736→                  value={emailBcc}
+   737→   737→                  onChange={(e) => setEmailBcc(e.target.value)}
+   738→   738→                  placeholder="bcc@example.com"
+   739→   739→                />
+   740→   740→              </div>
+   741→   741→            </div>
+   742→   742→            <div>
+   743→   743→              <Label className="text-xs font-medium text-muted-foreground mb-1.5 block">
+   744→   744→                Subject
+   745→   745→              </Label>
+   746→   746→              <Input
+   747→   747→                value={emailSubject}
+   748→   748→                onChange={(e) => setEmailSubject(e.target.value)}
+   749→   749→              />
+   750→   750→            </div>
+   751→   751→            <div>
+   752→   752→              <Label className="text-xs font-medium text-muted-foreground mb-1.5 block">
+   753→   753→                Body
+   754→   754→              </Label>
+   755→   755→              <Textarea
+   756→   756→                rows={5}
+   757→   757→                value={emailBody}
+   758→   758→                onChange={(e) => setEmailBody(e.target.value)}
+   759→   759→              />
+   760→   760→            </div>
+   761→   761→          </div>
+   762→   762→
+   763→   763→          <DialogFooter className="px-6 py-4 border-t border-border">
+   764→   764→            <Button variant="outline" onClick={() => setEmailOpen(false)}>
+   765→   765→              Cancel
+   766→   766→            </Button>
+   767→   767→            <Button onClick={handleSendEmail} disabled={sendingEmail}>
+   768→   768→              {sendingEmail && (
+   769→   769→                <Loader2 className="size-4 mr-2 animate-spin" />
+   770→   770→              )}
+   771→   771→              Send Email
+   772→   772→            </Button>
+   773→   773→          </DialogFooter>
+   774→   774→        </DialogContent>
+   775→   775→      </Dialog>
+   776→   776→    </>
+   777→   777→  );
+   778→   778→}
+   779→   779→
+   780→   780→// =========================================================
+   781→   781→// Small sub-component: breakdown row
+   782→   782→// =========================================================
+   783→   783→
+   784→   784→function BreakdownRow({
+   785→   785→  icon,
+   786→   786→  label,
+   787→   787→  value,
+   788→   788→  muted,
+   789→   789→  danger,
+   790→   790→}: {
+   791→   791→  icon: React.ReactNode;
+   792→   792→  label: string;
+   793→   793→  value: string;
+   794→   794→  muted?: boolean;
+   795→   795→  danger?: boolean;
+   796→   796→}) {
+   797→   797→  return (
+   798→   798→    <div className="flex items-center justify-between gap-2 text-xs">
+   799→   799→      <div className="flex items-center gap-1.5 min-w-0">
+   800→   800→        <span className={`flex-shrink-0 ${danger ? "text-rose-600" : muted ? "text-muted-foreground" : "text-foreground"}`}>
+   801→   801→          {icon}
+   802→   802→        </span>
+   803→   803→        <span className={`${muted ? "text-muted-foreground" : "text-foreground"} truncate`}>
+   804→   804→          {label}
+   805→   805→        </span>
+   806→   806→      </div>
+   807→   807→      <span
+   808→   808→        className={`font-mono tabular-nums flex-shrink-0 ${danger ? "text-rose-600" : muted ? "text-muted-foreground" : "text-foreground font-medium"}`}
+   809→   809→      >
+   810→   810→        {value}
+   811→   811→      </span>
+   812→   812→    </div>
+   813→   813→  );
+   814→   814→}
+   815→   815→
