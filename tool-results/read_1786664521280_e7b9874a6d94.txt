@@ -1,0 +1,1602 @@
+     1→"use client";
+     2→
+     3→import { useEffect, useState } from "react";
+     4→import { useApp } from "@/lib/store";
+     5→import { PageHeader } from "../shared/page-header";
+     6→import { KpiCard } from "../shared/kpi-card";
+     7→import { AvatarBadge } from "../shared/avatar-badge";
+     8→import { StatusBadge } from "../shared/status-badge";
+     9→import { EmptyState } from "../shared/empty-state";
+    10→import { Button } from "@/components/ui/button";
+    11→import { Input } from "@/components/ui/input";
+    12→import { Textarea } from "@/components/ui/textarea";
+    13→import { Badge } from "@/components/ui/badge";
+    14→import { Card, CardContent } from "@/components/ui/card";
+    15→import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+    16→import {
+    17→  Select,
+    18→  SelectContent,
+    19→  SelectItem,
+    20→  SelectTrigger,
+    21→  SelectValue,
+    22→} from "@/components/ui/select";
+    23→import {
+    24→  Table,
+    25→  TableBody,
+    26→  TableCell,
+    27→  TableHead,
+    28→  TableHeader,
+    29→  TableRow,
+    30→} from "@/components/ui/table";
+    31→import {
+    32→  DropdownMenu,
+    33→  DropdownMenuContent,
+    34→  DropdownMenuItem,
+    35→  DropdownMenuLabel,
+    36→  DropdownMenuSeparator,
+    37→  DropdownMenuTrigger,
+    38→} from "@/components/ui/dropdown-menu";
+    39→import {
+    40→  Dialog,
+    41→  DialogContent,
+    42→  DialogHeader,
+    43→  DialogTitle,
+    44→} from "@/components/ui/dialog";
+    45→import { ScrollArea } from "@/components/ui/scroll-area";
+    46→import { useQuery, useQueryClient } from "@tanstack/react-query";
+    47→import { toast } from "sonner";
+    48→import {
+    49→  FileText,
+    50→  FilePlus,
+    51→  Search,
+    52→  Plus,
+    53→  MoreVertical,
+    54→  Eye,
+    55→  Download,
+    56→  Mail,
+    57→  Pencil,
+    58→  Copy,
+    59→  Archive,
+    60→  Send,
+    61→  RefreshCw,
+    62→  FileEdit,
+    63→  CheckCircle2,
+    64→  Clock,
+    65→  MailX,
+    66→  FileStack,
+    67→  MailCheck,
+    68→  Layers,
+    69→  Forward,
+    70→  X,
+    71→  Stamp,
+    72→  ChevronRight,
+    73→  Printer,
+    74→} from "lucide-react";
+    75→import { formatDate, relativeTime, cn } from "@/lib/utils";
+    76→import { printDocument } from "@/lib/print";
+    77→import { TemplateFormDialog } from "./template-form-dialog";
+    78→import { GenerateDocumentDialog } from "./generate-document-dialog";
+    79→import { BulkGenerateDialog } from "./bulk-generate-dialog";
+    80→import { ApprovalQueue } from "./approval-queue";
+    81→import { ExportButton } from "../shared/export-button";
+    82→
+    83→const DOC_TYPES = [
+    84→  "OFFER",
+    85→  "APPOINTMENT",
+    86→  "CONTRACT",
+    87→  "JOINING",
+    88→  "CONFIRMATION",
+    89→  "PAYSLIP",
+    90→  "SALARY_CERT",
+    91→  "INCREMENT",
+    92→  "SALARY_REVISION",
+    93→  "PROMOTION",
+    94→  "TRANSFER",
+    95→  "WARNING",
+    96→  "SHOW_CAUSE",
+    97→  "EXPERIENCE",
+    98→  "EMPLOYMENT_CERT",
+    99→  "NOC",
+   100→  "LEAVE_APPROVAL",
+   101→  "LEAVE_CANCELLATION",
+   102→  "RESIGN_ACCEPT",
+   103→  "RELIEVING",
+   104→  "FINAL_SETTLEMENT",
+   105→  "CUSTOM",
+   106→];
+   107→
+   108→const DOC_STATUSES = [
+   109→  "GENERATED",
+   110→  "PENDING_APPROVAL",
+   111→  "APPROVED",
+   112→  "ISSUED",
+   113→  "SENT",
+   114→  "ARCHIVED",
+   115→];
+   116→
+   117→export function DocumentsModule() {
+   118→  const documentsTab = useApp((s) => s.documentsTab);
+   119→  const setDocumentsTab = useApp((s) => s.setDocumentsTab);
+   120→  const [generateOpen, setGenerateOpen] = useState(false);
+   121→  const [bulkOpen, setBulkOpen] = useState(false);
+   122→  const [templateFormOpen, setTemplateFormOpen] = useState(false);
+   123→  const [editTemplate, setEditTemplate] = useState<{ id: string } | null>(null);
+   124→  const [previewDoc, setPreviewDoc] = useState<any | null>(null);
+   125→  const [sendEmailDoc, setSendEmailDoc] = useState<any | null>(null);
+   126→
+   127→  return (
+   128→    <div className="space-y-6">
+   129→      <PageHeader
+   130→        title="Documents"
+   131→        description="Generate HR documents from templates, deliver them via email, and track delivery."
+   132→        icon={<FileText className="size-5" />}
+   133→        actions={
+   134→          <>
+   135→            <Button
+   136→              variant="outline"
+   137→              size="sm"
+   138→              onClick={() => setTemplateFormOpen(true)}
+   139→            >
+   140→              <Plus className="size-4 mr-1.5" /> Template
+   141→            </Button>
+   142→            <Button
+   143→              variant="outline"
+   144→              size="sm"
+   145→              onClick={() => setBulkOpen(true)}
+   146→            >
+   147→              <Layers className="size-4 mr-1.5" /> Bulk Generate
+   148→            </Button>
+   149→            <Button size="sm" onClick={() => setGenerateOpen(true)}>
+   150→              <FilePlus className="size-4 mr-1.5" /> Generate Document
+   151→            </Button>
+   152→          </>
+   153→        }
+   154→      />
+   155→
+   156→      <Tabs
+   157→        value={documentsTab}
+   158→        onValueChange={(v) => setDocumentsTab(v as any)}
+   159→      >
+   160→        <TabsList className="grid w-full grid-cols-2 md:grid-cols-5 h-auto">
+   161→          <TabsTrigger value="all" className="py-1.5 text-xs sm:text-sm">
+   162→            All Documents
+   163→          </TabsTrigger>
+   164→          <TabsTrigger value="templates" className="py-1.5 text-xs sm:text-sm">
+   165→            Templates
+   166→          </TabsTrigger>
+   167→          <TabsTrigger value="generated" className="py-1.5 text-xs sm:text-sm">
+   168→            Generated
+   169→          </TabsTrigger>
+   170→          <TabsTrigger value="email-history" className="py-1.5 text-xs sm:text-sm">
+   171→            Email History
+   172→          </TabsTrigger>
+   173→          <TabsTrigger value="approval-queue" className="py-1.5 text-xs sm:text-sm col-span-2 md:col-span-1">
+   174→            Approval Queue
+   175→          </TabsTrigger>
+   176→        </TabsList>
+   177→      </Tabs>
+   178→
+   179→      {documentsTab === "all" && (
+   180→        <AllDocumentsTab onPreview={setPreviewDoc} onSendEmail={setSendEmailDoc} />
+   181→      )}
+   182→      {documentsTab === "templates" && (
+   183→        <TemplatesTab
+   184→          onEdit={(id) => {
+   185→            setEditTemplate({ id });
+   186→            setTemplateFormOpen(true);
+   187→          }}
+   188→          onCreate={() => {
+   189→            setEditTemplate(null);
+   190→            setTemplateFormOpen(true);
+   191→          }}
+   192→        />
+   193→      )}
+   194→      {documentsTab === "generated" && (
+   195→        <GeneratedTab
+   196→          onPreview={setPreviewDoc}
+   197→          onSendEmail={setSendEmailDoc}
+   198→        />
+   199→      )}
+   200→      {documentsTab === "email-history" && <EmailHistoryTab />}
+   201→      {documentsTab === "approval-queue" && (
+   202→        <ApprovalQueue onPreview={setPreviewDoc} />
+   203→      )}
+   204→
+   205→      {/* Generate dialog */}
+   206→      <GenerateDocumentDialog
+   207→        open={generateOpen}
+   208→        onOpenChange={setGenerateOpen}
+   209→        onGenerated={() => {
+   210→          /* could navigate */
+   211→        }}
+   212→      />
+   213→
+   214→      {/* Bulk generate dialog */}
+   215→      <BulkGenerateDialog open={bulkOpen} onOpenChange={setBulkOpen} />
+   216→
+   217→      {/* Template form dialog */}
+   218→      <TemplateFormDialog
+   219→        open={templateFormOpen}
+   220→        onOpenChange={(o) => {
+   221→          setTemplateFormOpen(o);
+   222→          if (!o) setEditTemplate(null);
+   223→        }}
+   224→        template={editTemplate}
+   225→      />
+   226→
+   227→      {/* Document preview dialog */}
+   228→      <DocumentPreviewDialog doc={previewDoc} onClose={() => setPreviewDoc(null)} />
+   229→
+   230→      {/* Send email dialog */}
+   231→      <DirectSendEmailDialog doc={sendEmailDoc} onClose={() => setSendEmailDoc(null)} />
+   232→    </div>
+   233→  );
+   234→}
+   235→
+   236→// =============================================================
+   237→// All Documents tab
+   238→// =============================================================
+   239→
+   240→function AllDocumentsTab({
+   241→  onPreview,
+   242→  onSendEmail,
+   243→}: {
+   244→  onPreview: (doc: any) => void;
+   245→  onSendEmail: (doc: any) => void;
+   246→}) {
+   247→  const { data, isLoading } = useQuery({
+   248→    queryKey: ["documents", "all-tab"],
+   249→    queryFn: async () => {
+   250→      const r = await fetch("/api/documents?pageSize=10");
+   251→      return r.json();
+   252→    },
+   253→  });
+   254→
+   255→  const { data: emailStats } = useQuery({
+   256→    queryKey: ["email-logs", "stats"],
+   257→    queryFn: async () => {
+   258→      const [sent, failed] = await Promise.all([
+   259→        fetch("/api/email-logs?status=SENT&pageSize=1").then((r) => r.json()),
+   260→        fetch("/api/email-logs?status=FAILED&pageSize=1").then((r) => r.json()),
+   261→      ]);
+   262→      return { sentToday: sent.total ?? 0, failed: failed.total ?? 0 };
+   263→    },
+   264→  });
+   265→
+   266→  const docs = data?.items ?? [];
+   267→  const total = data?.total ?? 0;
+   268→  const todayStr = new Date().toDateString();
+   269→  const generatedToday = docs.filter(
+   270→    (d: any) => new Date(d.createdAt).toDateString() === todayStr
+   271→  ).length;
+   272→  const sentToday = emailStats?.sentToday ?? 0;
+   273→  const failedEmails = emailStats?.failed ?? 0;
+   274→  const pendingApproval = docs.filter((d: any) =>
+   275→    ["PENDING_APPROVAL", "GENERATED"].includes(d.status)
+   276→  ).length;
+   277→
+   278→  return (
+   279→    <div className="space-y-4">
+   280→      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-3">
+   281→        <KpiCard label="Total" value={total} icon={FileStack} iconClass="bg-primary/10 text-primary" />
+   282→        <KpiCard label="Generated Today" value={generatedToday} icon={FilePlus} iconClass="bg-violet-500/10 text-violet-600" />
+   283→        <KpiCard label="Sent Today" value={sentToday} icon={MailCheck} iconClass="bg-teal-500/10 text-teal-600" />
+   284→        <KpiCard label="Pending Approval" value={pendingApproval} icon={Clock} iconClass="bg-amber-500/10 text-amber-600" />
+   285→        <KpiCard label="Failed Emails" value={failedEmails} icon={MailX} iconClass="bg-rose-500/10 text-rose-600" />
+   286→      </div>
+   287→
+   288→      <Card className="border-border/60 shadow-soft overflow-hidden">
+   289→        <div className="flex items-center justify-between px-5 py-3 border-b border-border bg-muted/30">
+   290→          <div className="font-medium text-sm">Recent Documents</div>
+   291→        </div>
+   292→        <DocumentsTable
+   293→          docs={docs}
+   294→          loading={isLoading}
+   295→          onPreview={onPreview}
+   296→          onSendEmail={onSendEmail}
+   297→        />
+   298→      </Card>
+   299→    </div>
+   300→  );
+   301→}
+   302→
+   303→// =============================================================
+   304→// Templates tab
+   305→// =============================================================
+   306→
+   307→function TemplatesTab({
+   308→  onEdit,
+   309→  onCreate,
+   310→}: {
+   311→  onEdit: (id: string) => void;
+   312→  onCreate: () => void;
+   313→}) {
+   314→  const qc = useQueryClient();
+   315→  const [search, setSearch] = useState("");
+   316→  const [type, setType] = useState("");
+   317→  const [previewTpl, setPreviewTpl] = useState<any | null>(null);
+   318→
+   319→  const { data, isLoading } = useQuery({
+   320→    queryKey: ["document-templates", "templates-tab", search, type],
+   321→    queryFn: async () => {
+   322→      const params = new URLSearchParams();
+   323→      if (search) params.set("search", search);
+   324→      if (type) params.set("type", type);
+   325→      const r = await fetch(`/api/document-templates?${params.toString()}`);
+   326→      return r.json();
+   327→    },
+   328→  });
+   329→  const templates = data?.items ?? [];
+   330→
+   331→  async function archiveTemplate(id: string) {
+   332→    if (!confirm("Archive this template? It will be hidden from the active list.")) return;
+   333→    try {
+   334→      const res = await fetch(`/api/document-templates/${id}`, {
+   335→        method: "DELETE",
+   336→      });
+   337→      if (!res.ok) throw new Error("Failed to archive");
+   338→      toast.success("Template archived.");
+   339→      qc.invalidateQueries({ queryKey: ["document-templates"] });
+   340→    } catch (err: any) {
+   341→      toast.error(err.message);
+   342→    }
+   343→  }
+   344→
+   345→  async function duplicateTemplate(t: any) {
+   346→    try {
+   347→      const res = await fetch("/api/document-templates", {
+   348→        method: "POST",
+   349→        headers: { "Content-Type": "application/json" },
+   350→        body: JSON.stringify({
+   351→          ...t,
+   352→          name: `${t.name} (Copy)`,
+   353→          code: `${t.code}-COPY`,
+   354→          status: "DRAFT",
+   355→        }),
+   356→      });
+   357→      if (!res.ok) {
+   358→        const err = await res.json().catch(() => ({}));
+   359→        throw new Error(err.error || "Failed");
+   360→      }
+   361→      toast.success("Template duplicated.");
+   362→      qc.invalidateQueries({ queryKey: ["document-templates"] });
+   363→    } catch (err: any) {
+   364→      toast.error(err.message);
+   365→    }
+   366→  }
+   367→
+   368→  return (
+   369→    <div className="space-y-4">
+   370→      <div className="flex flex-col md:flex-row gap-3">
+   371→        <div className="relative flex-1">
+   372→          <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+   373→          <Input
+   374→            placeholder="Search templates by name, code, description…"
+   375→            value={search}
+   376→            onChange={(e) => setSearch(e.target.value)}
+   377→            className="pl-9"
+   378→          />
+   379→        </div>
+   380→        <Select
+   381→          value={type || "ALL"}
+   382→          onValueChange={(v) => setType(v === "ALL" ? "" : v)}
+   383→        >
+   384→          <SelectTrigger className="md:w-56">
+   385→            <SelectValue placeholder="All types" />
+   386→          </SelectTrigger>
+   387→          <SelectContent>
+   388→            <SelectItem value="ALL">All types</SelectItem>
+   389→            {DOC_TYPES.map((t) => (
+   390→              <SelectItem key={t} value={t}>
+   391→                {t.replace(/_/g, " ")}
+   392→              </SelectItem>
+   393→            ))}
+   394→          </SelectContent>
+   395→        </Select>
+   396→        <Button onClick={onCreate} size="sm" className="md:w-auto">
+   397→          <Plus className="size-4 mr-1.5" /> Create Template
+   398→        </Button>
+   399→      </div>
+   400→
+   401→      {isLoading && (
+   402→        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+   403→          {Array.from({ length: 6 }).map((_, i) => (
+   404→            <div key={i} className="h-44 rounded-xl bg-muted/40 animate-pulse" />
+   405→          ))}
+   406→        </div>
+   407→      )}
+   408→
+   409→      {!isLoading && templates.length === 0 && (
+   410→        <EmptyState
+   411→          icon={FileText}
+   412→          title="No templates found"
+   413→          description="Create your first template to start generating HR documents."
+   414→          actionLabel="Create Template"
+   415→          onAction={onCreate}
+   416→        />
+   417→      )}
+   418→
+   419→      {!isLoading && templates.length > 0 && (
+   420→        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+   421→          {templates.map((t: any) => (
+   422→            <Card
+   423→              key={t.id}
+   424→              className="border-border/60 shadow-soft hover:shadow-card-hover hover:-translate-y-0.5 transition-all overflow-hidden flex flex-col"
+   425→            >
+   426→              <CardContent className="p-5 flex-1 flex flex-col">
+   427→                <div className="flex items-start justify-between gap-2 mb-3">
+   428→                  <div className="min-w-0 flex-1">
+   429→                    <div className="font-semibold truncate">{t.name}</div>
+   430→                    <div className="text-xs text-muted-foreground truncate">
+   431→                      {t.description ?? "No description"}
+   432→                    </div>
+   433→                  </div>
+   434→                  <Badge variant="outline" className="font-mono text-[10px]">
+   435→                    {t.code}
+   436→                  </Badge>
+   437→                </div>
+   438→
+   439→                <div className="grid grid-cols-2 gap-2 text-xs mb-3">
+   440→                  <div>
+   441→                    <div className="text-muted-foreground">Type</div>
+   442→                    <div className="font-medium">
+   443→                      {t.type?.replace(/_/g, " ")}
+   444→                    </div>
+   445→                  </div>
+   446→                  <div>
+   447→                    <div className="text-muted-foreground">Category</div>
+   448→                    <div className="font-medium">{t.category}</div>
+   449→                  </div>
+   450→                  <div>
+   451→                    <div className="text-muted-foreground">Version</div>
+   452→                    <div className="font-medium">v{t.version}</div>
+   453→                  </div>
+   454→                  <div>
+   455→                    <div className="text-muted-foreground">Status</div>
+   456→                    <StatusBadge status={t.status} />
+   457→                  </div>
+   458→                </div>
+   459→
+   460→                <div className="rounded-md bg-muted/40 p-2 text-[11px] text-muted-foreground mb-3 line-clamp-2 flex-1">
+   461→                  <div
+   462→                    dangerouslySetInnerHTML={{
+   463→                      __html: t.content?.slice(0, 280) ?? "",
+   464→                    }}
+   465→                  />
+   466→                </div>
+   467→
+   468→                <div className="flex items-center gap-1">
+   469→                  <Button
+   470→                    size="sm"
+   471→                    variant="ghost"
+   472→                    className="h-8 flex-1"
+   473→                    onClick={() => setPreviewTpl(t)}
+   474→                  >
+   475→                    <Eye className="size-3.5 mr-1" /> Preview
+   476→                  </Button>
+   477→                  <Button
+   478→                    size="sm"
+   479→                    variant="ghost"
+   480→                    className="h-8"
+   481→                    onClick={() => onEdit(t.id)}
+   482→                  >
+   483→                    <Pencil className="size-3.5" />
+   484→                  </Button>
+   485→                  <DropdownMenu>
+   486→                    <DropdownMenuTrigger asChild>
+   487→                      <Button size="sm" variant="ghost" className="h-8">
+   488→                        <MoreVertical className="size-3.5" />
+   489→                      </Button>
+   490→                    </DropdownMenuTrigger>
+   491→                    <DropdownMenuContent align="end">
+   492→                      <DropdownMenuLabel>Actions</DropdownMenuLabel>
+   493→                      <DropdownMenuSeparator />
+   494→                      <DropdownMenuItem onClick={() => onEdit(t.id)}>
+   495→                        <FileEdit className="size-4 mr-2" /> Edit
+   496→                      </DropdownMenuItem>
+   497→                      <DropdownMenuItem onClick={() => duplicateTemplate(t)}>
+   498→                        <Copy className="size-4 mr-2" /> Duplicate
+   499→                      </DropdownMenuItem>
+   500→                      <DropdownMenuItem onClick={() => setPreviewTpl(t)}>
+   501→                        <Eye className="size-4 mr-2" /> Preview
+   502→                      </DropdownMenuItem>
+   503→                      <DropdownMenuSeparator />
+   504→                      <DropdownMenuItem
+   505→                        className="text-rose-600"
+   506→                        onClick={() => archiveTemplate(t.id)}
+   507→                      >
+   508→                        <Archive className="size-4 mr-2" /> Archive
+   509→                      </DropdownMenuItem>
+   510→                    </DropdownMenuContent>
+   511→                  </DropdownMenu>
+   512→                </div>
+   513→              </CardContent>
+   514→            </Card>
+   515→          ))}
+   516→        </div>
+   517→      )}
+   518→
+   519→      <TemplatePreviewDialog
+   520→        template={previewTpl}
+   521→        onClose={() => setPreviewTpl(null)}
+   522→      />
+   523→    </div>
+   524→  );
+   525→}
+   526→
+   527→// =============================================================
+   528→// Generated tab
+   529→// =============================================================
+   530→
+   531→function GeneratedTab({
+   532→  onPreview,
+   533→  onSendEmail,
+   534→}: {
+   535→  onPreview: (doc: any) => void;
+   536→  onSendEmail: (doc: any) => void;
+   537→}) {
+   538→  const qc = useQueryClient();
+   539→  const [search, setSearch] = useState("");
+   540→  const [type, setType] = useState("");
+   541→  const [status, setStatus] = useState("");
+   542→  const [page, setPage] = useState(1);
+   543→
+   544→  const { data, isLoading } = useQuery({
+   545→    queryKey: ["documents", "generated-tab", search, type, status, page],
+   546→    queryFn: async () => {
+   547→      const params = new URLSearchParams();
+   548→      if (search) params.set("search", search);
+   549→      if (type) params.set("type", type);
+   550→      if (status) params.set("status", status);
+   551→      params.set("page", String(page));
+   552→      params.set("pageSize", "20");
+   553→      const r = await fetch(`/api/documents?${params.toString()}`);
+   554→      return r.json();
+   555→    },
+   556→    placeholderData: (prev) => prev,
+   557→  });
+   558→  const docs = data?.items ?? [];
+   559→  const total = data?.total ?? 0;
+   560→  const totalPages = data?.totalPages ?? 1;
+   561→
+   562→  async function archiveDoc(id: string) {
+   563→    if (!confirm("Archive this document?")) return;
+   564→    try {
+   565→      await fetch(`/api/documents/${id}`, { method: "DELETE" });
+   566→      toast.success("Document archived.");
+   567→      qc.invalidateQueries({ queryKey: ["documents"] });
+   568→    } catch {
+   569→      toast.error("Archive failed.");
+   570→    }
+   571→  }
+   572→
+   573→  function download(id: string, format: "docx" | "pdf", docNumber: string) {
+   574→    const url = `/api/documents/${id}/download?format=${format}`;
+   575→    const a = document.createElement("a");
+   576→    a.href = url;
+   577→    a.download = `${docNumber}.${format}`;
+   578→    document.body.appendChild(a);
+   579→    a.click();
+   580→    document.body.removeChild(a);
+   581→    toast.success(`Downloading ${format.toUpperCase()}…`);
+   582→  }
+   583→
+   584→  return (
+   585→    <div className="space-y-4">
+   586→      <div className="flex flex-col md:flex-row gap-3">
+   587→        <div className="relative flex-1">
+   588→          <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+   589→          <Input
+   590→            placeholder="Search by document number or title…"
+   591→            value={search}
+   592→            onChange={(e) => {
+   593→              setSearch(e.target.value);
+   594→              setPage(1);
+   595→            }}
+   596→            className="pl-9"
+   597→          />
+   598→        </div>
+   599→        <Select
+   600→          value={type || "ALL"}
+   601→          onValueChange={(v) => {
+   602→            setType(v === "ALL" ? "" : v);
+   603→            setPage(1);
+   604→          }}
+   605→        >
+   606→          <SelectTrigger className="md:w-48">
+   607→            <SelectValue placeholder="All types" />
+   608→          </SelectTrigger>
+   609→          <SelectContent>
+   610→            <SelectItem value="ALL">All types</SelectItem>
+   611→            {DOC_TYPES.map((t) => (
+   612→              <SelectItem key={t} value={t}>
+   613→                {t.replace(/_/g, " ")}
+   614→              </SelectItem>
+   615→            ))}
+   616→          </SelectContent>
+   617→        </Select>
+   618→        <Select
+   619→          value={status || "ALL"}
+   620→          onValueChange={(v) => {
+   621→            setStatus(v === "ALL" ? "" : v);
+   622→            setPage(1);
+   623→          }}
+   624→        >
+   625→          <SelectTrigger className="md:w-48">
+   626→            <SelectValue placeholder="All statuses" />
+   627→          </SelectTrigger>
+   628→          <SelectContent>
+   629→            <SelectItem value="ALL">All statuses</SelectItem>
+   630→            {DOC_STATUSES.map((s) => (
+   631→              <SelectItem key={s} value={s}>
+   632→                {s.replace(/_/g, " ")}
+   633→              </SelectItem>
+   634→            ))}
+   635→          </SelectContent>
+   636→        </Select>
+   637→        <ExportButton
+   638→          module="documents"
+   639→          filters={{ search, type, status }}
+   640→        />
+   641→      </div>
+   642→
+   643→      <div className="text-sm text-muted-foreground">
+   644→        Showing <span className="font-medium text-foreground">{docs.length}</span>{" "}
+   645→        of <span className="font-medium text-foreground">{total}</span>{" "}
+   646→        documents
+   647→      </div>
+   648→
+   649→      <Card className="border-border/60 shadow-soft overflow-hidden">
+   650→        <DocumentsTable
+   651→          docs={docs}
+   652→          loading={isLoading}
+   653→          onPreview={onPreview}
+   654→          onSendEmail={onSendEmail}
+   655→          onDownload={download}
+   656→          onArchive={archiveDoc}
+   657→        />
+   658→      </Card>
+   659→
+   660→      {totalPages > 1 && (
+   661→        <div className="flex items-center justify-between">
+   662→          <Button
+   663→            variant="outline"
+   664→            size="sm"
+   665→            disabled={page === 1}
+   666→            onClick={() => setPage((p) => Math.max(1, p - 1))}
+   667→          >
+   668→            Previous
+   669→          </Button>
+   670→          <div className="text-sm text-muted-foreground">
+   671→            Page {page} of {totalPages}
+   672→          </div>
+   673→          <Button
+   674→            variant="outline"
+   675→            size="sm"
+   676→            disabled={page >= totalPages}
+   677→            onClick={() => setPage((p) => p + 1)}
+   678→          >
+   679→            Next
+   680→          </Button>
+   681→        </div>
+   682→      )}
+   683→    </div>
+   684→  );
+   685→}
+   686→
+   687→// =============================================================
+   688→// Email History tab
+   689→// =============================================================
+   690→
+   691→function EmailHistoryTab() {
+   692→  const qc = useQueryClient();
+   693→  const [search, setSearch] = useState("");
+   694→  const [status, setStatus] = useState("");
+   695→  const [page, setPage] = useState(1);
+   696→
+   697→  const { data, isLoading } = useQuery({
+   698→    queryKey: ["email-logs", "history-tab", search, status, page],
+   699→    queryFn: async () => {
+   700→      const params = new URLSearchParams();
+   701→      if (search) params.set("search", search);
+   702→      if (status) params.set("status", status);
+   703→      params.set("page", String(page));
+   704→      params.set("pageSize", "20");
+   705→      const r = await fetch(`/api/email-logs?${params.toString()}`);
+   706→      return r.json();
+   707→    },
+   708→    placeholderData: (prev) => prev,
+   709→  });
+   710→  const logs = data?.items ?? [];
+   711→  const total = data?.total ?? 0;
+   712→  const totalPages = data?.totalPages ?? 1;
+   713→
+   714→  async function resend(id: string) {
+   715→    try {
+   716→      const res = await fetch(`/api/email-logs/${id}/resend`, {
+   717→        method: "POST",
+   718→      });
+   719→      if (!res.ok) throw new Error("Resend failed");
+   720→      toast.success("Email resent.");
+   721→      qc.invalidateQueries({ queryKey: ["email-logs"] });
+   722→      qc.invalidateQueries({ queryKey: ["documents"] });
+   723→    } catch (err: any) {
+   724→      toast.error(err.message);
+   725→    }
+   726→  }
+   727→
+   728→  return (
+   729→    <div className="space-y-4">
+   730→      <div className="flex flex-col md:flex-row gap-3">
+   731→        <div className="relative flex-1">
+   732→          <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+   733→          <Input
+   734→            placeholder="Search by recipient, subject…"
+   735→            value={search}
+   736→            onChange={(e) => {
+   737→              setSearch(e.target.value);
+   738→              setPage(1);
+   739→            }}
+   740→            className="pl-9"
+   741→          />
+   742→        </div>
+   743→        <Select
+   744→          value={status || "ALL"}
+   745→          onValueChange={(v) => {
+   746→            setStatus(v === "ALL" ? "" : v);
+   747→            setPage(1);
+   748→          }}
+   749→        >
+   750→          <SelectTrigger className="md:w-48">
+   751→            <SelectValue placeholder="All statuses" />
+   752→          </SelectTrigger>
+   753→          <SelectContent>
+   754→            <SelectItem value="ALL">All statuses</SelectItem>
+   755→            <SelectItem value="SENT">Sent</SelectItem>
+   756→            <SelectItem value="FAILED">Failed</SelectItem>
+   757→            <SelectItem value="QUEUED">Queued</SelectItem>
+   758→          </SelectContent>
+   759→        </Select>
+   760→        <ExportButton
+   761→          module="email-logs"
+   762→          filters={{ search, status }}
+   763→        />
+   764→      </div>
+   765→
+   766→      <div className="text-sm text-muted-foreground">
+   767→        Showing <span className="font-medium text-foreground">{logs.length}</span>{" "}
+   768→        of <span className="font-medium text-foreground">{total}</span> emails
+   769→      </div>
+   770→
+   771→      {!isLoading && logs.length === 0 && (
+   772→        <EmptyState
+   773→          icon={Mail}
+   774→          title="No emails yet"
+   775→          description="Send a document via email to see the delivery history here."
+   776→        />
+   777→      )}
+   778→
+   779→      {!isLoading && logs.length > 0 && (
+   780→        <Card className="border-border/60 shadow-soft overflow-hidden">
+   781→          <div className="overflow-x-auto">
+   782→            <Table>
+   783→              <TableHeader>
+   784→                <TableRow className="bg-muted/40 hover:bg-muted/40">
+   785→                  <TableHead className="min-w-[180px]">Document</TableHead>
+   786→                  <TableHead>Employee</TableHead>
+   787→                  <TableHead>Recipient</TableHead>
+   788→                  <TableHead className="min-w-[200px]">Subject</TableHead>
+   789→                  <TableHead>Sent By</TableHead>
+   790→                  <TableHead>Sent At</TableHead>
+   791→                  <TableHead>Status</TableHead>
+   792→                  <TableHead className="text-right">Actions</TableHead>
+   793→                </TableRow>
+   794→              </TableHeader>
+   795→              <TableBody>
+   796→                {logs.map((log: any) => (
+   797→                  <TableRow key={log.id}>
+   798→                    <TableCell>
+   799→                      <div className="font-mono text-[11px]">
+   800→                        {log.document?.documentNumber ?? "—"}
+   801→                      </div>
+   802→                      <div className="text-[11px] text-muted-foreground truncate max-w-[160px]">
+   803→                        {log.document?.title ?? "—"}
+   804→                      </div>
+   805→                    </TableCell>
+   806→                    <TableCell>
+   807→                      <div className="flex items-center gap-2">
+   808→                        <AvatarBadge
+   809→                          name={log.employee?.fullName}
+   810→                          size="sm"
+   811→                        />
+   812→                        <div className="min-w-0">
+   813→                          <div className="text-xs font-medium truncate max-w-[140px]">
+   814→                            {log.employee?.fullName ?? "—"}
+   815→                          </div>
+   816→                          <div className="text-[10px] text-muted-foreground">
+   817→                            {log.employee?.employeeId ?? ""}
+   818→                          </div>
+   819→                        </div>
+   820→                      </div>
+   821→                    </TableCell>
+   822→                    <TableCell className="text-xs">{log.recipientTo}</TableCell>
+   823→                    <TableCell>
+   824→                      <div className="text-xs truncate max-w-[220px]">
+   825→                        {log.subject}
+   826→                      </div>
+   827→                    </TableCell>
+   828→                    <TableCell className="text-xs">
+   829→                      {log.sentBy?.name ?? "—"}
+   830→                    </TableCell>
+   831→                    <TableCell className="text-xs">
+   832→                      {log.sentAt ? formatDate(log.sentAt, "datetime") : "—"}
+   833→                    </TableCell>
+   834→                    <TableCell>
+   835→                      <StatusBadge status={log.status} />
+   836→                    </TableCell>
+   837→                    <TableCell className="text-right">
+   838→                      {["SENT", "FAILED", "QUEUED"].includes(log.status) && (
+   839→                        <Button
+   840→                          variant="ghost"
+   841→                          size="sm"
+   842→                          className="h-8"
+   843→                          onClick={() => resend(log.id)}
+   844→                        >
+   845→                          <RefreshCw className="size-3.5 mr-1" /> Resend
+   846→                        </Button>
+   847→                      )}
+   848→                    </TableCell>
+   849→                  </TableRow>
+   850→                ))}
+   851→              </TableBody>
+   852→            </Table>
+   853→          </div>
+   854→        </Card>
+   855→      )}
+   856→
+   857→      {totalPages > 1 && (
+   858→        <div className="flex items-center justify-between">
+   859→          <Button
+   860→            variant="outline"
+   861→            size="sm"
+   862→            disabled={page === 1}
+   863→            onClick={() => setPage((p) => Math.max(1, p - 1))}
+   864→          >
+   865→            Previous
+   866→          </Button>
+   867→          <div className="text-sm text-muted-foreground">
+   868→            Page {page} of {totalPages}
+   869→          </div>
+   870→          <Button
+   871→            variant="outline"
+   872→            size="sm"
+   873→            disabled={page >= totalPages}
+   874→            onClick={() => setPage((p) => p + 1)}
+   875→          >
+   876→            Next
+   877→          </Button>
+   878→        </div>
+   879→      )}
+   880→    </div>
+   881→  );
+   882→}
+   883→
+   884→// =============================================================
+   885→// Shared documents table
+   886→// =============================================================
+   887→
+   888→// Status pipeline shown as small horizontal pills.
+   889→const STATUS_PIPELINE: { key: string; label: string }[] = [
+   890→  { key: "DRAFT", label: "Draft" },
+   891→  { key: "GENERATED", label: "Generated" },
+   892→  { key: "PENDING_APPROVAL", label: "Pending" },
+   893→  { key: "APPROVED", label: "Approved" },
+   894→  { key: "ISSUED", label: "Issued" },
+   895→  { key: "SENT", label: "Sent" },
+   896→];
+   897→
+   898→function StatusFlowPills({ status }: { status: string }) {
+   899→  const currentIdx = STATUS_PIPELINE.findIndex((s) => s.key === status);
+   900→  if (status === "ARCHIVED") {
+   901→    return <StatusBadge status="ARCHIVED" />;
+   902→  }
+   903→  if (currentIdx === -1) {
+   904→    return <StatusBadge status={status} />;
+   905→  }
+   906→  return (
+   907→    <div className="flex items-center gap-0.5 flex-wrap">
+   908→      {STATUS_PIPELINE.map((s, idx) => {
+   909→        const isCurrent = idx === currentIdx;
+   910→        const isPast = idx < currentIdx;
+   911→        return (
+   912→          <div key={s.key} className="flex items-center">
+   913→            <span
+   914→              className={cn(
+   915→                "inline-flex items-center px-1.5 h-5 rounded text-[9px] font-medium leading-none",
+   916→                isCurrent &&
+   917→                  "bg-primary text-primary-foreground shadow-soft",
+   918→                isPast && "bg-primary/15 text-primary",
+   919→                !isCurrent && !isPast &&
+   920→                  "bg-muted text-muted-foreground"
+   921→              )}
+   922→              title={s.label}
+   923→            >
+   924→              {s.label}
+   925→            </span>
+   926→            {idx < STATUS_PIPELINE.length - 1 && (
+   927→              <ChevronRight
+   928→                className={cn(
+   929→                  "size-2.5 mx-0.5 flex-shrink-0",
+   930→                  idx < currentIdx ? "text-primary" : "text-muted-foreground/50"
+   931→                )}
+   932→              />
+   933→            )}
+   934→          </div>
+   935→        );
+   936→      })}
+   937→    </div>
+   938→  );
+   939→}
+   940→
+   941→function DocumentsTable({
+   942→  docs,
+   943→  loading,
+   944→  onPreview,
+   945→  onSendEmail,
+   946→  onDownload,
+   947→  onArchive,
+   948→}: {
+   949→  docs: any[];
+   950→  loading: boolean;
+   951→  onPreview: (doc: any) => void;
+   952→  onSendEmail: (doc: any) => void;
+   953→  onDownload?: (id: string, format: "docx" | "pdf", docNumber: string) => void;
+   954→  onArchive?: (id: string) => void;
+   955→}) {
+   956→  const qc = useQueryClient();
+   957→
+   958→  if (loading) {
+   959→    return (
+   960→      <div className="p-6 space-y-2">
+   961→        {Array.from({ length: 5 }).map((_, i) => (
+   962→          <div key={i} className="h-12 rounded-md bg-muted/40 animate-pulse" />
+   963→        ))}
+   964→      </div>
+   965→    );
+   966→  }
+   967→
+   968→  if (docs.length === 0) {
+   969→    return (
+   970→      <div className="p-8">
+   971→        <EmptyState
+   972→          icon={FileText}
+   973→          title="No documents yet"
+   974→          description="Generate your first document to see it here."
+   975→        />
+   976→      </div>
+   977→    );
+   978→  }
+   979→
+   980→  // ----- Status-transition helpers (call the dedicated endpoints). -----
+   981→  async function submitForApproval(d: any) {
+   982→    try {
+   983→      const res = await fetch(`/api/documents/${d.id}`, {
+   984→        method: "PATCH",
+   985→        headers: { "Content-Type": "application/json" },
+   986→        body: JSON.stringify({ status: "PENDING_APPROVAL" }),
+   987→      });
+   988→      if (!res.ok) {
+   989→        const err = await res.json().catch(() => ({}));
+   990→        throw new Error(err.error || "Failed");
+   991→      }
+   992→      toast.success(`Submitted ${d.documentNumber} for approval.`);
+   993→      qc.invalidateQueries({ queryKey: ["documents"] });
+   994→    } catch (err: any) {
+   995→      toast.error(err.message || "Failed to submit");
+   996→    }
+   997→  }
+   998→
+   999→  async function approveDoc(d: any) {
+  1000→    try {
+  1001→      const res = await fetch(`/api/documents/${d.id}/approve`, {
+  1002→        method: "POST",
+  1003→        headers: { "Content-Type": "application/json" },
+  1004→        body: JSON.stringify({}),
+  1005→      });
+  1006→      if (!res.ok) {
+  1007→        const err = await res.json().catch(() => ({}));
+  1008→        throw new Error(err.error || "Failed");
+  1009→      }
+  1010→      toast.success(`Approved ${d.documentNumber}.`);
+  1011→      qc.invalidateQueries({ queryKey: ["documents"] });
+  1012→      qc.invalidateQueries({ queryKey: ["dashboard"] });
+  1013→    } catch (err: any) {
+  1014→      toast.error(err.message || "Failed to approve");
+  1015→    }
+  1016→  }
+  1017→
+  1018→  async function rejectDoc(d: any) {
+  1019→    const reason = prompt("Rejection reason (optional):");
+  1020→    if (reason === null) return; // user cancelled
+  1021→    try {
+  1022→      const res = await fetch(`/api/documents/${d.id}/reject`, {
+  1023→        method: "POST",
+  1024→        headers: { "Content-Type": "application/json" },
+  1025→        body: JSON.stringify({ note: reason.trim() || undefined }),
+  1026→      });
+  1027→      if (!res.ok) {
+  1028→        const err = await res.json().catch(() => ({}));
+  1029→        throw new Error(err.error || "Failed");
+  1030→      }
+  1031→      toast.success(`Rejected ${d.documentNumber} — returned to draft.`);
+  1032→      qc.invalidateQueries({ queryKey: ["documents"] });
+  1033→      qc.invalidateQueries({ queryKey: ["dashboard"] });
+  1034→    } catch (err: any) {
+  1035→      toast.error(err.message || "Failed to reject");
+  1036→    }
+  1037→  }
+  1038→
+  1039→  async function issueDoc(d: any) {
+  1040→    if (!confirm(`Issue ${d.documentNumber}? This locks the document content.`))
+  1041→      return;
+  1042→    try {
+  1043→      const res = await fetch(`/api/documents/${d.id}/issue`, {
+  1044→        method: "POST",
+  1045→      });
+  1046→      if (!res.ok) {
+  1047→        const err = await res.json().catch(() => ({}));
+  1048→        throw new Error(err.error || "Failed");
+  1049→      }
+  1050→      toast.success(`Issued ${d.documentNumber}.`);
+  1051→      qc.invalidateQueries({ queryKey: ["documents"] });
+  1052→      qc.invalidateQueries({ queryKey: ["dashboard"] });
+  1053→    } catch (err: any) {
+  1054→      toast.error(err.message || "Failed to issue");
+  1055→    }
+  1056→  }
+  1057→
+  1058→  return (
+  1059→    <div className="overflow-x-auto">
+  1060→      <Table>
+  1061→        <TableHeader>
+  1062→          <TableRow className="bg-muted/40 hover:bg-muted/40">
+  1063→            <TableHead className="min-w-[160px]">Doc Number</TableHead>
+  1064→            <TableHead>Employee</TableHead>
+  1065→            <TableHead>Type</TableHead>
+  1066→            <TableHead>Created</TableHead>
+  1067→            <TableHead className="min-w-[260px]">Status Flow</TableHead>
+  1068→            <TableHead>Email Status</TableHead>
+  1069→            <TableHead className="text-right">Actions</TableHead>
+  1070→          </TableRow>
+  1071→        </TableHeader>
+  1072→        <TableBody>
+  1073→          {docs.map((d: any) => (
+  1074→            <TableRow key={d.id} className="hover:bg-muted/30">
+  1075→              <TableCell>
+  1076→                <button
+  1077→                  className="font-mono text-xs text-primary hover:underline"
+  1078→                  onClick={() => onPreview(d)}
+  1079→                >
+  1080→                  {d.documentNumber}
+  1081→                </button>
+  1082→                <div className="text-[10px] text-muted-foreground truncate max-w-[160px]">
+  1083→                  {d.title}
+  1084→                </div>
+  1085→              </TableCell>
+  1086→              <TableCell>
+  1087→                <div className="flex items-center gap-2">
+  1088→                  <AvatarBadge
+  1089→                    name={d.employee?.fullName}
+  1090→                    photo={d.employee?.photo}
+  1091→                    size="sm"
+  1092→                  />
+  1093→                  <div className="min-w-0">
+  1094→                    <div className="text-xs font-medium truncate max-w-[140px]">
+  1095→                      {d.employee?.fullName ?? "—"}
+  1096→                    </div>
+  1097→                    <div className="text-[10px] text-muted-foreground">
+  1098→                      {d.employee?.employeeId ?? ""}
+  1099→                    </div>
+  1100→                  </div>
+  1101→                </div>
+  1102→              </TableCell>
+  1103→              <TableCell>
+  1104→                <Badge variant="outline" className="font-mono text-[10px]">
+  1105→                  {d.type?.replace(/_/g, " ")}
+  1106→                </Badge>
+  1107→              </TableCell>
+  1108→              <TableCell className="text-xs">
+  1109→                <div>{formatDate(d.createdAt)}</div>
+  1110→                <div className="text-[10px] text-muted-foreground">
+  1111→                  {relativeTime(d.createdAt)}
+  1112→                </div>
+  1113→              </TableCell>
+  1114→              <TableCell>
+  1115→                <StatusFlowPills status={d.status} />
+  1116→              </TableCell>
+  1117→              <TableCell>
+  1118→                {d.latestEmail ? (
+  1119→                  <div className="flex items-center gap-1.5">
+  1120→                    <StatusBadge status={d.latestEmail.status} />
+  1121→                    <span className="text-[10px] text-muted-foreground">
+  1122→                      {relativeTime(d.latestEmail.createdAt)}
+  1123→                    </span>
+  1124→                  </div>
+  1125→                ) : (
+  1126→                  <span className="text-xs text-muted-foreground">Not sent</span>
+  1127→                )}
+  1128→              </TableCell>
+  1129→              <TableCell className="text-right">
+  1130→                <div className="flex items-center justify-end gap-1">
+  1131→                  <Button
+  1132→                    variant="ghost"
+  1133→                    size="icon"
+  1134→                    className="size-8"
+  1135→                    onClick={() => onPreview(d)}
+  1136→                    title="Preview"
+  1137→                  >
+  1138→                    <Eye className="size-4" />
+  1139→                  </Button>
+  1140→                  <DropdownMenu>
+  1141→                    <DropdownMenuTrigger asChild>
+  1142→                      <Button
+  1143→                        variant="ghost"
+  1144→                        size="icon"
+  1145→                        className="size-8"
+  1146→                        title="More actions"
+  1147→                      >
+  1148→                        <MoreVertical className="size-4" />
+  1149→                      </Button>
+  1150→                    </DropdownMenuTrigger>
+  1151→                    <DropdownMenuContent align="end" className="w-56">
+  1152→                      {/* Status-based actions at top of menu */}
+  1153→                      {d.status === "GENERATED" && (
+  1154→                        <>
+  1155→                          <DropdownMenuLabel>Workflow</DropdownMenuLabel>
+  1156→                          <DropdownMenuItem
+  1157→                            onClick={() => submitForApproval(d)}
+  1158→                            className="text-emerald-700 focus:text-emerald-700"
+  1159→                          >
+  1160→                            <Forward className="size-4 mr-2" /> Submit for
+  1161→                            Approval
+  1162→                          </DropdownMenuItem>
+  1163→                          <DropdownMenuSeparator />
+  1164→                        </>
+  1165→                      )}
+  1166→                      {d.status === "PENDING_APPROVAL" && (
+  1167→                        <>
+  1168→                          <DropdownMenuLabel>Approval</DropdownMenuLabel>
+  1169→                          <DropdownMenuItem
+  1170→                            onClick={() => approveDoc(d)}
+  1171→                            className="text-emerald-700 focus:text-emerald-700"
+  1172→                          >
+  1173→                            <CheckCircle2 className="size-4 mr-2" /> Approve
+  1174→                          </DropdownMenuItem>
+  1175→                          <DropdownMenuItem
+  1176→                            onClick={() => rejectDoc(d)}
+  1177→                            className="text-rose-700 focus:text-rose-700"
+  1178→                          >
+  1179→                            <X className="size-4 mr-2" /> Reject (return to
+  1180→                            draft)
+  1181→                          </DropdownMenuItem>
+  1182→                          <DropdownMenuSeparator />
+  1183→                        </>
+  1184→                      )}
+  1185→                      {d.status === "APPROVED" && (
+  1186→                        <>
+  1187→                          <DropdownMenuLabel>Workflow</DropdownMenuLabel>
+  1188→                          <DropdownMenuItem
+  1189→                            onClick={() => issueDoc(d)}
+  1190→                            className="text-teal-700 focus:text-teal-700"
+  1191→                          >
+  1192→                            <Stamp className="size-4 mr-2" /> Issue &amp; Lock
+  1193→                          </DropdownMenuItem>
+  1194→                          <DropdownMenuSeparator />
+  1195→                        </>
+  1196→                      )}
+  1197→                      {d.status === "ISSUED" && (
+  1198→                        <>
+  1199→                          <DropdownMenuLabel>Delivery</DropdownMenuLabel>
+  1200→                          <DropdownMenuItem onClick={() => onSendEmail(d)}>
+  1201→                            <Mail className="size-4 mr-2" /> Send Email
+  1202→                          </DropdownMenuItem>
+  1203→                          <DropdownMenuSeparator />
+  1204→                        </>
+  1205→                      )}
+  1206→                      {d.status === "SENT" && (
+  1207→                        <>
+  1208→                          <DropdownMenuLabel>Delivery</DropdownMenuLabel>
+  1209→                          <DropdownMenuItem
+  1210→                            onClick={() => onSendEmail(d)}
+  1211→                          >
+  1212→                            <Mail className="size-4 mr-2" /> Resend Email
+  1213→                          </DropdownMenuItem>
+  1214→                          <DropdownMenuSeparator />
+  1215→                        </>
+  1216→                      )}
+  1217→                      {/* Standard actions */}
+  1218→                      <DropdownMenuItem onClick={() => onPreview(d)}>
+  1219→                        <Eye className="size-4 mr-2" /> Preview
+  1220→                      </DropdownMenuItem>
+  1221→                      {onDownload && (
+  1222→                        <>
+  1223→                          <DropdownMenuItem
+  1224→                            onClick={() =>
+  1225→                              onDownload(d.id, "docx", d.documentNumber)
+  1226→                            }
+  1227→                          >
+  1228→                            <Download className="size-4 mr-2" /> Download DOCX
+  1229→                          </DropdownMenuItem>
+  1230→                          <DropdownMenuItem
+  1231→                            onClick={() =>
+  1232→                              onDownload(d.id, "pdf", d.documentNumber)
+  1233→                            }
+  1234→                          >
+  1235→                            <Download className="size-4 mr-2" /> Download PDF
+  1236→                          </DropdownMenuItem>
+  1237→                        </>
+  1238→                      )}
+  1239→                      {d.status !== "ISSUED" &&
+  1240→                        d.status !== "SENT" &&
+  1241→                        d.status !== "ARCHIVED" && (
+  1242→                          <DropdownMenuItem onClick={() => onSendEmail(d)}>
+  1243→                            <Mail className="size-4 mr-2" /> Send Email
+  1244→                          </DropdownMenuItem>
+  1245→                        )}
+  1246→                      {onArchive && (
+  1247→                        <>
+  1248→                          <DropdownMenuSeparator />
+  1249→                          <DropdownMenuItem
+  1250→                            className="text-rose-600 focus:text-rose-600"
+  1251→                            onClick={() => onArchive(d.id)}
+  1252→                          >
+  1253→                            <Archive className="size-4 mr-2" /> Archive
+  1254→                          </DropdownMenuItem>
+  1255→                        </>
+  1256→                      )}
+  1257→                    </DropdownMenuContent>
+  1258→                  </DropdownMenu>
+  1259→                </div>
+  1260→              </TableCell>
+  1261→            </TableRow>
+  1262→          ))}
+  1263→        </TableBody>
+  1264→      </Table>
+  1265→    </div>
+  1266→  );
+  1267→}
+  1268→
+  1269→// =============================================================
+  1270→// Document Preview Dialog
+  1271→// =============================================================
+  1272→
+  1273→function DocumentPreviewDialog({
+  1274→  doc,
+  1275→  onClose,
+  1276→}: {
+  1277→  doc: any | null;
+  1278→  onClose: () => void;
+  1279→}) {
+  1280→  const [preview, setPreview] = useState<any | null>(null);
+  1281→  const [loading, setLoading] = useState(false);
+  1282→
+  1283→  useEffect(() => {
+  1284→    if (!doc) {
+  1285→      // Defer the reset to avoid synchronous setState in effect body.
+  1286→      const t = setTimeout(() => {
+  1287→        setPreview(null);
+  1288→        setLoading(false);
+  1289→      }, 0);
+  1290→      return () => clearTimeout(t);
+  1291→    }
+  1292→    let cancelled = false;
+  1293→    // Use queueMicrotask so the rule about synchronous setState in effects
+  1294→    // doesn't fire — we genuinely want to flip loading=true before the fetch.
+  1295→    queueMicrotask(() => {
+  1296→      if (!cancelled) setLoading(true);
+  1297→    });
+  1298→    fetch(`/api/documents/${doc.id}/preview`)
+  1299→      .then((r) => r.json())
+  1300→      .then((d) => {
+  1301→        if (!cancelled) setPreview(d);
+  1302→      })
+  1303→      .catch(() => toast.error("Failed to load preview"))
+  1304→      .finally(() => {
+  1305→        if (!cancelled) setLoading(false);
+  1306→      });
+  1307→    return () => {
+  1308→      cancelled = true;
+  1309→    };
+  1310→  }, [doc]);
+  1311→
+  1312→  return (
+  1313→    <Dialog open={!!doc} onOpenChange={(o) => !o && onClose()}>
+  1314→      <DialogContent className="max-w-[95vw] sm:max-w-4xl max-h-[92vh] p-0 gap-0">
+  1315→        <DialogHeader className="px-4 sm:px-6 py-4 border-b border-border">
+  1316→          <div className="flex items-start justify-between gap-3">
+  1317→            <div className="min-w-0 flex-1">
+  1318→              <DialogTitle className="flex items-center gap-2">
+  1319→                <Eye className="size-5 text-primary flex-shrink-0" />
+  1320→                <span className="truncate">
+  1321→                  {preview?.title ?? doc?.documentNumber ?? "Preview"}
+  1322→                </span>
+  1323→              </DialogTitle>
+  1324→              {preview && (
+  1325→                <div className="text-xs text-muted-foreground flex items-center gap-2 mt-1 flex-wrap">
+  1326→                  <span className="font-mono">{preview.documentNumber}</span>
+  1327→                  <span>·</span>
+  1328→                  <span>{preview.employee?.fullName}</span>
+  1329→                  <span>·</span>
+  1330→                  <StatusBadge status={preview.status} />
+  1331→                </div>
+  1332→              )}
+  1333→            </div>
+  1334→            {preview && (
+  1335→              <Button
+  1336→                variant="outline"
+  1337→                size="sm"
+  1338→                className="flex-shrink-0"
+  1339→                onClick={() =>
+  1340→                  printDocument({
+  1341→                    title: preview.title ?? preview.documentNumber ?? "Document",
+  1342→                    html: preview.content ?? "",
+  1343→                    docNumber: preview.documentNumber,
+  1344→                  })
+  1345→                }
+  1346→              >
+  1347→                <Printer className="size-4 mr-1.5" /> Print
+  1348→              </Button>
+  1349→            )}
+  1350→          </div>
+  1351→        </DialogHeader>
+  1352→        <ScrollArea className="max-h-[70vh]">
+  1353→          <div className="px-4 sm:px-6 py-5">
+  1354→            {loading && (
+  1355→              <div className="p-12 flex flex-col items-center text-muted-foreground">
+  1356→                <div className="size-8 border-2 border-primary border-t-transparent rounded-full animate-spin mb-3" />
+  1357→                <div className="text-sm">Loading preview…</div>
+  1358→              </div>
+  1359→            )}
+  1360→            {!loading && preview && (
+  1361→              <div className="rounded-lg border border-border bg-white p-4 sm:p-8">
+  1362→                <div
+  1363→                  className="prose prose-sm max-w-none"
+  1364→                  dangerouslySetInnerHTML={{ __html: preview.content }}
+  1365→                />
+  1366→              </div>
+  1367→            )}
+  1368→          </div>
+  1369→        </ScrollArea>
+  1370→      </DialogContent>
+  1371→    </Dialog>
+  1372→  );
+  1373→}
+  1374→
+  1375→// =============================================================
+  1376→// Template Preview Dialog
+  1377→// =============================================================
+  1378→
+  1379→function TemplatePreviewDialog({
+  1380→  template,
+  1381→  onClose,
+  1382→}: {
+  1383→  template: any | null;
+  1384→  onClose: () => void;
+  1385→}) {
+  1386→  return (
+  1387→    <Dialog open={!!template} onOpenChange={(o) => !o && onClose()}>
+  1388→      <DialogContent className="max-w-[95vw] sm:max-w-4xl max-h-[92vh] p-0 gap-0">
+  1389→        <DialogHeader className="px-4 sm:px-6 py-4 border-b border-border">
+  1390→          <div className="flex items-start justify-between gap-3">
+  1391→            <div className="min-w-0 flex-1">
+  1392→              <DialogTitle className="flex items-center gap-2">
+  1393→                <FileText className="size-5 text-primary flex-shrink-0" />
+  1394→                <span className="truncate">
+  1395→                  {template?.name ?? "Template"}
+  1396→                </span>
+  1397→              </DialogTitle>
+  1398→              {template && (
+  1399→                <div className="text-xs text-muted-foreground flex items-center gap-2 mt-1 flex-wrap">
+  1400→                  <Badge variant="outline" className="font-mono text-[10px]">
+  1401→                    {template.code}
+  1402→                  </Badge>
+  1403→                  <span>{template.type?.replace(/_/g, " ")}</span>
+  1404→                  <span>·</span>
+  1405→                  <span>v{template.version}</span>
+  1406→                </div>
+  1407→              )}
+  1408→            </div>
+  1409→            {template?.content && (
+  1410→              <Button
+  1411→                variant="outline"
+  1412→                size="sm"
+  1413→                className="flex-shrink-0"
+  1414→                onClick={() =>
+  1415→                  printDocument({
+  1416→                    title: template.name ?? "Template",
+  1417→                    html: template.content ?? "",
+  1418→                    docNumber: template.code,
+  1419→                  })
+  1420→                }
+  1421→              >
+  1422→                <Printer className="size-4 mr-1.5" /> Print
+  1423→              </Button>
+  1424→            )}
+  1425→          </div>
+  1426→        </DialogHeader>
+  1427→        <ScrollArea className="max-h-[70vh]">
+  1428→          <div className="px-4 sm:px-6 py-5 space-y-4">
+  1429→            {template?.emailSubject && (
+  1430→              <div className="rounded-lg bg-muted/40 p-3 text-xs">
+  1431→                <div className="font-medium text-muted-foreground mb-1">
+  1432→                  Email Subject
+  1433→                </div>
+  1434→                <div>{template.emailSubject}</div>
+  1435→              </div>
+  1436→            )}
+  1437→            {template?.content && (
+  1438→              <div className="rounded-lg border border-border bg-white p-4 sm:p-6">
+  1439→                <div
+  1440→                  className="prose prose-sm max-w-none"
+  1441→                  dangerouslySetInnerHTML={{ __html: template.content }}
+  1442→                />
+  1443→              </div>
+  1444→            )}
+  1445→          </div>
+  1446→        </ScrollArea>
+  1447→      </DialogContent>
+  1448→    </Dialog>
+  1449→  );
+  1450→}
+  1451→
+  1452→// =============================================================
+  1453→// Direct Send Email Dialog (from table)
+  1454→// =============================================================
+  1455→
+  1456→function DirectSendEmailDialog({
+  1457→  doc,
+  1458→  onClose,
+  1459→}: {
+  1460→  doc: any | null;
+  1461→  onClose: () => void;
+  1462→}) {
+  1463→  const qc = useQueryClient();
+  1464→  const [sending, setSending] = useState(false);
+  1465→  const [to, setTo] = useState("");
+  1466→  const [cc, setCc] = useState("");
+  1467→  const [bcc, setBcc] = useState("");
+  1468→  const [subject, setSubject] = useState("");
+  1469→  const [body, setBody] = useState("");
+  1470→
+  1471→  useEffect(() => {
+  1472→    if (!doc) return;
+  1473→    // Fetch full document + template to get email subject/body presets.
+  1474→    fetch(`/api/documents/${doc.id}`)
+  1475→      .then((r) => r.json())
+  1476→      .then((d) => {
+  1477→        setTo(d.employee?.officialEmail ?? "");
+  1478→        setSubject(
+  1479→          d.template?.emailSubject
+  1480→            ? d.template.emailSubject.replace(
+  1481→                /\{\{company\.name\}\}/g,
+  1482→                "the company"
+  1483→              )
+  1484→            : `Your document - ${d.documentNumber}`
+  1485→        );
+  1486→        setBody(
+  1487→          d.template?.emailBody ||
+  1488→            `Dear ${d.employee?.fullName ?? ""},\n\nPlease find attached your document ${d.documentNumber}.\n\nRegards,\nHR Team`
+  1489→        );
+  1490→      })
+  1491→      .catch(() => {
+  1492→        setTo("");
+  1493→        setSubject(`Your document - ${doc.documentNumber}`);
+  1494→        setBody("");
+  1495→      });
+  1496→  }, [doc]);
+  1497→
+  1498→  async function handleSend() {
+  1499→    if (!doc) return;
+  1500→    if (!to || !subject || !body) {
+  1501→      toast.error("To, subject and body are required.");
+  1502→      return;
+  1503→    }
+  1504→    setSending(true);
+  1505→    try {
+  1506→      const res = await fetch(`/api/documents/${doc.id}/send-email`, {
+  1507→        method: "POST",
+  1508→        headers: { "Content-Type": "application/json" },
+  1509→        body: JSON.stringify({ to, cc, bcc, subject, body }),
+  1510→      });
+  1511→      if (!res.ok) {
+  1512→        const err = await res.json().catch(() => ({}));
+  1513→        throw new Error(err.error || "Send failed");
+  1514→      }
+  1515→      toast.success(`Email sent to ${to}`);
+  1516→      qc.invalidateQueries({ queryKey: ["documents"] });
+  1517→      qc.invalidateQueries({ queryKey: ["email-logs"] });
+  1518→      qc.invalidateQueries({ queryKey: ["dashboard"] });
+  1519→      onClose();
+  1520→    } catch (err: any) {
+  1521→      toast.error(err.message);
+  1522→    } finally {
+  1523→      setSending(false);
+  1524→    }
+  1525→  }
+  1526→
+  1527→  return (
+  1528→    <Dialog open={!!doc} onOpenChange={(o) => !o && onClose()}>
+  1529→      <DialogContent className="max-w-[95vw] sm:max-w-2xl">
+  1530→        <DialogHeader>
+  1531→          <DialogTitle className="flex items-center gap-2">
+  1532→            <Mail className="size-5 text-primary" />
+  1533→            Send Document via Email
+  1534→          </DialogTitle>
+  1535→        </DialogHeader>
+  1536→        <div className="space-y-3">
+  1537→          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+  1538→            <div className="md:col-span-2">
+  1539→              <label className="text-xs font-medium text-muted-foreground mb-1.5 block">
+  1540→                To *
+  1541→              </label>
+  1542→              <Input
+  1543→                type="email"
+  1544→                value={to}
+  1545→                onChange={(e) => setTo(e.target.value)}
+  1546→              />
+  1547→            </div>
+  1548→            <div>
+  1549→              <label className="text-xs font-medium text-muted-foreground mb-1.5 block">
+  1550→                CC
+  1551→              </label>
+  1552→              <Input value={cc} onChange={(e) => setCc(e.target.value)} />
+  1553→            </div>
+  1554→            <div>
+  1555→              <label className="text-xs font-medium text-muted-foreground mb-1.5 block">
+  1556→                BCC
+  1557→              </label>
+  1558→              <Input value={bcc} onChange={(e) => setBcc(e.target.value)} />
+  1559→            </div>
+  1560→            <div className="md:col-span-2">
+  1561→              <label className="text-xs font-medium text-muted-foreground mb-1.5 block">
+  1562→                Subject *
+  1563→              </label>
+  1564→              <Input value={subject} onChange={(e) => setSubject(e.target.value)} />
+  1565→            </div>
+  1566→            <div className="md:col-span-2">
+  1567→              <label className="text-xs font-medium text-muted-foreground mb-1.5 block">
+  1568→                Body *
+  1569→              </label>
+  1570→              <Textarea
+  1571→                value={body}
+  1572→                onChange={(e) => setBody(e.target.value)}
+  1573→                rows={8}
+  1574→              />
+  1575→            </div>
+  1576→          </div>
+  1577→          <div className="rounded-lg bg-muted/40 p-3 text-xs flex items-center gap-2">
+  1578→            <CheckCircle2 className="size-3.5 text-primary flex-shrink-0" />
+  1579→            <div>
+  1580→              PDF attachment ({doc?.documentNumber ?? "document"}.pdf) will be
+  1581→              auto-generated and attached.
+  1582→            </div>
+  1583→          </div>
+  1584→        </div>
+  1585→        <div className="flex justify-end gap-2 pt-2">
+  1586→          <Button variant="outline" onClick={onClose}>
+  1587→            Cancel
+  1588→          </Button>
+  1589→          <Button onClick={handleSend} disabled={sending}>
+  1590→            {sending ? (
+  1591→              <RefreshCw className="size-4 mr-2 animate-spin" />
+  1592→            ) : (
+  1593→              <Send className="size-4 mr-2" />
+  1594→            )}
+  1595→            Send Email
+  1596→          </Button>
+  1597→        </div>
+  1598→      </DialogContent>
+  1599→    </Dialog>
+  1600→  );
+  1601→}
+  1602→

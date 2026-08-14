@@ -49,10 +49,12 @@ import {
   MoreVertical,
   Pencil,
   Trash2,
+  UploadCloud,
 } from "lucide-react";
 import { formatDate, cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { AttendanceEntryDialog } from "./attendance-entry-dialog";
+import { AttendanceImportDialog } from "./attendance-import-dialog";
 import { ExportButton } from "../shared/export-button";
 
 export function AttendanceModule() {
@@ -66,6 +68,7 @@ export function AttendanceModule() {
 
   const [entryOpen, setEntryOpen] = useState(false);
   const [editRecord, setEditRecord] = useState<{ id: string } | null>(null);
+  const [importOpen, setImportOpen] = useState(false);
 
   const { data: departments } = useQuery({
     queryKey: ["departments"],
@@ -133,6 +136,15 @@ export function AttendanceModule() {
               module="attendance"
               filters={{ date, departmentId, status, search }}
             />
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setImportOpen(true)}
+            >
+              <UploadCloud className="size-4 mr-1.5" />{" "}
+              <span className="hidden sm:inline">Import CSV</span>
+              <span className="sm:hidden">Import</span>
+            </Button>
             <Button size="sm" onClick={addNew}>
               <Plus className="size-4 mr-1.5" />{" "}
               <span className="hidden sm:inline">Add Attendance</span>
@@ -412,6 +424,15 @@ export function AttendanceModule() {
         }}
         record={editRecord}
         onSaved={() => {
+          qc.invalidateQueries({ queryKey: ["attendance"] });
+          qc.invalidateQueries({ queryKey: ["attendance-heatmap"] });
+        }}
+      />
+
+      <AttendanceImportDialog
+        open={importOpen}
+        onOpenChange={setImportOpen}
+        onImported={() => {
           qc.invalidateQueries({ queryKey: ["attendance"] });
           qc.invalidateQueries({ queryKey: ["attendance-heatmap"] });
         }}

@@ -18,12 +18,33 @@ import { CommandPalette } from "./command-palette";
 import { QuickActions } from "./quick-actions";
 import { useKeyboardShortcuts } from "@/hooks/use-keyboard-shortcuts";
 import { ShortcutsHelp } from "./shortcuts-help";
+import { motion, AnimatePresence } from "framer-motion";
+import { useMemo } from "react";
+
+const MODULE_COMPONENTS: Record<string, React.ComponentType> = {
+  dashboard: DashboardModule,
+  employees: EmployeesModule,
+  attendance: AttendanceModule,
+  leave: LeaveModule,
+  payroll: PayrollModule,
+  performance: PerformanceModule,
+  recruitment: RecruitmentModule,
+  documents: DocumentsModule,
+  reports: ReportsModule,
+  audit: AuditModule,
+  settings: SettingsModule,
+};
 
 export function AppShell() {
   const activeModule = useApp((s) => s.activeModule);
   const helpOpen = useApp((s) => s.shortcutsHelpOpen);
   const setHelpOpen = useApp((s) => s.setShortcutsHelpOpen);
   useKeyboardShortcuts();
+
+  const ModuleComponent = useMemo(
+    () => MODULE_COMPONENTS[activeModule] ?? DashboardModule,
+    [activeModule]
+  );
 
   return (
     <div className="min-h-screen flex bg-background bg-dots">
@@ -32,17 +53,17 @@ export function AppShell() {
         <Topbar />
         <main className="flex-1 min-h-0 overflow-y-auto">
           <div className="mx-auto max-w-[1600px] p-4 md:p-6 lg:p-8">
-            {activeModule === "dashboard" && <DashboardModule />}
-            {activeModule === "employees" && <EmployeesModule />}
-            {activeModule === "attendance" && <AttendanceModule />}
-            {activeModule === "leave" && <LeaveModule />}
-            {activeModule === "payroll" && <PayrollModule />}
-            {activeModule === "performance" && <PerformanceModule />}
-            {activeModule === "recruitment" && <RecruitmentModule />}
-            {activeModule === "documents" && <DocumentsModule />}
-            {activeModule === "reports" && <ReportsModule />}
-            {activeModule === "audit" && <AuditModule />}
-            {activeModule === "settings" && <SettingsModule />}
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={activeModule}
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -4 }}
+                transition={{ duration: 0.2, ease: "easeOut" }}
+              >
+                <ModuleComponent />
+              </motion.div>
+            </AnimatePresence>
           </div>
         </main>
         <footer className="mt-auto border-t border-border/60 bg-card/60 backdrop-blur-sm px-6 py-3 text-xs text-muted-foreground flex flex-col sm:flex-row items-center justify-between gap-2">

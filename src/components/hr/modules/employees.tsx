@@ -47,12 +47,15 @@ import {
   Briefcase,
   Building2,
   UserCheck,
+  FileDown,
+  Loader2,
 } from "lucide-react";
 import { formatDate, formatCurrency } from "@/lib/utils";
 import { EmployeeFormDialog } from "./employee-form-dialog";
 import { EmployeeProfile } from "./employee-profile";
 import { ExportButton } from "../shared/export-button";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 
 export function EmployeesModule() {
   const employeeView = useApp((s) => s.employeeView);
@@ -78,6 +81,33 @@ function EmployeeList() {
   const [page, setPage] = useState(1);
   const [editEmp, setEditEmp] = useState<{ id: string } | null>(null);
   const [formOpen, setFormOpen] = useState(false);
+  const [pdfLoading, setPdfLoading] = useState(false);
+
+  async function downloadDirectoryPdf() {
+    setPdfLoading(true);
+    try {
+      const params = new URLSearchParams();
+      if (departmentId) params.set("departmentId", departmentId);
+      if (status) params.set("status", status);
+      const url = `/api/employees/directory-pdf?${params.toString()}`;
+      const res = await fetch(url);
+      if (!res.ok) throw new Error("Failed to generate directory PDF");
+      const blob = await res.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = blobUrl;
+      a.download = `employee-directory-${new Date().toISOString().split("T")[0]}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(blobUrl);
+      toast.success("Employee directory PDF downloaded.");
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to generate directory PDF.");
+    } finally {
+      setPdfLoading(false);
+    }
+  }
 
   const { data: departments } = useQuery({
     queryKey: ["departments"],
@@ -126,6 +156,25 @@ function EmployeeList() {
               module="employees"
               filters={{ search, departmentId, status }}
             />
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={downloadDirectoryPdf}
+              disabled={pdfLoading}
+              className="gap-1.5"
+            >
+              {pdfLoading ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : (
+                <FileDown className="size-4" />
+              )}
+              <span className="hidden sm:inline">
+                {pdfLoading ? "Generating…" : "Directory PDF"}
+              </span>
+              <span className="sm:hidden">
+                {pdfLoading ? "…" : "PDF"}
+              </span>
+            </Button>
             <div className="flex rounded-lg border border-border overflow-hidden">
               <button
                 className={`p-2 ${view === "list" ? "bg-primary text-primary-foreground" : "hover:bg-muted"}`}

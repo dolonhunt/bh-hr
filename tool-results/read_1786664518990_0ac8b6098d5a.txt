@@ -1,0 +1,1071 @@
+     1→"use client";
+     2→
+     3→import { useState, useMemo } from "react";
+     4→import { useQuery, useQueryClient } from "@tanstack/react-query";
+     5→import { PageHeader } from "../shared/page-header";
+     6→import { KpiCard } from "../shared/kpi-card";
+     7→import { AvatarBadge } from "../shared/avatar-badge";
+     8→import { StatusBadge } from "../shared/status-badge";
+     9→import { EmptyState } from "../shared/empty-state";
+    10→import { Button } from "@/components/ui/button";
+    11→import { Input } from "@/components/ui/input";
+    12→import { Card } from "@/components/ui/card";
+    13→import { Skeleton } from "@/components/ui/skeleton";
+    14→import {
+    15→  Select,
+    16→  SelectContent,
+    17→  SelectItem,
+    18→  SelectTrigger,
+    19→  SelectValue,
+    20→} from "@/components/ui/select";
+    21→import {
+    22→  Tabs,
+    23→  TabsList,
+    24→  TabsTrigger,
+    25→} from "@/components/ui/tabs";
+    26→import {
+    27→  Table,
+    28→  TableBody,
+    29→  TableCell,
+    30→  TableHead,
+    31→  TableHeader,
+    32→  TableRow,
+    33→} from "@/components/ui/table";
+    34→import {
+    35→  DropdownMenu,
+    36→  DropdownMenuContent,
+    37→  DropdownMenuItem,
+    38→  DropdownMenuSeparator,
+    39→  DropdownMenuTrigger,
+    40→} from "@/components/ui/dropdown-menu";
+    41→import {
+    42→  CalendarDays,
+    43→  Plus,
+    44→  Search,
+    45→  MoreVertical,
+    46→  Check,
+    47→  X,
+    48→  Eye,
+    49→  Pencil,
+    50→  Trash2,
+    51→  Clock,
+    52→  ChevronLeft,
+    53→  ChevronRight,
+    54→  List as ListIcon,
+    55→} from "lucide-react";
+    56→import { formatDate, relativeTime, cn } from "@/lib/utils";
+    57→import { toast } from "sonner";
+    58→import {
+    59→  Dialog,
+    60→  DialogContent,
+    61→  DialogDescription,
+    62→  DialogFooter,
+    63→  DialogHeader,
+    64→  DialogTitle,
+    65→} from "@/components/ui/dialog";
+    66→import { Textarea } from "@/components/ui/textarea";
+    67→import { Label } from "@/components/ui/label";
+    68→import { LeaveEntryDialog } from "./leave-entry-dialog";
+    69→import { ExportButton } from "../shared/export-button";
+    70→
+    71→type View = "list" | "calendar";
+    72→
+    73→type LeaveCalendarItem = {
+    74→  id: string;
+    75→  employeeId: string;
+    76→  employeeName: string;
+    77→  employeePhoto: string | null;
+    78→  leaveTypeName: string;
+    79→  leaveTypeColor: string;
+    80→  startDate: string;
+    81→  endDate: string;
+    82→  days: number;
+    83→  status: string;
+    84→};
+    85→
+    86→export function LeaveModule() {
+    87→  const qc = useQueryClient();
+    88→  const [view, setView] = useState<View>("list");
+    89→  const [tab, setTab] = useState<"ALL" | "PENDING" | "APPROVED" | "REJECTED">(
+    90→    "ALL"
+    91→  );
+    92→  const [leaveTypeId, setLeaveTypeId] = useState("");
+    93→  const [search, setSearch] = useState("");
+    94→  const [page, setPage] = useState(1);
+    95→
+    96→  const [entryOpen, setEntryOpen] = useState(false);
+    97→  const [editRecord, setEditRecord] = useState<{ id: string } | null>(null);
+    98→  const [viewRecord, setViewRecord] = useState<any | null>(null);
+    99→  const [decision, setDecision] = useState<
+   100→    { id: string; action: "APPROVED" | "REJECTED" } | null
+   101→  >(null);
+   102→  const [decisionNote, setDecisionNote] = useState("");
+   103→  const [deciding, setDeciding] = useState(false);
+   104→
+   105→  // Calendar state
+   106→  const [calMonth, setCalMonth] = useState(() => {
+   107→    const now = new Date();
+   108→    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+   109→  });
+   110→  const [dayDialog, setDayDialog] = useState<{
+   111→    date: string;
+   112→    items: LeaveCalendarItem[];
+   113→  } | null>(null);
+   114→
+   115→  const { data: leaveTypes } = useQuery({
+   116→    queryKey: ["leave-types"],
+   117→    queryFn: () => fetch("/api/leave-types").then((r) => r.json()),
+   118→  });
+   119→
+   120→  const { data, isLoading } = useQuery({
+   121→    queryKey: ["leave", tab, leaveTypeId, search, page],
+   122→    queryFn: async () => {
+   123→      const params = new URLSearchParams();
+   124→      if (tab !== "ALL") params.set("status", tab);
+   125→      if (leaveTypeId) params.set("leaveTypeId", leaveTypeId);
+   126→      if (search) params.set("search", search);
+   127→      params.set("page", String(page));
+   128→      params.set("pageSize", "20");
+   129→      const r = await fetch(`/api/leave?${params.toString()}`);
+   130→      return r.json();
+   131→    },
+   132→    placeholderData: (prev) => prev,
+   133→  });
+   134→
+   135→  // Calendar data — only fetched when calendar view is active
+   136→  const { data: calData, isLoading: calLoading } = useQuery({
+   137→    queryKey: ["leave-calendar", calMonth],
+   138→    queryFn: async () => {
+   139→      const r = await fetch(`/api/leave/calendar?month=${calMonth}`);
+   140→      return r.json();
+   141→    },
+   142→    enabled: view === "calendar",
+   143→  });
+   144→
+   145→  const items = data?.items ?? [];
+   146→  const total = data?.total ?? 0;
+   147→  const totalPages = data?.totalPages ?? 1;
+   148→
+   149→  // KPIs computed from current page items (good enough for MVP)
+   150→  const allForKpi = items;
+   151→  const pendingCount = allForKpi.filter((l: any) => l.status === "PENDING").length;
+   152→  const approvedCount = allForKpi.filter((l: any) => l.status === "APPROVED").length;
+   153→  const rejectedCount = allForKpi.filter((l: any) => l.status === "REJECTED").length;
+   154→
+   155→  // Calendar grid math — memoised per month.
+   156→  const calItems: LeaveCalendarItem[] = calData?.items ?? [];
+   157→  const { weeks, monthLabel, isCurrentMonth } = useMemo(() => {
+   158→    const [y, m] = calMonth.split("-").map(Number);
+   159→    const days = buildCalendarDays(y, m - 1);
+   160→    // Group into weeks of 7
+   161→    const w: Date[][] = [];
+   162→    for (let i = 0; i < days.length; i += 7) {
+   163→      w.push(days.slice(i, i + 7));
+   164→    }
+   165→    const label = new Date(y, m - 1, 1).toLocaleDateString("en-US", {
+   166→      month: "long",
+   167→      year: "numeric",
+   168→    });
+   169→    const now = new Date();
+   170→    const cur =
+   171→      y === now.getFullYear() && m - 1 === now.getMonth();
+   172→    return { weeks: w, monthLabel: label, isCurrentMonth: cur };
+   173→  }, [calMonth]);
+   174→
+   175→  function addNew() {
+   176→    setEditRecord(null);
+   177→    setEntryOpen(true);
+   178→  }
+   179→
+   180→  function editFn(id: string) {
+   181→    setEditRecord({ id });
+   182→    setEntryOpen(true);
+   183→  }
+   184→
+   185→  async function deleteFn(id: string) {
+   186→    if (!confirm("Delete this leave request?")) return;
+   187→    try {
+   188→      const r = await fetch(`/api/leave/${id}`, { method: "DELETE" });
+   189→      if (!r.ok) throw new Error("Failed to delete");
+   190→      toast.success("Leave request deleted.");
+   191→      qc.invalidateQueries({ queryKey: ["leave"] });
+   192→      qc.invalidateQueries({ queryKey: ["leave-calendar"] });
+   193→    } catch (err: any) {
+   194→      toast.error(err.message || "Delete failed");
+   195→    }
+   196→  }
+   197→
+   198→  async function submitDecision() {
+   199→    if (!decision) return;
+   200→    setDeciding(true);
+   201→    try {
+   202→      const r = await fetch(`/api/leave/${decision.id}`, {
+   203→        method: "PATCH",
+   204→        headers: { "Content-Type": "application/json" },
+   205→        body: JSON.stringify({
+   206→          status: decision.action,
+   207→          approverNote: decisionNote || null,
+   208→          approverId: "hr-user",
+   209→        }),
+   210→      });
+   211→      if (!r.ok) {
+   212→        const err = await r.json().catch(() => ({}));
+   213→        throw new Error(err.error || "Failed to update");
+   214→      }
+   215→      toast.success(
+   216→        decision.action === "APPROVED"
+   217→          ? "Leave request approved."
+   218→          : "Leave request rejected."
+   219→      );
+   220→      setDecision(null);
+   221→      setDecisionNote("");
+   222→      qc.invalidateQueries({ queryKey: ["leave"] });
+   223→      qc.invalidateQueries({ queryKey: ["leave-calendar"] });
+   224→      qc.invalidateQueries({ queryKey: ["dashboard"] });
+   225→    } catch (err: any) {
+   226→      toast.error(err.message || "Action failed");
+   227→    } finally {
+   228→      setDeciding(false);
+   229→    }
+   230→  }
+   231→
+   232→  function shiftMonth(delta: number) {
+   233→    const [y, m] = calMonth.split("-").map(Number);
+   234→    const d = new Date(y, m - 1 + delta, 1);
+   235→    setCalMonth(
+   236→      `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`
+   237→    );
+   238→  }
+   239→
+   240→  function goToday() {
+   241→    const now = new Date();
+   242→    setCalMonth(
+   243→      `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`
+   244→    );
+   245→  }
+   246→
+   247→  return (
+   248→    <div className="space-y-6">
+   249→      <PageHeader
+   250→        title="Leave Management"
+   251→        description="Apply, approve, and track employee leave requests"
+   252→        icon={<CalendarDays className="size-5" />}
+   253→        actions={
+   254→          <>
+   255→            <ExportButton
+   256→              module="leave"
+   257→              filters={{
+   258→                search,
+   259→                status: tab !== "ALL" ? tab : "",
+   260→                leaveTypeId,
+   261→              }}
+   262→            />
+   263→            <Button size="sm" onClick={addNew}>
+   264→              <Plus className="size-4 mr-1.5" />{" "}
+   265→              <span className="hidden sm:inline">Add Leave</span>
+   266→              <span className="sm:hidden">Add</span>
+   267→            </Button>
+   268→          </>
+   269→        }
+   270→      />
+   271→
+   272→      {/* KPIs */}
+   273→      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
+   274→        <KpiCard
+   275→          label="Total Requests"
+   276→          value={total}
+   277→          icon={CalendarDays}
+   278→          iconClass="bg-primary/10 text-primary"
+   279→        />
+   280→        <KpiCard
+   281→          label="Pending"
+   282→          value={pendingCount}
+   283→          icon={Clock}
+   284→          iconClass="bg-amber-500/10 text-amber-600"
+   285→        />
+   286→        <KpiCard
+   287→          label="Approved"
+   288→          value={approvedCount}
+   289→          icon={Check}
+   290→          iconClass="bg-emerald-500/10 text-emerald-600"
+   291→        />
+   292→        <KpiCard
+   293→          label="Rejected"
+   294→          value={rejectedCount}
+   295→          icon={X}
+   296→          iconClass="bg-rose-500/10 text-rose-600"
+   297→        />
+   298→      </div>
+   299→
+   300→      {/* View toggle */}
+   301→      <div className="flex items-center justify-between gap-3 flex-wrap">
+   302→        <div className="inline-flex items-center rounded-md border border-border/60 bg-muted/40 p-0.5">
+   303→          <Button
+   304→            size="sm"
+   305→            variant={view === "list" ? "default" : "ghost"}
+   306→            className={cn(
+   307→              "h-7 rounded-sm gap-1.5",
+   308→              view === "list"
+   309→                ? "bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground"
+   310→                : "text-muted-foreground hover:text-foreground"
+   311→            )}
+   312→            onClick={() => setView("list")}
+   313→          >
+   314→            <ListIcon className="size-3.5" />
+   315→            <span>List View</span>
+   316→          </Button>
+   317→          <Button
+   318→            size="sm"
+   319→            variant={view === "calendar" ? "default" : "ghost"}
+   320→            className={cn(
+   321→              "h-7 rounded-sm gap-1.5",
+   322→              view === "calendar"
+   323→                ? "bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground"
+   324→                : "text-muted-foreground hover:text-foreground"
+   325→            )}
+   326→            onClick={() => setView("calendar")}
+   327→          >
+   328→            <CalendarDays className="size-3.5" />
+   329→            <span>Calendar View</span>
+   330→          </Button>
+   331→        </div>
+   332→
+   333→        {view === "calendar" && (
+   334→          <div className="flex items-center gap-2 flex-wrap">
+   335→            <div className="inline-flex items-center gap-1">
+   336→              <Button
+   337→                size="sm"
+   338→                variant="outline"
+   339→                className="size-8 p-0"
+   340→                onClick={() => shiftMonth(-1)}
+   341→                title="Previous month"
+   342→              >
+   343→                <ChevronLeft className="size-4" />
+   344→              </Button>
+   345→              <div className="min-w-[140px] sm:min-w-[160px] text-center text-sm font-semibold">
+   346→                {monthLabel}
+   347→              </div>
+   348→              <Button
+   349→                size="sm"
+   350→                variant="outline"
+   351→                className="size-8 p-0"
+   352→                onClick={() => shiftMonth(1)}
+   353→                title="Next month"
+   354→              >
+   355→                <ChevronRight className="size-4" />
+   356→              </Button>
+   357→            </div>
+   358→            <Button
+   359→              size="sm"
+   360→              variant="outline"
+   361→              onClick={goToday}
+   362→              disabled={isCurrentMonth}
+   363→            >
+   364→              Today
+   365→            </Button>
+   366→          </div>
+   367→        )}
+   368→      </div>
+   369→
+   370→      {/* LIST VIEW */}
+   371→      {view === "list" && (
+   372→        <>
+   373→          {/* Tabs */}
+   374→          <Tabs
+   375→            value={tab}
+   376→            onValueChange={(v) => {
+   377→              setTab(v as any);
+   378→              setPage(1);
+   379→            }}
+   380→          >
+   381→            <div className="overflow-x-auto pb-1 -mx-1 px-1">
+   382→              <TabsList className="flex w-max">
+   383→                <TabsTrigger value="ALL">All Requests</TabsTrigger>
+   384→                <TabsTrigger value="PENDING">Pending Approval</TabsTrigger>
+   385→                <TabsTrigger value="APPROVED">Approved</TabsTrigger>
+   386→                <TabsTrigger value="REJECTED">Rejected</TabsTrigger>
+   387→              </TabsList>
+   388→            </div>
+   389→          </Tabs>
+   390→
+   391→          {/* Filters */}
+   392→          <div className="flex flex-col md:flex-row gap-3">
+   393→            <Select
+   394→              value={leaveTypeId || "ALL"}
+   395→              onValueChange={(v) => {
+   396→                setLeaveTypeId(v === "ALL" ? "" : v);
+   397→                setPage(1);
+   398→              }}
+   399→            >
+   400→              <SelectTrigger className="md:w-48">
+   401→                <SelectValue placeholder="All leave types" />
+   402→              </SelectTrigger>
+   403→              <SelectContent>
+   404→                <SelectItem value="ALL">All leave types</SelectItem>
+   405→                {(leaveTypes?.items ?? []).map((lt: any) => (
+   406→                  <SelectItem key={lt.id} value={lt.id}>
+   407→                    {lt.name}
+   408→                  </SelectItem>
+   409→                ))}
+   410→              </SelectContent>
+   411→            </Select>
+   412→            <div className="relative flex-1">
+   413→              <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+   414→              <Input
+   415→                placeholder="Search employee name or ID…"
+   416→                value={search}
+   417→                onChange={(e) => {
+   418→                  setSearch(e.target.value);
+   419→                  setPage(1);
+   420→                }}
+   421→                className="pl-9"
+   422→              />
+   423→            </div>
+   424→          </div>
+   425→
+   426→          <div className="text-sm text-muted-foreground">
+   427→            Showing{" "}
+   428→            <span className="font-medium text-foreground">{items.length}</span>{" "}
+   429→            of <span className="font-medium text-foreground">{total}</span>{" "}
+   430→            requests
+   431→          </div>
+   432→
+   433→          {/* Loading */}
+   434→          {isLoading && (
+   435→            <Card className="border-border/60 shadow-soft p-4">
+   436→              <div className="space-y-3">
+   437→                {Array.from({ length: 6 }).map((_, i) => (
+   438→                  <div
+   439→                    key={i}
+   440→                    className="h-12 rounded-md bg-muted/40 animate-pulse"
+   441→                  />
+   442→                ))}
+   443→              </div>
+   444→            </Card>
+   445→          )}
+   446→
+   447→          {/* Empty */}
+   448→          {!isLoading && items.length === 0 && (
+   449→            <EmptyState
+   450→              icon={CalendarDays}
+   451→              title="No leave requests"
+   452→              description={
+   453→                leaveTypeId || search || tab !== "ALL"
+   454→                  ? "No requests match the current filters."
+   455→                  : "Add the first leave request to get started."
+   456→              }
+   457→              actionLabel="Add Leave"
+   458→              onAction={addNew}
+   459→            />
+   460→          )}
+   461→
+   462→          {/* Table */}
+   463→          {!isLoading && items.length > 0 && (
+   464→            <Card className="border-border/60 shadow-soft overflow-hidden">
+   465→              <div className="overflow-x-auto">
+   466→                <Table>
+   467→                  <TableHeader>
+   468→                    <TableRow className="bg-muted/40 hover:bg-muted/40">
+   469→                      <TableHead className="min-w-[180px]">Employee</TableHead>
+   470→                      <TableHead className="hidden md:table-cell">
+   471→                        Leave Type
+   472→                      </TableHead>
+   473→                      <TableHead>Start</TableHead>
+   474→                      <TableHead className="hidden sm:table-cell">End</TableHead>
+   475→                      <TableHead>Days</TableHead>
+   476→                      <TableHead className="min-w-[180px] hidden lg:table-cell">
+   477→                        Reason
+   478→                      </TableHead>
+   479→                      <TableHead className="hidden md:table-cell">
+   480→                        Applied
+   481→                      </TableHead>
+   482→                      <TableHead>Status</TableHead>
+   483→                      <TableHead className="text-right">Actions</TableHead>
+   484→                    </TableRow>
+   485→                  </TableHeader>
+   486→                  <TableBody>
+   487→                    {items.map((l: any) => (
+   488→                      <TableRow key={l.id} className="hover:bg-muted/30">
+   489→                        <TableCell>
+   490→                          <div className="flex items-center gap-3">
+   491→                            <AvatarBadge
+   492→                              name={l.employee?.fullName}
+   493→                              photo={l.employee?.photo}
+   494→                              size="md"
+   495→                            />
+   496→                            <div className="min-w-0">
+   497→                              <div className="font-medium truncate">
+   498→                                {l.employee?.fullName}
+   499→                              </div>
+   500→                              <div className="text-xs text-muted-foreground font-mono">
+   501→                                {l.employee?.employeeId}
+   502→                              </div>
+   503→                              <div className="md:hidden text-[11px] text-muted-foreground mt-0.5 flex items-center gap-1">
+   504→                                <span
+   505→                                  className="size-1.5 rounded-full"
+   506→                                  style={{
+   507→                                    background:
+   508→                                      l.leaveType?.color ?? "#94a3b8",
+   509→                                  }}
+   510→                                />
+   511→                                {l.leaveType?.name}
+   512→                              </div>
+   513→                            </div>
+   514→                          </div>
+   515→                        </TableCell>
+   516→                        <TableCell className="hidden md:table-cell">
+   517→                          <div className="flex items-center gap-1.5">
+   518→                            <span
+   519→                              className="size-2 rounded-full"
+   520→                              style={{
+   521→                                background:
+   522→                                  l.leaveType?.color ?? "#94a3b8",
+   523→                              }}
+   524→                            />
+   525→                            <span className="text-xs">{l.leaveType?.name}</span>
+   526→                          </div>
+   527→                        </TableCell>
+   528→                        <TableCell className="text-xs">
+   529→                          {formatDate(l.startDate)}
+   530→                        </TableCell>
+   531→                        <TableCell className="text-xs hidden sm:table-cell">
+   532→                          {formatDate(l.endDate)}
+   533→                        </TableCell>
+   534→                        <TableCell className="text-xs tabular-nums font-medium">
+   535→                          {l.days}d
+   536→                        </TableCell>
+   537→                        <TableCell className="text-xs text-muted-foreground max-w-[220px] truncate hidden lg:table-cell">
+   538→                          {l.reason}
+   539→                        </TableCell>
+   540→                        <TableCell className="text-xs text-muted-foreground hidden md:table-cell">
+   541→                          {relativeTime(l.appliedAt)}
+   542→                        </TableCell>
+   543→                        <TableCell>
+   544→                          <StatusBadge status={l.status} />
+   545→                        </TableCell>
+   546→                        <TableCell className="text-right">
+   547→                          <div className="flex items-center justify-end gap-1">
+   548→                            {l.status === "PENDING" && (
+   549→                              <>
+   550→                                <Button
+   551→                                  size="sm"
+   552→                                  variant="ghost"
+   553→                                  className="size-8 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-500/10"
+   554→                                  onClick={() => {
+   555→                                    setDecision({ id: l.id, action: "APPROVED" });
+   556→                                    setDecisionNote(l.approverNote || "");
+   557→                                  }}
+   558→                                  title="Approve"
+   559→                                >
+   560→                                  <Check className="size-4" />
+   561→                                </Button>
+   562→                                <Button
+   563→                                  size="sm"
+   564→                                  variant="ghost"
+   565→                                  className="size-8 text-rose-600 hover:text-rose-700 hover:bg-rose-500/10"
+   566→                                  onClick={() => {
+   567→                                    setDecision({ id: l.id, action: "REJECTED" });
+   568→                                    setDecisionNote(l.approverNote || "");
+   569→                                  }}
+   570→                                  title="Reject"
+   571→                                >
+   572→                                  <X className="size-4" />
+   573→                                </Button>
+   574→                              </>
+   575→                            )}
+   576→                            <DropdownMenu>
+   577→                              <DropdownMenuTrigger asChild>
+   578→                                <Button
+   579→                                  variant="ghost"
+   580→                                  size="icon"
+   581→                                  className="size-8"
+   582→                                >
+   583→                                  <MoreVertical className="size-4" />
+   584→                                </Button>
+   585→                              </DropdownMenuTrigger>
+   586→                              <DropdownMenuContent align="end">
+   587→                                <DropdownMenuItem
+   588→                                  onClick={() => setViewRecord(l)}
+   589→                                >
+   590→                                  <Eye className="size-4 mr-2" /> View
+   591→                                </DropdownMenuItem>
+   592→                                <DropdownMenuItem onClick={() => editFn(l.id)}>
+   593→                                  <Pencil className="size-4 mr-2" /> Edit
+   594→                                </DropdownMenuItem>
+   595→                                <DropdownMenuSeparator />
+   596→                                <DropdownMenuItem
+   597→                                  className="text-rose-600"
+   598→                                  onClick={() => deleteFn(l.id)}
+   599→                                >
+   600→                                  <Trash2 className="size-4 mr-2" /> Delete
+   601→                                </DropdownMenuItem>
+   602→                              </DropdownMenuContent>
+   603→                            </DropdownMenu>
+   604→                          </div>
+   605→                        </TableCell>
+   606→                      </TableRow>
+   607→                    ))}
+   608→                  </TableBody>
+   609→                </Table>
+   610→              </div>
+   611→            </Card>
+   612→          )}
+   613→
+   614→          {/* Pagination */}
+   615→          {!isLoading && totalPages > 1 && (
+   616→            <div className="flex items-center justify-between">
+   617→              <Button
+   618→                variant="outline"
+   619→                size="sm"
+   620→                disabled={page === 1}
+   621→                onClick={() => setPage((p) => Math.max(1, p - 1))}
+   622→              >
+   623→                Previous
+   624→              </Button>
+   625→              <div className="text-sm text-muted-foreground">
+   626→                Page {page} of {totalPages}
+   627→              </div>
+   628→              <Button
+   629→                variant="outline"
+   630→                size="sm"
+   631→                disabled={page >= totalPages}
+   632→                onClick={() => setPage((p) => p + 1)}
+   633→              >
+   634→                Next
+   635→              </Button>
+   636→            </div>
+   637→          )}
+   638→        </>
+   639→      )}
+   640→
+   641→      {/* CALENDAR VIEW */}
+   642→      {view === "calendar" && (
+   643→        <>
+   644→          {/* Legend */}
+   645→          <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-muted-foreground">
+   646→            <span className="font-medium text-foreground">Legend:</span>
+   647→            <span className="inline-flex items-center gap-1.5">
+   648→              <span className="size-2.5 rounded-full bg-emerald-500" />
+   649→              Approved
+   650→            </span>
+   651→            <span className="inline-flex items-center gap-1.5">
+   652→              <span
+   653→                className="size-2.5 rounded-full"
+   654→                style={{
+   655→                  backgroundColor: "#f59e0b",
+   656→                  backgroundImage:
+   657→                    "repeating-linear-gradient(45deg, rgba(255,255,255,0.55) 0 2px, transparent 2px 4px)",
+   658→                }}
+   659→              />
+   660→              Pending
+   661→            </span>
+   662→            <span className="inline-flex items-center gap-1.5">
+   663→              <span className="size-2.5 rounded-sm bg-muted-foreground/15" />
+   664→              Weekend
+   665→            </span>
+   666→            <span className="inline-flex items-center gap-1.5">
+   667→              <span className="size-2.5 rounded-full ring-2 ring-primary ring-offset-1 ring-offset-background" />
+   668→              Today
+   669→            </span>
+   670→          </div>
+   671→
+   672→          <Card className="border-border/60 shadow-soft p-3 sm:p-4">
+   673→            {calLoading ? (
+   674→              <div className="space-y-2">
+   675→                <div className="grid grid-cols-7 gap-1.5">
+   676→                  {Array.from({ length: 7 }).map((_, i) => (
+   677→                    <Skeleton key={i} className="h-6" />
+   678→                  ))}
+   679→                </div>
+   680→                <div className="grid grid-cols-7 gap-1.5">
+   681→                  {Array.from({ length: 35 }).map((_, i) => (
+   682→                    <Skeleton key={i} className="h-20 sm:h-24" />
+   683→                  ))}
+   684→                </div>
+   685→              </div>
+   686→            ) : (
+   687→              <>
+   688→                {/* Weekday header */}
+   689→                <div className="grid grid-cols-7 gap-1 sm:gap-1.5 mb-1.5">
+   690→                  {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map(
+   691→                    (d) => (
+   692→                      <div
+   693→                        key={d}
+   694→                        className="text-center text-[10px] sm:text-xs font-semibold text-muted-foreground uppercase tracking-wide py-1"
+   695→                      >
+   696→                        <span className="hidden sm:inline">{d}</span>
+   697→                        <span className="sm:hidden">
+   698→                          {d.slice(0, 1)}
+   699→                        </span>
+   700→                      </div>
+   701→                    )
+   702→                  )}
+   703→                </div>
+   704→
+   705→                {/* Day grid */}
+   706→                <div className="space-y-1 sm:space-y-1.5">
+   707→                  {weeks.map((week, wi) => (
+   708→                    <div
+   709→                      key={wi}
+   710→                      className="grid grid-cols-7 gap-1 sm:gap-1.5"
+   711→                    >
+   712→                      {week.map((day) => {
+   713→                        const inMonth =
+   714→                          day.getMonth() ===
+   715→                          parseInt(calMonth.split("-")[1], 10) - 1;
+   716→                        const isWeekend = day.getDay() === 0 || day.getDay() === 6;
+   717→                        const today = new Date();
+   718→                        const isToday =
+   719→                          day.getFullYear() === today.getFullYear() &&
+   720→                          day.getMonth() === today.getMonth() &&
+   721→                          day.getDate() === today.getDate();
+   722→                        const dayLeaves = leavesOnDay(calItems, day);
+   723→
+   724→                        return (
+   725→                          <button
+   726→                            key={day.toISOString()}
+   727→                            type="button"
+   728→                            onClick={() =>
+   729→                              dayLeaves.length > 0 &&
+   730→                              setDayDialog({
+   731→                                date: localDateKey(day),
+   732→                                items: dayLeaves,
+   733→                              })
+   734→                            }
+   735→                            className={cn(
+   736→                              "relative text-left rounded-md border min-h-[64px] sm:min-h-[92px] p-1 sm:p-1.5 transition-colors",
+   737→                              "flex flex-col gap-1",
+   738→                              inMonth
+   739→                                ? "bg-card border-border/60"
+   740→                                : "bg-muted/20 border-border/30 text-muted-foreground/70",
+   741→                              isWeekend && inMonth && "bg-muted/30",
+   742→                              isToday && "ring-2 ring-primary ring-offset-1 ring-offset-background",
+   743→                              dayLeaves.length > 0
+   744→                                ? "hover:border-primary/40 hover:bg-accent/40 cursor-pointer"
+   745→                                : "cursor-default"
+   746→                            )}
+   747→                          >
+   748→                            <div className="flex items-center justify-between">
+   749→                              <span
+   750→                                className={cn(
+   751→                                  "text-[10px] sm:text-xs font-medium tabular-nums",
+   752→                                  !inMonth && "text-muted-foreground/60",
+   753→                                  isToday && "text-primary font-bold"
+   754→                                )}
+   755→                              >
+   756→                                {day.getDate()}
+   757→                              </span>
+   758→                              {dayLeaves.length > 0 && (
+   759→                                <span className="text-[9px] sm:text-[10px] text-muted-foreground tabular-nums">
+   760→                                  {dayLeaves.length}
+   761→                                </span>
+   762→                              )}
+   763→                            </div>
+   764→
+   765→                            {/* Dots */}
+   766→                            {dayLeaves.length > 0 && (
+   767→                              <div className="flex flex-wrap gap-0.5 sm:gap-1 mt-auto">
+   768→                                {dayLeaves.slice(0, 3).map((l) => (
+   769→                                  <span
+   770→                                    key={l.id}
+   771→                                    className="size-1.5 sm:size-2 rounded-full"
+   772→                                    style={
+   773→                                      l.status === "PENDING"
+   774→                                        ? {
+   775→                                            backgroundColor: l.leaveTypeColor,
+   776→                                            backgroundImage:
+   777→                                              "repeating-linear-gradient(45deg, rgba(255,255,255,0.6) 0 2px, transparent 2px 4px)",
+   778→                                          }
+   779→                                        : { backgroundColor: l.leaveTypeColor }
+   780→                                    }
+   781→                                    title={`${l.employeeName} — ${l.leaveTypeName}`}
+   782→                                  />
+   783→                                ))}
+   784→                                {dayLeaves.length > 3 && (
+   785→                                  <span className="text-[9px] sm:text-[10px] text-muted-foreground leading-none self-center">
+   786→                                    +{dayLeaves.length - 3}
+   787→                                  </span>
+   788→                                )}
+   789→                              </div>
+   790→                            )}
+   791→                          </button>
+   792→                        );
+   793→                      })}
+   794→                    </div>
+   795→                  ))}
+   796→                </div>
+   797→              </>
+   798→            )}
+   799→          </Card>
+   800→        </>
+   801→      )}
+   802→
+   803→      <LeaveEntryDialog
+   804→        open={entryOpen}
+   805→        onOpenChange={(o) => {
+   806→          setEntryOpen(o);
+   807→          if (!o) setEditRecord(null);
+   808→        }}
+   809→        record={editRecord}
+   810→        onSaved={() => {
+   811→          qc.invalidateQueries({ queryKey: ["leave"] });
+   812→          qc.invalidateQueries({ queryKey: ["leave-calendar"] });
+   813→        }}
+   814→      />
+   815→
+   816→      {/* View dialog */}
+   817→      <Dialog open={!!viewRecord} onOpenChange={(o) => !o && setViewRecord(null)}>
+   818→        <DialogContent className="max-w-[95vw] sm:max-w-lg">
+   819→          <DialogHeader>
+   820→            <DialogTitle>Leave Request Details</DialogTitle>
+   821→            <DialogDescription>
+   822→              Submitted {viewRecord ? relativeTime(viewRecord.appliedAt) : ""}
+   823→            </DialogDescription>
+   824→          </DialogHeader>
+   825→          {viewRecord && (
+   826→            <div className="space-y-3 text-sm">
+   827→              <div className="flex items-center gap-3">
+   828→                <AvatarBadge
+   829→                  name={viewRecord.employee?.fullName}
+   830→                  photo={viewRecord.employee?.photo}
+   831→                  size="md"
+   832→                />
+   833→                <div>
+   834→                  <div className="font-medium">
+   835→                    {viewRecord.employee?.fullName}
+   836→                  </div>
+   837→                  <div className="text-xs text-muted-foreground font-mono">
+   838→                    {viewRecord.employee?.employeeId}
+   839→                  </div>
+   840→                </div>
+   841→              </div>
+   842→              <div className="grid grid-cols-2 gap-3">
+   843→                <Detail label="Leave Type" value={viewRecord.leaveType?.name} />
+   844→                <Detail label="Status" value={<StatusBadge status={viewRecord.status} />} />
+   845→                <Detail label="Start Date" value={formatDate(viewRecord.startDate, "long")} />
+   846→                <Detail label="End Date" value={formatDate(viewRecord.endDate, "long")} />
+   847→                <Detail label="Days" value={`${viewRecord.days} day(s)`} />
+   848→                <Detail
+   849→                  label="Decided At"
+   850→                  value={viewRecord.decidedAt ? formatDate(viewRecord.decidedAt) : "—"}
+   851→                />
+   852→              </div>
+   853→              <div>
+   854→                <div className="text-xs font-medium text-muted-foreground mb-1">
+   855→                  Reason
+   856→                </div>
+   857→                <div className="rounded-md bg-muted/40 p-3 text-sm">
+   858→                  {viewRecord.reason || "—"}
+   859→                </div>
+   860→              </div>
+   861→              {viewRecord.approverNote && (
+   862→                <div>
+   863→                  <div className="text-xs font-medium text-muted-foreground mb-1">
+   864→                    Approver Note
+   865→                  </div>
+   866→                  <div className="rounded-md bg-muted/40 p-3 text-sm">
+   867→                    {viewRecord.approverNote}
+   868→                  </div>
+   869→                </div>
+   870→              )}
+   871→            </div>
+   872→          )}
+   873→        </DialogContent>
+   874→      </Dialog>
+   875→
+   876→      {/* Day dialog (calendar view) */}
+   877→      <Dialog
+   878→        open={!!dayDialog}
+   879→        onOpenChange={(o) => !o && setDayDialog(null)}
+   880→      >
+   881→        <DialogContent className="max-w-[95vw] sm:max-w-md">
+   882→          <DialogHeader>
+   883→            <DialogTitle>Leave on {dayDialog ? formatDate(dayDialog.date, "long") : ""}</DialogTitle>
+   884→            <DialogDescription>
+   885→              {dayDialog?.items.length ?? 0} employee
+   886→              {(dayDialog?.items.length ?? 0) === 1 ? "" : "s"} on leave this day
+   887→            </DialogDescription>
+   888→          </DialogHeader>
+   889→          {dayDialog && (
+   890→            <div className="space-y-2 max-h-[60vh] overflow-y-auto pr-1">
+   891→              {dayDialog.items.map((l) => (
+   892→                <div
+   893→                  key={l.id}
+   894→                  className="flex items-start gap-3 rounded-md border border-border/60 bg-card p-2.5"
+   895→                >
+   896→                  <AvatarBadge
+   897→                    name={l.employeeName}
+   898→                    photo={l.employeePhoto}
+   899→                    size="md"
+   900→                  />
+   901→                  <div className="min-w-0 flex-1">
+   902→                    <div className="flex items-center justify-between gap-2">
+   903→                      <div className="font-medium truncate text-sm">
+   904→                        {l.employeeName}
+   905→                      </div>
+   906→                      <StatusBadge status={l.status} />
+   907→                    </div>
+   908→                    <div className="flex items-center gap-1.5 mt-1 text-xs text-muted-foreground">
+   909→                      <span
+   910→                        className="size-2 rounded-full"
+   911→                        style={{
+   912→                          backgroundColor: l.leaveTypeColor,
+   913→                          ...(l.status === "PENDING"
+   914→                            ? {
+   915→                                backgroundImage:
+   916→                                  "repeating-linear-gradient(45deg, rgba(255,255,255,0.6) 0 2px, transparent 2px 4px)",
+   917→                              }
+   918→                            : {}),
+   919→                        }}
+   920→                      />
+   921→                      {l.leaveTypeName}
+   922→                      <span className="text-muted-foreground/60">·</span>
+   923→                      <span>
+   924→                        {formatDate(l.startDate)} – {formatDate(l.endDate)}
+   925→                      </span>
+   926→                      <span className="text-muted-foreground/60">·</span>
+   927→                      <span className="tabular-nums">{l.days}d</span>
+   928→                    </div>
+   929→                  </div>
+   930→                </div>
+   931→              ))}
+   932→            </div>
+   933→          )}
+   934→        </DialogContent>
+   935→      </Dialog>
+   936→
+   937→      {/* Decision dialog */}
+   938→      <Dialog
+   939→        open={!!decision}
+   940→        onOpenChange={(o) => {
+   941→          if (!o) {
+   942→            setDecision(null);
+   943→            setDecisionNote("");
+   944→          }
+   945→        }}
+   946→      >
+   947→        <DialogContent className="max-w-[95vw] sm:max-w-md">
+   948→          <DialogHeader>
+   949→            <DialogTitle>
+   950→              {decision?.action === "APPROVED" ? "Approve Leave" : "Reject Leave"}
+   951→            </DialogTitle>
+   952→            <DialogDescription>
+   953→              Add an optional note that the employee will see.
+   954→            </DialogDescription>
+   955→          </DialogHeader>
+   956→          <div className="space-y-3">
+   957→            <div>
+   958→              <Label className="text-xs font-medium text-muted-foreground mb-1.5 block">
+   959→                Approver Note
+   960→              </Label>
+   961→              <Textarea
+   962→                rows={3}
+   963→                value={decisionNote}
+   964→                onChange={(e) => setDecisionNote(e.target.value)}
+   965→                placeholder={
+   966→                  decision?.action === "APPROVED"
+   967→                    ? "Approved - coverage arranged."
+   968→                    : "Rejected - peak period."
+   969→                }
+   970→              />
+   971→            </div>
+   972→          </div>
+   973→          <DialogFooter>
+   974→            <Button
+   975→              variant="outline"
+   976→              onClick={() => {
+   977→                setDecision(null);
+   978→                setDecisionNote("");
+   979→              }}
+   980→            >
+   981→              Cancel
+   982→            </Button>
+   983→            <Button
+   984→              onClick={submitDecision}
+   985→              disabled={deciding}
+   986→              variant={
+   987→                decision?.action === "APPROVED" ? "default" : "destructive"
+   988→              }
+   989→            >
+   990→              Confirm{" "}
+   991→              {decision?.action === "APPROVED" ? "Approval" : "Rejection"}
+   992→            </Button>
+   993→          </DialogFooter>
+   994→        </DialogContent>
+   995→      </Dialog>
+   996→    </div>
+   997→  );
+   998→}
+   999→
+  1000→function Detail({
+  1001→  label,
+  1002→  value,
+  1003→}: {
+  1004→  label: string;
+  1005→  value: React.ReactNode;
+  1006→}) {
+  1007→  return (
+  1008→    <div>
+  1009→      <div className="text-xs font-medium text-muted-foreground">{label}</div>
+  1010→      <div className="text-sm font-medium mt-0.5">{value}</div>
+  1011→    </div>
+  1012→  );
+  1013→}
+  1014→
+  1015→// ----- Calendar helpers -----
+  1016→
+  1017→function localDateKey(d: Date): string {
+  1018→  const y = d.getFullYear();
+  1019→  const m = String(d.getMonth() + 1).padStart(2, "0");
+  1020→  const day = String(d.getDate()).padStart(2, "0");
+  1021→  return `${y}-${m}-${day}`;
+  1022→}
+  1023→
+  1024→function buildCalendarDays(year: number, monthIdx: number): Date[] {
+  1025→  const first = new Date(year, monthIdx, 1);
+  1026→  const last = new Date(year, monthIdx + 1, 0);
+  1027→  // Monday-indexed day-of-week (Mon=0 ... Sun=6)
+  1028→  const startOffset = (first.getDay() + 6) % 7;
+  1029→  const endDay = (last.getDay() + 6) % 7;
+  1030→  const endOffset = (7 - endDay - 1) % 7;
+  1031→
+  1032→  const start = new Date(first);
+  1033→  start.setDate(start.getDate() - startOffset);
+  1034→  const end = new Date(last);
+  1035→  end.setDate(end.getDate() + endOffset);
+  1036→
+  1037→  const days: Date[] = [];
+  1038→  const cur = new Date(start);
+  1039→  while (cur.getTime() <= end.getTime()) {
+  1040→    days.push(new Date(cur));
+  1041→    cur.setDate(cur.getDate() + 1);
+  1042→  }
+  1043→  return days;
+  1044→}
+  1045→
+  1046→function leavesOnDay(items: LeaveCalendarItem[], date: Date): LeaveCalendarItem[] {
+  1047→  const dayStart = new Date(
+  1048→    date.getFullYear(),
+  1049→    date.getMonth(),
+  1050→    date.getDate(),
+  1051→    0,
+  1052→    0,
+  1053→    0,
+  1054→    0
+  1055→  );
+  1056→  const dayEnd = new Date(
+  1057→    date.getFullYear(),
+  1058→    date.getMonth(),
+  1059→    date.getDate(),
+  1060→    23,
+  1061→    59,
+  1062→    59,
+  1063→    999
+  1064→  );
+  1065→  return items.filter((l) => {
+  1066→    const s = new Date(l.startDate);
+  1067→    const e = new Date(l.endDate);
+  1068→    return s <= dayEnd && e >= dayStart;
+  1069→  });
+  1070→}
+  1071→

@@ -1,0 +1,727 @@
+     1→"use client";
+     2→
+     3→import { useState, useMemo } from "react";
+     4→import { useQuery, useQueryClient } from "@tanstack/react-query";
+     5→import { PageHeader } from "../shared/page-header";
+     6→import { KpiCard } from "../shared/kpi-card";
+     7→import { AvatarBadge } from "../shared/avatar-badge";
+     8→import { StatusBadge } from "../shared/status-badge";
+     9→import { EmptyState } from "../shared/empty-state";
+    10→import { Button } from "@/components/ui/button";
+    11→import { Input } from "@/components/ui/input";
+    12→import { Card } from "@/components/ui/card";
+    13→import { Skeleton } from "@/components/ui/skeleton";
+    14→import {
+    15→  Select,
+    16→  SelectContent,
+    17→  SelectItem,
+    18→  SelectTrigger,
+    19→  SelectValue,
+    20→} from "@/components/ui/select";
+    21→import {
+    22→  Table,
+    23→  TableBody,
+    24→  TableCell,
+    25→  TableHead,
+    26→  TableHeader,
+    27→  TableRow,
+    28→} from "@/components/ui/table";
+    29→import {
+    30→  DropdownMenu,
+    31→  DropdownMenuContent,
+    32→  DropdownMenuItem,
+    33→  DropdownMenuSeparator,
+    34→  DropdownMenuTrigger,
+    35→} from "@/components/ui/dropdown-menu";
+    36→import {
+    37→  Tooltip,
+    38→  TooltipContent,
+    39→  TooltipProvider,
+    40→  TooltipTrigger,
+    41→} from "@/components/ui/tooltip";
+    42→import {
+    43→  CalendarCheck,
+    44→  CalendarX,
+    45→  Clock,
+    46→  CalendarDays,
+    47→  Plus,
+    48→  Search,
+    49→  MoreVertical,
+    50→  Pencil,
+    51→  Trash2,
+    52→} from "lucide-react";
+    53→import { formatDate, cn } from "@/lib/utils";
+    54→import { toast } from "sonner";
+    55→import { AttendanceEntryDialog } from "./attendance-entry-dialog";
+    56→import { ExportButton } from "../shared/export-button";
+    57→
+    58→export function AttendanceModule() {
+    59→  const qc = useQueryClient();
+    60→  const todayStr = new Date().toISOString().slice(0, 10);
+    61→  const [date, setDate] = useState(todayStr);
+    62→  const [departmentId, setDepartmentId] = useState("");
+    63→  const [status, setStatus] = useState("");
+    64→  const [search, setSearch] = useState("");
+    65→  const [page, setPage] = useState(1);
+    66→
+    67→  const [entryOpen, setEntryOpen] = useState(false);
+    68→  const [editRecord, setEditRecord] = useState<{ id: string } | null>(null);
+    69→
+    70→  const { data: departments } = useQuery({
+    71→    queryKey: ["departments"],
+    72→    queryFn: () => fetch("/api/departments").then((r) => r.json()),
+    73→  });
+    74→
+    75→  const { data, isLoading } = useQuery({
+    76→    queryKey: ["attendance", date, departmentId, status, search, page],
+    77→    queryFn: async () => {
+    78→      const params = new URLSearchParams();
+    79→      if (date) params.set("date", date);
+    80→      if (departmentId) params.set("departmentId", departmentId);
+    81→      if (status) params.set("status", status);
+    82→      if (search) params.set("search", search);
+    83→      params.set("page", String(page));
+    84→      params.set("pageSize", "20");
+    85→      const r = await fetch(`/api/attendance?${params.toString()}`);
+    86→      return r.json();
+    87→    },
+    88→    placeholderData: (prev) => prev,
+    89→  });
+    90→
+    91→  const items = data?.items ?? [];
+    92→  const total = data?.total ?? 0;
+    93→  const totalPages = data?.totalPages ?? 1;
+    94→
+    95→  // KPIs for the selected date
+    96→  const presentToday = items.filter((a: any) => a.status === "PRESENT").length;
+    97→  const absentToday = items.filter((a: any) => a.status === "ABSENT").length;
+    98→  const lateToday = items.filter((a: any) => a.status === "LATE").length;
+    99→  const onLeaveToday = items.filter((a: any) => a.status === "LEAVE").length;
+   100→
+   101→  function editRecordFn(id: string) {
+   102→    setEditRecord({ id });
+   103→    setEntryOpen(true);
+   104→  }
+   105→
+   106→  function addNew() {
+   107→    setEditRecord(null);
+   108→    setEntryOpen(true);
+   109→  }
+   110→
+   111→  async function deleteRecord(id: string) {
+   112→    if (!confirm("Delete this attendance record?")) return;
+   113→    try {
+   114→      const r = await fetch(`/api/attendance/${id}`, { method: "DELETE" });
+   115→      if (!r.ok) throw new Error("Failed to delete");
+   116→      toast.success("Attendance record deleted.");
+   117→      qc.invalidateQueries({ queryKey: ["attendance"] });
+   118→      qc.invalidateQueries({ queryKey: ["attendance-heatmap"] });
+   119→    } catch (err: any) {
+   120→      toast.error(err.message || "Delete failed");
+   121→    }
+   122→  }
+   123→
+   124→  return (
+   125→    <div className="space-y-6">
+   126→      <PageHeader
+   127→        title="Attendance"
+   128→        description="Track daily check-in / check-out, late arrivals, and overtime"
+   129→        icon={<CalendarCheck className="size-5" />}
+   130→        actions={
+   131→          <>
+   132→            <ExportButton
+   133→              module="attendance"
+   134→              filters={{ date, departmentId, status, search }}
+   135→            />
+   136→            <Button size="sm" onClick={addNew}>
+   137→              <Plus className="size-4 mr-1.5" />{" "}
+   138→              <span className="hidden sm:inline">Add Attendance</span>
+   139→              <span className="sm:hidden">Add</span>
+   140→            </Button>
+   141→          </>
+   142→        }
+   143→      />
+   144→
+   145→      {/* KPIs */}
+   146→      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
+   147→        <KpiCard
+   148→          label="Present"
+   149→          value={presentToday}
+   150→          icon={CalendarCheck}
+   151→          iconClass="bg-emerald-500/10 text-emerald-600"
+   152→        />
+   153→        <KpiCard
+   154→          label="Absent"
+   155→          value={absentToday}
+   156→          icon={CalendarX}
+   157→          iconClass="bg-rose-500/10 text-rose-600"
+   158→        />
+   159→        <KpiCard
+   160→          label="Late"
+   161→          value={lateToday}
+   162→          icon={Clock}
+   163→          iconClass="bg-amber-500/10 text-amber-600"
+   164→        />
+   165→        <KpiCard
+   166→          label="On Leave"
+   167→          value={onLeaveToday}
+   168→          icon={CalendarDays}
+   169→          iconClass="bg-violet-500/10 text-violet-600"
+   170→        />
+   171→      </div>
+   172→
+   173→      {/* Heatmap section */}
+   174→      <AttendanceHeatmap />
+   175→
+   176→      {/* Filters */}
+   177→      <div className="flex flex-col md:flex-row gap-3">
+   178→        <Input
+   179→          type="date"
+   180→          value={date}
+   181→          onChange={(e) => {
+   182→            setDate(e.target.value);
+   183→            setPage(1);
+   184→          }}
+   185→          className="md:w-44"
+   186→        />
+   187→        <Select
+   188→          value={departmentId || "ALL"}
+   189→          onValueChange={(v) => {
+   190→            setDepartmentId(v === "ALL" ? "" : v);
+   191→            setPage(1);
+   192→          }}
+   193→        >
+   194→          <SelectTrigger className="md:w-48">
+   195→            <SelectValue placeholder="All departments" />
+   196→          </SelectTrigger>
+   197→          <SelectContent>
+   198→            <SelectItem value="ALL">All departments</SelectItem>
+   199→            {(departments?.items ?? departments ?? []).map((d: any) => (
+   200→              <SelectItem key={d.id} value={d.id}>
+   201→                {d.name}
+   202→              </SelectItem>
+   203→            ))}
+   204→          </SelectContent>
+   205→        </Select>
+   206→        <Select
+   207→          value={status || "ALL"}
+   208→          onValueChange={(v) => {
+   209→            setStatus(v === "ALL" ? "" : v);
+   210→            setPage(1);
+   211→          }}
+   212→        >
+   213→          <SelectTrigger className="md:w-40">
+   214→            <SelectValue placeholder="All statuses" />
+   215→          </SelectTrigger>
+   216→          <SelectContent>
+   217→            <SelectItem value="ALL">All statuses</SelectItem>
+   218→            <SelectItem value="PRESENT">Present</SelectItem>
+   219→            <SelectItem value="ABSENT">Absent</SelectItem>
+   220→            <SelectItem value="LATE">Late</SelectItem>
+   221→            <SelectItem value="LEAVE">On Leave</SelectItem>
+   222→            <SelectItem value="HALF_DAY">Half Day</SelectItem>
+   223→            <SelectItem value="REMOTE">Remote</SelectItem>
+   224→          </SelectContent>
+   225→        </Select>
+   226→        <div className="relative flex-1">
+   227→          <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+   228→          <Input
+   229→            placeholder="Search employee name or ID…"
+   230→            value={search}
+   231→            onChange={(e) => {
+   232→              setSearch(e.target.value);
+   233→              setPage(1);
+   234→            }}
+   235→            className="pl-9"
+   236→          />
+   237→        </div>
+   238→      </div>
+   239→
+   240→      <div className="text-sm text-muted-foreground">
+   241→        Showing{" "}
+   242→        <span className="font-medium text-foreground">{items.length}</span> of{" "}
+   243→        <span className="font-medium text-foreground">{total}</span> records
+   244→      </div>
+   245→
+   246→      {/* Loading */}
+   247→      {isLoading && (
+   248→        <Card className="border-border/60 shadow-soft p-4">
+   249→          <div className="space-y-3">
+   250→            {Array.from({ length: 6 }).map((_, i) => (
+   251→              <div
+   252→                key={i}
+   253→                className="h-12 rounded-md bg-muted/40 animate-pulse"
+   254→              />
+   255→            ))}
+   256→          </div>
+   257→        </Card>
+   258→      )}
+   259→
+   260→      {/* Empty */}
+   261→      {!isLoading && items.length === 0 && (
+   262→        <EmptyState
+   263→          icon={CalendarCheck}
+   264→          title="No attendance records"
+   265→          description={
+   266→            date || departmentId || status || search
+   267→              ? "No records match the current filters."
+   268→              : "Add the first attendance entry to get started."
+   269→          }
+   270→          actionLabel="Add Attendance"
+   271→          onAction={addNew}
+   272→        />
+   273→      )}
+   274→
+   275→      {/* Table */}
+   276→      {!isLoading && items.length > 0 && (
+   277→        <Card className="border-border/60 shadow-soft overflow-hidden">
+   278→          <div className="overflow-x-auto">
+   279→            <Table>
+   280→              <TableHeader>
+   281→                <TableRow className="bg-muted/40 hover:bg-muted/40">
+   282→                  <TableHead className="min-w-[200px]">Employee</TableHead>
+   283→                  <TableHead className="hidden sm:table-cell">Date</TableHead>
+   284→                  <TableHead>Check In</TableHead>
+   285→                  <TableHead className="hidden sm:table-cell">Check Out</TableHead>
+   286→                  <TableHead className="hidden md:table-cell">Hours</TableHead>
+   287→                  <TableHead className="hidden md:table-cell">Late</TableHead>
+   288→                  <TableHead className="hidden lg:table-cell">Overtime</TableHead>
+   289→                  <TableHead>Status</TableHead>
+   290→                  <TableHead className="text-right">Actions</TableHead>
+   291→                </TableRow>
+   292→              </TableHeader>
+   293→              <TableBody>
+   294→                {items.map((a: any) => (
+   295→                  <TableRow key={a.id} className="hover:bg-muted/30">
+   296→                    <TableCell>
+   297→                      <div className="flex items-center gap-3">
+   298→                        <AvatarBadge
+   299→                          name={a.employee?.fullName}
+   300→                          photo={a.employee?.photo}
+   301→                          size="md"
+   302→                        />
+   303→                        <div className="min-w-0">
+   304→                          <div className="font-medium truncate">
+   305→                            {a.employee?.fullName}
+   306→                          </div>
+   307→                          <div className="text-xs text-muted-foreground font-mono">
+   308→                            {a.employee?.employeeId}
+   309→                          </div>
+   310→                          <div className="sm:hidden text-[11px] text-muted-foreground mt-0.5">
+   311→                            {formatDate(a.date)}
+   312→                          </div>
+   313→                        </div>
+   314→                      </div>
+   315→                    </TableCell>
+   316→                    <TableCell className="text-xs hidden sm:table-cell">
+   317→                      {formatDate(a.date)}
+   318→                    </TableCell>
+   319→                    <TableCell className="text-xs tabular-nums">
+   320→                      {a.checkIn
+   321→                        ? new Date(a.checkIn).toLocaleTimeString("en-GB", {
+   322→                            hour: "2-digit",
+   323→                            minute: "2-digit",
+   324→                          })
+   325→                        : "—"}
+   326→                    </TableCell>
+   327→                    <TableCell className="text-xs tabular-nums hidden sm:table-cell">
+   328→                      {a.checkOut
+   329→                        ? new Date(a.checkOut).toLocaleTimeString("en-GB", {
+   330→                            hour: "2-digit",
+   331→                            minute: "2-digit",
+   332→                          })
+   333→                        : "—"}
+   334→                    </TableCell>
+   335→                    <TableCell className="text-xs tabular-nums hidden md:table-cell">
+   336→                      {a.workingHours ? `${a.workingHours}h` : "—"}
+   337→                    </TableCell>
+   338→                    <TableCell className="text-xs hidden md:table-cell">
+   339→                      {a.late ? (
+   340→                        <span className="text-amber-600 font-medium">
+   341→                          {a.lateMinutes}m
+   342→                        </span>
+   343→                      ) : (
+   344→                        "—"
+   345→                      )}
+   346→                    </TableCell>
+   347→                    <TableCell className="text-xs tabular-nums hidden lg:table-cell">
+   348→                      {a.overtime ? `${a.overtime}h` : "—"}
+   349→                    </TableCell>
+   350→                    <TableCell>
+   351→                      <StatusBadge status={a.status} />
+   352→                    </TableCell>
+   353→                    <TableCell className="text-right">
+   354→                      <DropdownMenu>
+   355→                        <DropdownMenuTrigger asChild>
+   356→                          <Button variant="ghost" size="icon" className="size-8">
+   357→                            <MoreVertical className="size-4" />
+   358→                          </Button>
+   359→                        </DropdownMenuTrigger>
+   360→                        <DropdownMenuContent align="end">
+   361→                          <DropdownMenuItem onClick={() => editRecordFn(a.id)}>
+   362→                            <Pencil className="size-4 mr-2" /> Edit
+   363→                          </DropdownMenuItem>
+   364→                          <DropdownMenuSeparator />
+   365→                          <DropdownMenuItem
+   366→                            className="text-rose-600"
+   367→                            onClick={() => deleteRecord(a.id)}
+   368→                          >
+   369→                            <Trash2 className="size-4 mr-2" /> Delete
+   370→                          </DropdownMenuItem>
+   371→                        </DropdownMenuContent>
+   372→                      </DropdownMenu>
+   373→                    </TableCell>
+   374→                  </TableRow>
+   375→                ))}
+   376→              </TableBody>
+   377→            </Table>
+   378→          </div>
+   379→        </Card>
+   380→      )}
+   381→
+   382→      {/* Pagination */}
+   383→      {!isLoading && totalPages > 1 && (
+   384→        <div className="flex items-center justify-between">
+   385→          <Button
+   386→            variant="outline"
+   387→            size="sm"
+   388→            disabled={page === 1}
+   389→            onClick={() => setPage((p) => Math.max(1, p - 1))}
+   390→          >
+   391→            Previous
+   392→          </Button>
+   393→          <div className="text-sm text-muted-foreground">
+   394→            Page {page} of {totalPages}
+   395→          </div>
+   396→          <Button
+   397→            variant="outline"
+   398→            size="sm"
+   399→            disabled={page >= totalPages}
+   400→            onClick={() => setPage((p) => p + 1)}
+   401→          >
+   402→            Next
+   403→          </Button>
+   404→        </div>
+   405→      )}
+   406→
+   407→      <AttendanceEntryDialog
+   408→        open={entryOpen}
+   409→        onOpenChange={(o) => {
+   410→          setEntryOpen(o);
+   411→          if (!o) setEditRecord(null);
+   412→        }}
+   413→        record={editRecord}
+   414→        onSaved={() => {
+   415→          qc.invalidateQueries({ queryKey: ["attendance"] });
+   416→          qc.invalidateQueries({ queryKey: ["attendance-heatmap"] });
+   417→        }}
+   418→      />
+   419→    </div>
+   420→  );
+   421→}
+   422→
+   423→// =========================================================
+   424→// AttendanceHeatmap — GitHub-style contribution graph
+   425→// =========================================================
+   426→
+   427→const INTENSITY_COLORS: Record<string, string> = {
+   428→  PRESENT: "bg-emerald-500",
+   429→  LATE: "bg-amber-500/80",
+   430→  REMOTE: "bg-amber-500/80",
+   431→  HALF_DAY: "bg-sky-500/60",
+   432→  LEAVE: "bg-amber-500/40",
+   433→  ABSENT: "bg-rose-500/60",
+   434→  HOLIDAY: "bg-muted/30",
+   435→};
+   436→
+   437→const STATUS_LABEL: Record<string, string> = {
+   438→  PRESENT: "Present",
+   439→  LATE: "Late",
+   440→  REMOTE: "Remote",
+   441→  HALF_DAY: "Half Day",
+   442→  LEAVE: "On Leave",
+   443→  ABSENT: "Absent",
+   444→  HOLIDAY: "Holiday",
+   445→};
+   446→
+   447→const LEGEND_ITEMS = [
+   448→  { label: "Less", color: "bg-muted/30" },
+   449→  { label: "Absent", color: "bg-rose-500/60" },
+   450→  { label: "Leave", color: "bg-amber-500/40" },
+   451→  { label: "Half Day", color: "bg-sky-500/60" },
+   452→  { label: "Late / Remote", color: "bg-amber-500/80" },
+   453→  { label: "Present", color: "bg-emerald-500" },
+   454→  { label: "More", color: "bg-emerald-600" },
+   455→];
+   456→
+   457→const CELL_PX = 12;
+   458→const GAP_PX = 3;
+   459→
+   460→type HeatmapItem = {
+   461→  date: string;
+   462→  status: string;
+   463→  workingHours: number | null;
+   464→  count?: number;
+   465→};
+   466→
+   467→function AttendanceHeatmap() {
+   468→  const [employeeId, setEmployeeId] = useState("");
+   469→  const [months, setMonths] = useState(3);
+   470→
+   471→  const { data: employeesData } = useQuery({
+   472→    queryKey: ["employees-for-heatmap"],
+   473→    queryFn: () =>
+   474→      fetch("/api/employees?pageSize=1000").then((r) => r.json()),
+   475→  });
+   476→
+   477→  const { data, isLoading } = useQuery({
+   478→    queryKey: ["attendance-heatmap", employeeId, months],
+   479→    queryFn: async () => {
+   480→      const params = new URLSearchParams();
+   481→      if (employeeId) params.set("employeeId", employeeId);
+   482→      params.set("months", String(months));
+   483→      const r = await fetch(`/api/attendance/heatmap?${params.toString()}`);
+   484→      return r.json();
+   485→    },
+   486→  });
+   487→
+   488→  const items: HeatmapItem[] = data?.items ?? [];
+   489→  const startDateStr = data?.startDate;
+   490→  const endDateStr = data?.endDate;
+   491→
+   492→  const { weeks, monthLabels } = useMemo(() => {
+   493→    if (!startDateStr || !endDateStr) {
+   494→      return { weeks: [] as Date[][], monthLabels: [] as { col: number; label: string }[] };
+   495→    }
+   496→    const start = new Date(startDateStr);
+   497→    start.setDate(start.getDate() - start.getDay()); // shift to Sunday
+   498→    const end = new Date(endDateStr);
+   499→    end.setDate(end.getDate() + (6 - end.getDay())); // shift to Saturday
+   500→
+   501→    const w: Date[][] = [];
+   502→    const cur = new Date(start);
+   503→    while (cur.getTime() <= end.getTime()) {
+   504→      const wk: Date[] = [];
+   505→      for (let i = 0; i < 7; i++) {
+   506→        wk.push(new Date(cur));
+   507→        cur.setDate(cur.getDate() + 1);
+   508→      }
+   509→      w.push(wk);
+   510→    }
+   511→
+   512→    const labels: { col: number; label: string }[] = [];
+   513→    w.forEach((wk, i) => {
+   514→      const first = wk[0];
+   515→      const isFirst = i === 0 || first.getMonth() !== w[i - 1][0].getMonth();
+   516→      if (isFirst) {
+   517→        labels.push({
+   518→          col: i,
+   519→          label: first.toLocaleDateString("en-US", { month: "short" }),
+   520→        });
+   521→      }
+   522→    });
+   523→    return { weeks: w, monthLabels: labels };
+   524→  }, [startDateStr, endDateStr]);
+   525→
+   526→  // Map items by date for O(1) lookup
+   527→  const byDate = useMemo(() => {
+   528→    const m = new Map<string, HeatmapItem>();
+   529→    items.forEach((i) => m.set(i.date, i));
+   530→    return m;
+   531→  }, [items]);
+   532→
+   533→  const todayKey = new Date().toISOString().slice(0, 10);
+   534→
+   535→  return (
+   536→    <Card className="border-border/60 shadow-soft p-4 sm:p-5">
+   537→      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+   538→        <div>
+   539→          <h3 className="text-sm font-semibold flex items-center gap-1.5">
+   540→            <CalendarDays className="size-4 text-primary" />
+   541→            Attendance Heatmap
+   542→          </h3>
+   543→          <p className="text-xs text-muted-foreground mt-0.5">
+   544→            Last {months} month{months === 1 ? "" : "s"} — color intensity reflects attendance status
+   545→          </p>
+   546→        </div>
+   547→        <div className="flex items-center gap-2 flex-wrap">
+   548→          <Select
+   549→            value={employeeId || "ALL"}
+   550→            onValueChange={(v) => setEmployeeId(v === "ALL" ? "" : v)}
+   551→          >
+   552→            <SelectTrigger className="w-[180px] h-8 text-xs">
+   553→              <SelectValue placeholder="All employees" />
+   554→            </SelectTrigger>
+   555→            <SelectContent>
+   556→              <SelectItem value="ALL">All employees (aggregated)</SelectItem>
+   557→              {(employeesData?.items ?? []).map((e: any) => (
+   558→                <SelectItem key={e.id} value={e.id}>
+   559→                  {e.fullName} · {e.employeeId}
+   560→                </SelectItem>
+   561→              ))}
+   562→            </SelectContent>
+   563→          </Select>
+   564→          <Select
+   565→            value={String(months)}
+   566→            onValueChange={(v) => setMonths(Number(v))}
+   567→          >
+   568→            <SelectTrigger className="w-[110px] h-8 text-xs">
+   569→              <SelectValue />
+   570→            </SelectTrigger>
+   571→            <SelectContent>
+   572→              <SelectItem value="1">1 month</SelectItem>
+   573→              <SelectItem value="3">3 months</SelectItem>
+   574→              <SelectItem value="6">6 months</SelectItem>
+   575→              <SelectItem value="12">12 months</SelectItem>
+   576→            </SelectContent>
+   577→          </Select>
+   578→        </div>
+   579→      </div>
+   580→
+   581→      {isLoading ? (
+   582→        <div className="space-y-2">
+   583→          <Skeleton className="h-4 w-full" />
+   584→          <Skeleton className="h-32 w-full" />
+   585→        </div>
+   586→      ) : weeks.length === 0 ? (
+   587→        <div className="text-sm text-muted-foreground py-8 text-center">
+   588→          No attendance data for this range.
+   589→        </div>
+   590→      ) : (
+   591→        <div className="overflow-x-auto pb-1 -mx-1 px-1">
+   592→          <div className="inline-block min-w-full">
+   593→            {/* Month labels */}
+   594→            <div
+   595→              className="relative mb-1 ml-7"
+   596→              style={{ height: "14px" }}
+   597→            >
+   598→              {monthLabels.map((m, i) => (
+   599→                <div
+   600→                  key={i}
+   601→                  className="absolute top-0 text-[10px] font-medium text-muted-foreground whitespace-nowrap"
+   602→                  style={{ left: `${m.col * (CELL_PX + GAP_PX)}px` }}
+   603→                >
+   604→                  {m.label}
+   605→                </div>
+   606→              ))}
+   607→            </div>
+   608→
+   609→            {/* Heatmap body: day labels + grid */}
+   610→            <div className="flex gap-1">
+   611→              {/* Day labels */}
+   612→              <div
+   613→                className="flex flex-col text-[10px] text-muted-foreground pr-1 flex-shrink-0"
+   614→                style={{ width: "1.5rem" }}
+   615→              >
+   616→                {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map(
+   617→                  (d, i) => (
+   618→                    <div
+   619→                      key={d}
+   620→                      className="leading-none flex items-end"
+   621→                      style={{
+   622→                        height: `${CELL_PX}px`,
+   623→                        marginBottom: i < 6 ? `${GAP_PX}px` : 0,
+   624→                      }}
+   625→                    >
+   626→                      {d === "Mon" || d === "Wed" || d === "Fri" ? d : ""}
+   627→                    </div>
+   628→                  )
+   629→                )}
+   630→              </div>
+   631→
+   632→              {/* Grid */}
+   633→              <TooltipProvider delayDuration={150}>
+   634→                <div
+   635→                  className="grid grid-flow-col"
+   636→                  style={{
+   637→                    gridTemplateRows: `repeat(7, ${CELL_PX}px)`,
+   638→                    gap: `${GAP_PX}px`,
+   639→                  }}
+   640→                >
+   641→                  {weeks.flat().map((day, idx) => {
+   642→                    const key = localDateKey(day);
+   643→                    const info = byDate.get(key);
+   644→                    const isFuture = key > todayKey;
+   645→                    const status = info?.status;
+   646→                    const colorClass = !status
+   647→                      ? isFuture
+   648→                        ? "bg-transparent"
+   649→                        : "bg-muted/30"
+   650→                      : INTENSITY_COLORS[status] ?? "bg-muted/30";
+   651→                    const tooltipText = buildTooltipText(day, info);
+   652→
+   653→                    return (
+   654→                      <Tooltip key={idx}>
+   655→                        <TooltipTrigger asChild>
+   656→                          <div
+   657→                            className={cn(
+   658→                              "rounded-[3px] ring-0 transition-transform hover:ring-1 hover:ring-primary/50 hover:scale-110",
+   659→                              colorClass
+   660→                            )}
+   661→                            style={{ width: `${CELL_PX}px`, height: `${CELL_PX}px` }}
+   662→                          />
+   663→                        </TooltipTrigger>
+   664→                        <TooltipContent
+   665→                          side="top"
+   666→                          className="text-xs whitespace-nowrap"
+   667→                        >
+   668→                          {tooltipText}
+   669→                        </TooltipContent>
+   670→                      </Tooltip>
+   671→                    );
+   672→                  })}
+   673→                </div>
+   674→              </TooltipProvider>
+   675→            </div>
+   676→
+   677→            {/* Legend */}
+   678→            <div className="mt-4 flex items-center gap-1.5 flex-wrap text-[10px] text-muted-foreground ml-7">
+   679→              <span className="font-medium">Less</span>
+   680→              {LEGEND_ITEMS.slice(1, -1).map((it, i) => (
+   681→                <span
+   682→                  key={i}
+   683→                  className={cn(
+   684→                    "size-3 rounded-[3px] inline-block",
+   685→                    it.color
+   686→                  )}
+   687→                  title={it.label}
+   688→                />
+   689→              ))}
+   690→              <span className="font-medium">More</span>
+   691→            </div>
+   692→          </div>
+   693→        </div>
+   694→      )}
+   695→    </Card>
+   696→  );
+   697→}
+   698→
+   699→function localDateKey(d: Date): string {
+   700→  const y = d.getFullYear();
+   701→  const m = String(d.getMonth() + 1).padStart(2, "0");
+   702→  const day = String(d.getDate()).padStart(2, "0");
+   703→  return `${y}-${m}-${day}`;
+   704→}
+   705→
+   706→function buildTooltipText(day: Date, info: HeatmapItem | undefined): string {
+   707→  const dateStr = day.toLocaleDateString("en-US", {
+   708→    weekday: "short",
+   709→    day: "numeric",
+   710→    month: "short",
+   711→    year: "numeric",
+   712→  });
+   713→  if (!info) {
+   714→    return `${dateStr} — No data`;
+   715→  }
+   716→  const statusLabel = STATUS_LABEL[info.status] ?? info.status;
+   717→  const countSuffix =
+   718→    info.count !== undefined && info.count > 0
+   719→      ? ` · ${info.count} record${info.count === 1 ? "" : "s"}`
+   720→      : "";
+   721→  const hoursSuffix =
+   722→    info.workingHours !== null && info.workingHours !== undefined
+   723→      ? ` · ${info.workingHours}h avg`
+   724→      : "";
+   725→  return `${dateStr} — ${statusLabel}${hoursSuffix}${countSuffix}`;
+   726→}
+   727→

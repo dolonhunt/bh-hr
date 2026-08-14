@@ -71,6 +71,7 @@ import {
   Stamp,
   ChevronRight,
   Printer,
+  GitCompareArrows,
 } from "lucide-react";
 import { formatDate, relativeTime, cn } from "@/lib/utils";
 import { printDocument } from "@/lib/print";
@@ -79,6 +80,7 @@ import { GenerateDocumentDialog } from "./generate-document-dialog";
 import { BulkGenerateDialog } from "./bulk-generate-dialog";
 import { ApprovalQueue } from "./approval-queue";
 import { ExportButton } from "../shared/export-button";
+import { TemplateCompareDialog } from "./template-compare-dialog";
 
 const DOC_TYPES = [
   "OFFER",
@@ -123,6 +125,9 @@ export function DocumentsModule() {
   const [editTemplate, setEditTemplate] = useState<{ id: string } | null>(null);
   const [previewDoc, setPreviewDoc] = useState<any | null>(null);
   const [sendEmailDoc, setSendEmailDoc] = useState<any | null>(null);
+  const [compareOpen, setCompareOpen] = useState(false);
+  const [compareTpl1, setCompareTpl1] = useState<string | undefined>(undefined);
+  const [compareTpl2, setCompareTpl2] = useState<string | undefined>(undefined);
 
   return (
     <div className="space-y-6">
@@ -189,6 +194,11 @@ export function DocumentsModule() {
             setEditTemplate(null);
             setTemplateFormOpen(true);
           }}
+          onCompare={(id1, id2) => {
+            setCompareTpl1(id1);
+            setCompareTpl2(id2);
+            setCompareOpen(true);
+          }}
         />
       )}
       {documentsTab === "generated" && (
@@ -229,6 +239,20 @@ export function DocumentsModule() {
 
       {/* Send email dialog */}
       <DirectSendEmailDialog doc={sendEmailDoc} onClose={() => setSendEmailDoc(null)} />
+
+      {/* Template compare dialog */}
+      <TemplateCompareDialog
+        open={compareOpen}
+        onOpenChange={(o) => {
+          setCompareOpen(o);
+          if (!o) {
+            setCompareTpl1(undefined);
+            setCompareTpl2(undefined);
+          }
+        }}
+        templateId1={compareTpl1}
+        templateId2={compareTpl2}
+      />
     </div>
   );
 }
@@ -307,9 +331,11 @@ function AllDocumentsTab({
 function TemplatesTab({
   onEdit,
   onCreate,
+  onCompare,
 }: {
   onEdit: (id: string) => void;
   onCreate: () => void;
+  onCompare: (id1?: string, id2?: string) => void;
 }) {
   const qc = useQueryClient();
   const [search, setSearch] = useState("");
@@ -393,6 +419,14 @@ function TemplatesTab({
             ))}
           </SelectContent>
         </Select>
+        <Button
+          variant="outline"
+          onClick={() => onCompare(undefined, undefined)}
+          size="sm"
+          className="md:w-auto"
+        >
+          <GitCompareArrows className="size-4 mr-1.5" /> Compare
+        </Button>
         <Button onClick={onCreate} size="sm" className="md:w-auto">
           <Plus className="size-4 mr-1.5" /> Create Template
         </Button>
@@ -499,6 +533,9 @@ function TemplatesTab({
                       </DropdownMenuItem>
                       <DropdownMenuItem onClick={() => setPreviewTpl(t)}>
                         <Eye className="size-4 mr-2" /> Preview
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => onCompare(t.id, undefined)}>
+                        <GitCompareArrows className="size-4 mr-2" /> Compare with…
                       </DropdownMenuItem>
                       <DropdownMenuSeparator />
                       <DropdownMenuItem

@@ -52,6 +52,7 @@ import {
   ChevronLeft,
   ChevronRight,
   List as ListIcon,
+  Scale,
 } from "lucide-react";
 import { formatDate, relativeTime, cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -67,8 +68,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { LeaveEntryDialog } from "./leave-entry-dialog";
 import { ExportButton } from "../shared/export-button";
+import { LeaveBalances } from "./leave-balances";
 
-type View = "list" | "calendar";
+type View = "list" | "calendar" | "balances";
 
 type LeaveCalendarItem = {
   id: string;
@@ -328,6 +330,20 @@ export function LeaveModule() {
             <CalendarDays className="size-3.5" />
             <span>Calendar View</span>
           </Button>
+          <Button
+            size="sm"
+            variant={view === "balances" ? "default" : "ghost"}
+            className={cn(
+              "h-7 rounded-sm gap-1.5",
+              view === "balances"
+                ? "bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground"
+                : "text-muted-foreground hover:text-foreground"
+            )}
+            onClick={() => setView("balances")}
+          >
+            <Scale className="size-3.5" />
+            <span>Balances View</span>
+          </Button>
         </div>
 
         {view === "calendar" && (
@@ -366,6 +382,9 @@ export function LeaveModule() {
           </div>
         )}
       </div>
+
+      {/* BALANCES VIEW */}
+      {view === "balances" && <LeaveBalances />}
 
       {/* LIST VIEW */}
       {view === "list" && (
