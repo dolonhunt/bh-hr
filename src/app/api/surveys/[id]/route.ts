@@ -47,16 +47,24 @@ export async function GET(
     orderBy: { createdAt: "desc" },
   });
 
+  const anonymous = survey.anonymous === true;
+
   const parsedResponses = responses
     .map((r) => {
       try {
         const m = JSON.parse(r.description || "{}");
         if (!m || m.surveyId !== id) return null;
+        const employeeId = anonymous ? null : (m.employeeId ?? null);
+        const employeeName = anonymous ? null : (m.employeeName ?? null);
         return {
           id: r.id,
           surveyId: m.surveyId,
-          employeeId: m.employeeId ?? null,
-          employeeName: m.employeeName ?? null,
+          employeeId,
+          employeeName,
+          anonymous,
+          displayName: anonymous
+            ? "Anonymous"
+            : (m.employeeName ?? "—"),
           answers: Array.isArray(m.answers) ? m.answers : [],
           submittedAt:
             m.submittedAt ?? r.createdAt?.toISOString?.() ?? r.createdAt,
@@ -122,6 +130,10 @@ export async function PATCH(
 
   if (body.createdBy !== undefined) {
     meta.createdBy = body.createdBy ? String(body.createdBy) : null;
+  }
+
+  if (body.anonymous !== undefined) {
+    meta.anonymous = body.anonymous === true;
   }
 
   if (Array.isArray(body.questions)) {

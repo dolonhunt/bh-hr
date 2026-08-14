@@ -1,11 +1,24 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
+import { parseSurveyMeta } from "../../route";
 
 // ============================================================
 // GET  /api/surveys/[id]/responses   → list responses for a survey
 // POST /api/surveys/[id]/responses   → submit a response
 //   Body: { employeeId?, answers: [{ questionId, value }] }
+//
+// ANONYMITY: if the survey's metadata.anonymous flag is true, the
+// GET endpoint strips employeeId/employeeName from every response
+// (replaced with "Anonymous") and the POST endpoint never stores
+// employee identity — only null is persisted.
 // ============================================================
+
+async function loadSurveyMeta(id: string) {
+  const survey = await db.activity.findUnique({ where: { id } });
+  if (!survey || survey.type !== "SURVEY") return null;
+  const meta = parseSurveyMeta(survey.description);
+  return { survey, meta };
+}
 
 export async function GET(
   _req: NextRequest,
@@ -13,10 +26,11 @@ export async function GET(
 ) {
   const { id } = await params;
 
-  const survey = await db.activity.findUnique({ where: { id } });
-  if (!survey || survey.type !== "SURVEY") {
+  const ctx = await loadSurveyMeta(id);
+  if (!ctx || !ctx.meta) {
     return NextResponse.json({ error: "Survey not found" }, { status: 404 });
   }
+  const anonymous = ctx.meta.anonymous === true;
 
   const responses = await db.activity.findMany({
     where: {
@@ -31,11 +45,15 @@ export async function GET(
       try {
         const m = JSON.parse(r.description || "{}");
         if (!m || m.surveyId !== id) return null;
+        const employeeId = anonymous ? null : (m.employeeId ?? null);
+        const employeeName = anonymous ? null : (m.employeeName ?? null);
         return {
           id: r.id,
           surveyId: m.surveyId,
-          employeeId: m.employeeId ?? null,
-          employeeName: m.employeeName ?? null,
+          employeeId,
+          employeeName,
+          anonymous,
+          displayName: anonymous ? "Anonymous" : (m.employeeName ?? "—"),
           answers: Array.isArray(m.answers) ? m.answers : [],
           submittedAt:
             m.submittedAt ?? r.createdAt?.toISOString?.() ?? r.createdAt,
@@ -47,7 +65,7 @@ export async function GET(
     })
     .filter(Boolean);
 
-  return NextResponse.json({ items: parsed, total: parsed.length });
+  return NextResponse.json({ items: parsed, total: parsed.length, anonymous });
 }
 
 export async function POST(
@@ -57,19 +75,14 @@ export async function POST(
   const { id } = await params;
   const body = await req.json();
 
-  const survey = await db.activity.findUnique({ where: { id } });
-  if (!survey || survey.type !== "SURVEY") {
+  const ctx = await loadSurveyMeta(id);
+  if (!ctx || !ctx.meta) {
     return NextResponse.json({ error: "Survey not found" }, { status: 404 });
   }
+  const anonymous = ctx.meta.anonymous === true;
 
   // Parse survey questions so we can validate answers + types.
-  let questions: any[] = [];
-  try {
-    const m = JSON.parse(survey.description || "{}");
-    questions = Array.isArray(m.questions) ? m.questions : [];
-  } catch {
-    questions = [];
-  }
+  const questions = ctx.meta.questions ?? [];
 
   if (!Array.isArray(body.answers) || body.answers.length === 0) {
     return NextResponse.json(
@@ -109,9 +122,10 @@ export async function POST(
     return { questionId: a.questionId, value };
   });
 
-  // Resolve employee name (optional).
+  // Resolve employee name (optional, and only if not anonymous).
   let employeeName: string | null = null;
-  if (body.employeeId) {
+  let storedEmployeeId: string | null = null;
+  if (!anonymous && body.employeeId) {
     const emp = await db.employee.findUnique({
       where: { id: body.employeeId },
       select: { id: true, fullName: true },
@@ -123,13 +137,15 @@ export async function POST(
       );
     }
     employeeName = emp.fullName;
+    storedEmployeeId = emp.id;
   }
 
   const submittedAt = new Date().toISOString();
   const meta = {
     surveyId: id,
-    employeeId: body.employeeId || null,
+    employeeId: storedEmployeeId,
     employeeName,
+    anonymous,
     answers: sanitisedAnswers,
     submittedAt,
   };
@@ -137,8 +153,8 @@ export async function POST(
   const activity = await db.activity.create({
     data: {
       type: "SURVEY_RESPONSE",
-      employeeId: body.employeeId || null,
-      title: `Response — ${survey.title}`,
+      employeeId: storedEmployeeId,
+      title: `Response — ${ctx.survey.title}`,
       description: JSON.stringify(meta),
     },
   });
@@ -148,9 +164,7 @@ export async function POST(
       action: "SURVEY_RESPONSE_SUBMIT",
       entityType: "SurveyResponse",
       entityId: activity.id,
-      description: `Submitted response to survey "${survey.title}"${
-        employeeName ? ` by ${employeeName}` : ""
-      }.`,
+      description: `Submitted ${anonymous ? "anonymous " : ""}response to survey "${ctx.survey.title}"${!anonymous && employeeName ? ` by ${employeeName}` : ""}.`,
     },
   });
 
@@ -158,6 +172,7 @@ export async function POST(
     {
       id: activity.id,
       ...meta,
+      displayName: anonymous ? "Anonymous" : (employeeName ?? "—"),
       createdAt: activity.createdAt?.toISOString?.() ?? activity.createdAt,
     },
     { status: 201 }

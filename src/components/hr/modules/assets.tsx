@@ -1,8 +1,17 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import {
+  Area,
+  AreaChart,
+  CartesianGrid,
+  ResponsiveContainer,
+  Tooltip as RechartsTooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
 import {
   Package,
   PackageCheck,
@@ -33,6 +42,10 @@ import {
   ChevronDown,
   ChevronsUpDown,
   Check,
+  TrendingDown,
+  Coins,
+  LineChart as LineChartIcon,
+  Info,
 } from "lucide-react";
 import { PageHeader } from "../shared/page-header";
 import { KpiCard } from "../shared/kpi-card";
@@ -86,7 +99,7 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command";
-import { cn, formatDate } from "@/lib/utils";
+import { cn, formatDate, formatCurrency } from "@/lib/utils";
 
 // =========================================================
 // Constants & types
@@ -140,6 +153,7 @@ interface Asset {
   type: AssetType;
   serialNumber: string;
   condition: AssetCondition;
+  purchaseValue?: number;
   assignedToId: string | null;
   assignedToName: string | null;
   assignedDate: string | null;
@@ -148,6 +162,61 @@ interface Asset {
   status: AssetStatus;
   notes: string | null;
   createdAt: string;
+}
+
+interface DepreciationRow {
+  id: string;
+  name: string;
+  type: AssetType;
+  serialNumber: string;
+  purchaseValue: number;
+  depreciationRate: number;
+  age: number;
+  annualDepreciation: number;
+  totalDepreciation: number;
+  currentValue: number;
+  purchaseDate: string;
+  condition: AssetCondition;
+  status: AssetStatus;
+}
+
+interface DepreciationSummary {
+  totalPurchaseValue: number;
+  totalCurrentValue: number;
+  totalDepreciation: number;
+  avgDepreciationPct: number;
+}
+
+interface DepreciationDetailYear {
+  year: number;
+  label: string;
+  startValue: number;
+  endValue: number;
+  depreciationThisYear: number;
+  cumulativeDepreciation: number;
+  remainingValue: number;
+  isPast: boolean;
+  isCurrent: boolean;
+  isProjection: boolean;
+}
+
+interface DepreciationDetail {
+  asset: {
+    id: string;
+    name: string;
+    type: AssetType;
+    serialNumber: string;
+    purchaseValue: number;
+    depreciationRate: number;
+    age: number;
+    annualDepreciation: number;
+    totalDepreciation: number;
+    currentValue: number;
+    purchaseDate: string;
+    condition: AssetCondition;
+    status: AssetStatus;
+  };
+  history: DepreciationDetailYear[];
 }
 
 interface EmployeeOption {
@@ -167,12 +236,13 @@ export function AssetsModule() {
   const [search, setSearch] = useState("");
   const [type, setType] = useState("");
   const [status, setStatus] = useState("");
-  const [view, setView] = useState<"table" | "grid">("table");
+  const [view, setView] = useState<"table" | "grid" | "depreciation">("table");
 
   const [formOpen, setFormOpen] = useState(false);
   const [editAsset, setEditAsset] = useState<Asset | null>(null);
   const [assignAsset, setAssignAsset] = useState<Asset | null>(null);
   const [returnAsset, setReturnAsset] = useState<Asset | null>(null);
+  const [depreciationAsset, setDepreciationAsset] = useState<DepreciationRow | null>(null);
 
   const qc = useQueryClient();
   const { data, isLoading, isError } = useQuery({
@@ -262,6 +332,16 @@ export function AssetsModule() {
               >
                 <LayoutGrid className="size-4" />
                 <span className="hidden sm:inline">Grid</span>
+              </Button>
+              <Button
+                variant={view === "depreciation" ? "default" : "ghost"}
+                size="sm"
+                className="rounded-none gap-1.5"
+                onClick={() => setView("depreciation")}
+                aria-label="Depreciation view"
+              >
+                <TrendingDown className="size-4" />
+                <span className="hidden sm:inline">Depreciation</span>
               </Button>
             </div>
             <Button size="sm" onClick={openCreate} className="gap-1.5">
@@ -366,7 +446,14 @@ export function AssetsModule() {
       </div>
 
       {/* Content */}
-      {isLoading ? (
+      {view === "depreciation" ? (
+        <DepreciationView
+          search={search}
+          type={type}
+          status={status}
+          onInspect={(row) => setDepreciationAsset(row)}
+        />
+      ) : isLoading ? (
         <AssetsSkeleton view={view} />
       ) : isError ? (
         <EmptyState
@@ -437,6 +524,12 @@ export function AssetsModule() {
           qc.invalidateQueries({ queryKey: ["assets"] });
           setReturnAsset(null);
         }}
+      />
+
+      {/* Depreciation detail dialog */}
+      <DepreciationDetailDialog
+        asset={depreciationAsset}
+        onClose={() => setDepreciationAsset(null)}
       />
     </div>
   );
@@ -872,6 +965,11 @@ function AssetFormBody({
   const [condition, setCondition] = useState<AssetCondition>(
     asset?.condition ?? "GOOD"
   );
+  const [purchaseValue, setPurchaseValue] = useState<string>(
+    asset?.purchaseValue !== undefined && asset.purchaseValue !== null
+      ? String(asset.purchaseValue)
+      : "1000"
+  );
   const [notes, setNotes] = useState(asset?.notes ?? "");
   const [saving, setSaving] = savingState;
 
@@ -880,9 +978,14 @@ function AssetFormBody({
       toast.error("Asset name is required.");
       return;
     }
+    const pvNum = Number(purchaseValue);
+    const pv =
+      purchaseValue.trim() !== "" && !isNaN(pvNum) && pvNum >= 0
+        ? pvNum
+        : 1000;
     setSaving(true);
     try {
-      const body = { name, type, serialNumber, condition, notes };
+      const body = { name, type, serialNumber, condition, purchaseValue: pv, notes };
       const r = asset
         ? await fetch(`/api/assets/${asset.id}`, {
             method: "PATCH",
@@ -955,14 +1058,33 @@ function AssetFormBody({
           </Select>
         </div>
       </div>
-      <div className="space-y-1.5">
-        <Label htmlFor="asset-serial">Serial number</Label>
-        <Input
-          id="asset-serial"
-          placeholder="e.g. SN-2024-001234"
-          value={serialNumber}
-          onChange={(e) => setSerialNumber(e.target.value)}
-        />
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div className="space-y-1.5">
+          <Label htmlFor="asset-serial">Serial number</Label>
+          <Input
+            id="asset-serial"
+            placeholder="e.g. SN-2024-001234"
+            value={serialNumber}
+            onChange={(e) => setSerialNumber(e.target.value)}
+          />
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="asset-purchase-value">
+            Purchase value (৳)
+          </Label>
+          <Input
+            id="asset-purchase-value"
+            type="number"
+            min="0"
+            step="100"
+            placeholder="1000"
+            value={purchaseValue}
+            onChange={(e) => setPurchaseValue(e.target.value)}
+          />
+          <p className="text-[11px] text-muted-foreground">
+            Used to compute depreciation. Defaults to ৳1,000 if left blank.
+          </p>
+        </div>
       </div>
       <div className="space-y-1.5">
         <Label htmlFor="asset-notes">Notes</Label>
@@ -1331,5 +1453,551 @@ function ReturnDialog({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  );
+}
+
+// =========================================================
+// Depreciation View — KPIs + table + color-coded bars
+// =========================================================
+
+function depreciationColor(pct: number) {
+  if (pct < 30) return "bg-emerald-500";
+  if (pct <= 70) return "bg-amber-500";
+  return "bg-rose-500";
+}
+
+function depreciationTone(pct: number) {
+  if (pct < 30)
+    return "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/20";
+  if (pct <= 70)
+    return "bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/20";
+  return "bg-rose-500/15 text-rose-700 dark:text-rose-300 border-rose-500/20";
+}
+
+function DepreciationView({
+  search,
+  type,
+  status,
+  onInspect,
+}: {
+  search: string;
+  type: string;
+  status: string;
+  onInspect: (row: DepreciationRow) => void;
+}) {
+  const qc = useQueryClient();
+  const { data, isLoading, isError } = useQuery({
+    queryKey: ["assets", "depreciation"],
+    queryFn: async () => {
+      const r = await fetch("/api/assets/depreciation");
+      if (!r.ok) throw new Error("Failed to load depreciation");
+      return r.json();
+    },
+  });
+
+  const summary: DepreciationSummary | undefined = data?.summary;
+  const items: DepreciationRow[] = data?.items ?? [];
+
+  const filtered = useMemo(() => {
+    let list = items;
+    if (type) list = list.filter((a) => a.type === type);
+    if (status) list = list.filter((a) => a.status === status);
+    if (search) {
+      const q = search.toLowerCase();
+      list = list.filter(
+        (a) =>
+          a.name.toLowerCase().includes(q) ||
+          a.serialNumber.toLowerCase().includes(q)
+      );
+    }
+    return list;
+  }, [items, type, status, search]);
+
+  if (isLoading) {
+    return (
+      <div className="space-y-4">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <Skeleton key={i} className="h-28 w-full rounded-xl" />
+          ))}
+        </div>
+        <Skeleton className="h-96 w-full rounded-xl" />
+      </div>
+    );
+  }
+
+  if (isError) {
+    return (
+      <EmptyState
+        icon={AlertTriangle}
+        title="Failed to load depreciation data"
+        description="Please try again. If the problem persists, check the dev server."
+        actionLabel="Retry"
+        onAction={() => qc.invalidateQueries({ queryKey: ["assets", "depreciation"] })}
+      />
+    );
+  }
+
+  if (items.length === 0) {
+    return (
+      <EmptyState
+        icon={TrendingDown}
+        title="No assets to depreciate"
+        description="Once you add assets, depreciation will be tracked here automatically."
+      />
+    );
+  }
+
+  return (
+    <div className="space-y-5">
+      {/* KPI cards */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
+        <KpiCard
+          label="Total Purchase Value"
+          value={summary ? formatCurrency(summary.totalPurchaseValue) : "—"}
+          icon={Coins}
+          iconClass="bg-primary/10 text-primary"
+          footer={<span className="text-muted-foreground">{items.length} asset{items.length === 1 ? "" : "s"}</span>}
+        />
+        <KpiCard
+          label="Total Current Value"
+          value={summary ? formatCurrency(summary.totalCurrentValue) : "—"}
+          icon={Package}
+          iconClass="bg-emerald-500/15 text-emerald-600"
+          footer={<span className="text-muted-foreground">After depreciation</span>}
+        />
+        <KpiCard
+          label="Total Depreciated"
+          value={summary ? formatCurrency(summary.totalDepreciation) : "—"}
+          icon={TrendingDown}
+          iconClass="bg-rose-500/15 text-rose-600"
+          footer={<span className="text-muted-foreground">All-time loss</span>}
+        />
+        <KpiCard
+          label="Avg Depreciation"
+          value={summary ? `${summary.avgDepreciationPct}%` : "—"}
+          icon={LineChartIcon}
+          iconClass="bg-amber-500/15 text-amber-600"
+          footer={<span className="text-muted-foreground">Across portfolio</span>}
+        />
+      </div>
+
+      {/* Table */}
+      <Card className="p-0 overflow-hidden border-border/60">
+        <div className="overflow-x-auto max-h-[70vh] overflow-y-auto">
+          <Table>
+            <TableHeader className="sticky top-0 bg-card z-10">
+              <TableRow>
+                <TableHead>Asset</TableHead>
+                <TableHead className="hidden md:table-cell">Type</TableHead>
+                <TableHead className="text-right">Purchase</TableHead>
+                <TableHead className="hidden lg:table-cell">Purchased</TableHead>
+                <TableHead className="text-right">Age (yrs)</TableHead>
+                <TableHead className="text-right hidden sm:table-cell">Rate</TableHead>
+                <TableHead className="text-right">Current</TableHead>
+                <TableHead className="min-w-[160px]">Depreciation</TableHead>
+                <TableHead className="text-right">Inspect</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filtered.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={9} className="text-center text-muted-foreground py-8">
+                    No assets match the current filters.
+                  </TableCell>
+                </TableRow>
+              ) : (
+                filtered.map((a) => {
+                  const pct =
+                    a.purchaseValue > 0
+                      ? Math.min(100, Math.round((a.totalDepreciation / a.purchaseValue) * 100))
+                      : 0;
+                  const tm = getTypeMeta(a.type);
+                  const TIcon = tm.icon;
+                  return (
+                    <TableRow key={a.id} className="hover:bg-muted/30">
+                      <TableCell>
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <div
+                            className={cn(
+                              "size-9 rounded-lg flex items-center justify-center flex-shrink-0",
+                              tm.color
+                            )}
+                          >
+                            <TIcon className="size-4" />
+                          </div>
+                          <div className="min-w-0">
+                            <div className="font-medium text-sm truncate">{a.name}</div>
+                            <div className="text-xs text-muted-foreground font-mono truncate">
+                              {a.serialNumber || "—"}
+                            </div>
+                          </div>
+                        </div>
+                      </TableCell>
+                      <TableCell className="hidden md:table-cell">
+                        <Badge variant="outline" className="gap-1 font-medium">
+                          <TIcon className="size-3" />
+                          {tm.label}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right text-sm font-medium tabular-nums">
+                        {formatCurrency(a.purchaseValue)}
+                      </TableCell>
+                      <TableCell className="hidden lg:table-cell text-xs text-muted-foreground">
+                        {formatDate(a.purchaseDate)}
+                      </TableCell>
+                      <TableCell className="text-right text-sm tabular-nums">
+                        {a.age.toFixed(1)}
+                      </TableCell>
+                      <TableCell className="text-right text-sm hidden sm:table-cell tabular-nums">
+                        {Math.round(a.depreciationRate * 100)}%
+                      </TableCell>
+                      <TableCell className="text-right text-sm font-semibold tabular-nums">
+                        {formatCurrency(a.currentValue)}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2 min-w-[140px]">
+                          <div className="flex-1 h-2 rounded-full bg-muted overflow-hidden">
+                            <div
+                              className={cn("h-full transition-all", depreciationColor(pct))}
+                              style={{ width: `${pct}%` }}
+                            />
+                          </div>
+                          <Badge
+                            variant="outline"
+                            className={cn(
+                              "text-[10px] px-1.5 py-0 tabular-nums w-12 justify-center",
+                              depreciationTone(pct)
+                            )}
+                          >
+                            {pct}%
+                          </Badge>
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-8 gap-1.5"
+                          onClick={() => onInspect(a)}
+                        >
+                          <LineChartIcon className="size-3.5" />
+                          <span className="hidden xl:inline">View</span>
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })
+              )}
+            </TableBody>
+          </Table>
+        </div>
+      </Card>
+    </div>
+  );
+}
+
+// =========================================================
+// Depreciation Detail Dialog — AreaChart of value decline
+// =========================================================
+
+function DepreciationDetailDialog({
+  asset,
+  onClose,
+}: {
+  asset: DepreciationRow | null;
+  onClose: () => void;
+}) {
+  const { data, isLoading, isError } = useQuery({
+    queryKey: ["assets", "depreciation", "detail", asset?.id],
+    queryFn: async () => {
+      if (!asset) return null;
+      const r = await fetch(`/api/assets/${asset.id}/depreciation`);
+      if (!r.ok) throw new Error("Failed to load depreciation history");
+      return r.json();
+    },
+    enabled: !!asset,
+  });
+
+  const detail: DepreciationDetail | null = data ?? null;
+
+  // Reset when asset changes — no-op state, just to satisfy lint/useEffect import.
+  useEffect(() => {
+    // no-op: query is keyed on asset id; nothing local to reset.
+  }, [asset?.id]);
+
+  const chartData = (detail?.history ?? []).map((h) => ({
+    label: `Yr ${h.year}`,
+    endValue: h.endValue,
+    depreciation: h.cumulativeDepreciation,
+    isProjection: h.isProjection,
+  }));
+
+  return (
+    <Dialog
+      open={!!asset}
+      onOpenChange={(o) => {
+        if (!o) onClose();
+      }}
+    >
+      <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <TrendingDown className="size-5 text-primary" />
+            Depreciation Timeline
+          </DialogTitle>
+          <DialogDescription>
+            {asset
+              ? `Per-year value decline for "${asset.name}".`
+              : ""}
+          </DialogDescription>
+        </DialogHeader>
+
+        {!asset ? null : isLoading ? (
+          <div className="space-y-3">
+            <Skeleton className="h-8 w-full" />
+            <Skeleton className="h-64 w-full rounded-xl" />
+          </div>
+        ) : isError ? (
+          <EmptyState
+            icon={AlertTriangle}
+            title="Failed to load depreciation history"
+            description="Please close and try again."
+          />
+        ) : detail ? (
+          <div className="space-y-5">
+            {/* Summary cards */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <SummaryTile
+                label="Purchase"
+                value={formatCurrency(detail.asset.purchaseValue)}
+                tone="primary"
+              />
+              <SummaryTile
+                label="Current"
+                value={formatCurrency(detail.asset.currentValue)}
+                tone="emerald"
+              />
+              <SummaryTile
+                label="Depreciated"
+                value={formatCurrency(detail.asset.totalDepreciation)}
+                tone="rose"
+              />
+              <SummaryTile
+                label="Rate / yr"
+                value={`${Math.round(detail.asset.depreciationRate * 100)}%`}
+                tone="amber"
+              />
+            </div>
+
+            {/* Asset meta */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
+              <MetaTile label="Age" value={`${detail.asset.age.toFixed(1)} yrs`} />
+              <MetaTile
+                label="Purchased"
+                value={formatDate(detail.asset.purchaseDate)}
+              />
+              <MetaTile
+                label="Annual Loss"
+                value={formatCurrency(detail.asset.annualDepreciation)}
+              />
+              <MetaTile
+                label="Type"
+                value={getTypeMeta(detail.asset.type).label}
+              />
+            </div>
+
+            {/* Area chart */}
+            <div className="rounded-xl border border-border/60 p-3 bg-muted/20">
+              <div className="flex items-center justify-between mb-2 px-1">
+                <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                  Value decline over time
+                </div>
+                <div className="flex items-center gap-3 text-[10px] text-muted-foreground">
+                  <span className="flex items-center gap-1">
+                    <span className="size-2.5 rounded-sm bg-emerald-500" />
+                    Remaining value
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <span className="size-2.5 rounded-sm bg-rose-400" />
+                    Cumulative depreciation
+                  </span>
+                </div>
+              </div>
+              <div className="h-72">
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart
+                    data={chartData}
+                    margin={{ top: 8, right: 12, bottom: 0, left: 0 }}
+                  >
+                    <defs>
+                      <linearGradient id="valueGrad" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#10b981" stopOpacity={0.5} />
+                        <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
+                      </linearGradient>
+                      <linearGradient id="depGrad" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#f43f5e" stopOpacity={0.4} />
+                        <stop offset="95%" stopColor="#f43f5e" stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" className="stroke-muted/30" />
+                    <XAxis
+                      dataKey="label"
+                      tick={{ fontSize: 11 }}
+                      className="text-muted-foreground"
+                    />
+                    <YAxis
+                      tick={{ fontSize: 11 }}
+                      className="text-muted-foreground"
+                      width={56}
+                      tickFormatter={(v) =>
+                        v >= 1000 ? `${(v / 1000).toFixed(0)}k` : String(v)
+                      }
+                    />
+                    <RechartsTooltip
+                      contentStyle={{
+                        borderRadius: 8,
+                        fontSize: 12,
+                        border: "1px solid hsl(var(--border))",
+                      }}
+                      formatter={(value: number, name: string) => [
+                        formatCurrency(value),
+                        name === "endValue" ? "Remaining" : "Depreciated",
+                      ]}
+                    />
+                    <Area
+                      type="monotone"
+                      dataKey="endValue"
+                      stroke="#10b981"
+                      strokeWidth={2}
+                      fill="url(#valueGrad)"
+                    />
+                    <Area
+                      type="monotone"
+                      dataKey="depreciation"
+                      stroke="#f43f5e"
+                      strokeWidth={2}
+                      fill="url(#depGrad)"
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+
+            {/* Yearly breakdown */}
+            <div className="rounded-xl border border-border/60 overflow-hidden">
+              <div className="overflow-x-auto max-h-64 overflow-y-auto">
+                <Table>
+                  <TableHeader className="sticky top-0 bg-card">
+                    <TableRow>
+                      <TableHead>Year</TableHead>
+                      <TableHead className="text-right">Start</TableHead>
+                      <TableHead className="text-right">Dep. (yr)</TableHead>
+                      <TableHead className="text-right">Cumulative</TableHead>
+                      <TableHead className="text-right">Remaining</TableHead>
+                      <TableHead>Stage</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {detail.history.map((h) => (
+                      <TableRow key={h.year}>
+                        <TableCell className="text-sm font-medium">{h.label}</TableCell>
+                        <TableCell className="text-right text-xs tabular-nums">
+                          {formatCurrency(h.startValue)}
+                        </TableCell>
+                        <TableCell className="text-right text-xs tabular-nums text-rose-600 dark:text-rose-400">
+                          −{formatCurrency(h.depreciationThisYear)}
+                        </TableCell>
+                        <TableCell className="text-right text-xs tabular-nums">
+                          {formatCurrency(h.cumulativeDepreciation)}
+                        </TableCell>
+                        <TableCell className="text-right text-xs font-medium tabular-nums">
+                          {formatCurrency(h.remainingValue)}
+                        </TableCell>
+                        <TableCell>
+                          {h.isCurrent ? (
+                            <Badge className="bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/20 text-[10px] px-1.5 py-0">
+                              Current
+                            </Badge>
+                          ) : h.isProjection ? (
+                            <Badge variant="outline" className="text-[10px] px-1.5 py-0 text-muted-foreground">
+                              Projected
+                            </Badge>
+                          ) : (
+                            <Badge variant="outline" className="text-[10px] px-1.5 py-0 text-muted-foreground">
+                              Past
+                            </Badge>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-2 text-xs text-muted-foreground bg-muted/30 rounded-md p-3">
+              <Info className="size-4 flex-shrink-0 mt-0.5" />
+              <div>
+                Depreciation is computed as{" "}
+                <span className="font-mono">
+                  currentValue = purchaseValue × (1 − rate)
+                  <sup>years</sup>
+                </span>{" "}
+                using the asset type&rsquo;s annual rate. Year 0 represents the
+                purchase date; projection years (next 5) are estimates only.
+              </div>
+            </div>
+          </div>
+        ) : null}
+
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>
+            Close
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function SummaryTile({
+  label,
+  value,
+  tone,
+}: {
+  label: string;
+  value: string;
+  tone: "primary" | "emerald" | "rose" | "amber";
+}) {
+  const toneClass =
+    tone === "primary"
+      ? "bg-primary/10 text-primary"
+      : tone === "emerald"
+        ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300"
+        : tone === "rose"
+          ? "bg-rose-500/15 text-rose-700 dark:text-rose-300"
+          : "bg-amber-500/15 text-amber-700 dark:text-amber-300";
+  return (
+    <Card className="p-3 gap-0 border-border/60">
+      <div className={cn("inline-flex size-7 rounded-lg items-center justify-center mb-1.5", toneClass)}>
+        <Coins className="size-4" />
+      </div>
+      <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
+        {label}
+      </div>
+      <div className="font-bold text-base mt-0.5 tabular-nums">{value}</div>
+    </Card>
+  );
+}
+
+function MetaTile({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-md bg-muted/30 p-2">
+      <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
+        {label}
+      </div>
+      <div className="text-sm font-medium mt-0.5 truncate">{value}</div>
+    </div>
   );
 }

@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useState } from "react";
+import { useQuery, useQueryClient, useQueries } from "@tanstack/react-query";
 import { PageHeader } from "../shared/page-header";
 import { KpiCard } from "../shared/kpi-card";
 import { AvatarBadge } from "../shared/avatar-badge";
@@ -9,6 +9,7 @@ import { StatusBadge } from "../shared/status-badge";
 import { EmptyState } from "../shared/empty-state";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import {
   Select,
@@ -33,6 +34,14 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
   Wallet,
   Plus,
   Search,
@@ -42,12 +51,38 @@ import {
   Pencil,
   Trash2,
   Layers,
+  Calculator,
+  TrendingDown,
+  Save,
+  Loader2,
+  RotateCcw,
 } from "lucide-react";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { toast } from "sonner";
 import { PayslipDialog } from "./payslip-dialog";
 import { PayrollBatchDialog } from "./payroll-batch-dialog";
 import { ExportButton } from "../shared/export-button";
+
+// =========================================================
+// Tax Slab types
+// =========================================================
+
+interface TaxSlab {
+  id: string;
+  min: number;
+  max: number | null;
+  rate: number;
+  label: string;
+}
+
+interface PayrollBreakdown {
+  tds: number;
+  taxSlab: { id: string; label: string; rate: number } | null;
+}
+
+// =========================================================
+// Main module
+// =========================================================
 
 export function PayrollModule() {
   const qc = useQueryClient();
@@ -62,6 +97,7 @@ export function PayrollModule() {
   const [payslipOpen, setPayslipOpen] = useState(false);
   const [presetEmployee, setPresetEmployee] = useState<string | null>(null);
   const [batchOpen, setBatchOpen] = useState(false);
+  const [taxConfigOpen, setTaxConfigOpen] = useState(false);
 
   const { data: departments } = useQuery({
     queryKey: ["departments"],
@@ -88,7 +124,35 @@ export function PayrollModule() {
   const total = data?.total ?? 0;
   const totalPages = data?.totalPages ?? 1;
 
-  // KPIs from current page
+  // Parallel-fetch calculated payroll breakdown for each visible payroll row
+  // (so we can show the actual progressive-tax TDS, not just the stored `tax` field).
+  const tdsQueries = useQueries({
+    queries: items.map((p: any) => ({
+      queryKey: ["payroll-calc", p.employeeId, p.payrollMonth],
+      queryFn: async () => {
+        const r = await fetch("/api/payroll/calculate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ employeeId: p.employeeId, month: p.payrollMonth }),
+        });
+        if (!r.ok) return null;
+        const json = await r.json();
+        return json as PayrollBreakdown;
+      },
+      staleTime: 60 * 1000, // 1 min
+    })),
+  });
+
+  // Map employeeId+month -> calculated breakdown
+  const tdsByEmp: Record<string, PayrollBreakdown | null> = {};
+  items.forEach((p: any, i: number) => {
+    const q = tdsQueries[i];
+    tdsByEmp[`${p.employeeId}:${p.payrollMonth}`] = q?.isSuccess
+      ? (q.data as PayrollBreakdown | null)
+      : null;
+  });
+
+  // KPIs from current page (use calculated TDS when available)
   const totalNet = items.reduce(
     (sum: number, p: any) => sum + (p.netSalary || 0),
     0
@@ -101,10 +165,11 @@ export function PayrollModule() {
     (sum: number, p: any) => sum + (p.allowances || 0),
     0
   );
-  const totalDeductions = items.reduce(
-    (sum: number, p: any) => sum + (p.deductions || 0) + (p.tax || 0),
-    0
-  );
+  const totalDeductions = items.reduce((sum: number, p: any) => {
+    const calc = tdsByEmp[`${p.employeeId}:${p.payrollMonth}`];
+    const tds = calc?.tds ?? p.tax ?? 0;
+    return sum + (p.deductions || 0) + tds;
+  }, 0);
 
   function generatePayslip(employeeId?: string) {
     setPresetEmployee(employeeId ?? null);
@@ -161,6 +226,16 @@ export function PayrollModule() {
             <Button
               size="sm"
               variant="outline"
+              onClick={() => setTaxConfigOpen(true)}
+              title="View & edit progressive tax slab configuration"
+            >
+              <Calculator className="size-4 mr-1.5" />
+              <span className="hidden sm:inline">Tax Configuration</span>
+              <span className="sm:hidden">Tax</span>
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
               onClick={() => setBatchOpen(true)}
             >
               <Layers className="size-4 mr-1.5" />{" "}
@@ -196,9 +271,9 @@ export function PayrollModule() {
           iconClass="bg-teal-500/10 text-teal-600"
         />
         <KpiCard
-          label="Deductions + Tax"
+          label="Deductions + TDS"
           value={formatCurrency(totalDeductions)}
-          icon={Wallet}
+          icon={TrendingDown}
           iconClass="bg-rose-500/10 text-rose-600"
         />
       </div>
@@ -308,7 +383,7 @@ export function PayrollModule() {
                   <TableHead>Basic</TableHead>
                   <TableHead>Allowances</TableHead>
                   <TableHead>Deductions</TableHead>
-                  <TableHead>Tax</TableHead>
+                  <TableHead>TDS (calculated)</TableHead>
                   <TableHead>Net Salary</TableHead>
                   <TableHead>Payment Date</TableHead>
                   <TableHead>Status</TableHead>
@@ -316,87 +391,122 @@ export function PayrollModule() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {items.map((p: any) => (
-                  <TableRow key={p.id} className="hover:bg-muted/30">
-                    <TableCell>
-                      <div className="flex items-center gap-3">
-                        <AvatarBadge
-                          name={p.employee?.fullName}
-                          photo={p.employee?.photo}
-                          size="md"
-                        />
-                        <div className="min-w-0">
-                          <div className="font-medium truncate">
-                            {p.employee?.fullName}
-                          </div>
-                          <div className="text-xs text-muted-foreground font-mono">
-                            {p.employee?.employeeId}
+                {items.map((p: any, idx: number) => {
+                  const calc = tdsByEmp[`${p.employeeId}:${p.payrollMonth}`];
+                  const tdsQuery = tdsQueries[idx];
+                  const tdsLoading = tdsQuery?.isLoading;
+                  const tdsValue = calc?.tds ?? null;
+                  const tdsSlab = calc?.taxSlab;
+                  return (
+                    <TableRow key={p.id} className="hover:bg-muted/30">
+                      <TableCell>
+                        <div className="flex items-center gap-3">
+                          <AvatarBadge
+                            name={p.employee?.fullName}
+                            photo={p.employee?.photo}
+                            size="md"
+                          />
+                          <div className="min-w-0">
+                            <div className="font-medium truncate">
+                              {p.employee?.fullName}
+                            </div>
+                            <div className="text-xs text-muted-foreground font-mono">
+                              {p.employee?.employeeId}
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-xs">
-                      {(() => {
-                        const [y, m] = (p.payrollMonth || "").split("-");
-                        if (!y || !m) return p.payrollMonth;
-                        const d = new Date(Number(y), Number(m) - 1, 1);
-                        return d.toLocaleDateString("en-US", {
-                          month: "short",
-                          year: "numeric",
-                        });
-                      })()}
-                    </TableCell>
-                    <TableCell className="text-xs tabular-nums">
-                      {formatCurrency(p.basicSalary)}
-                    </TableCell>
-                    <TableCell className="text-xs tabular-nums">
-                      {formatCurrency(p.allowances)}
-                    </TableCell>
-                    <TableCell className="text-xs tabular-nums">
-                      {formatCurrency(p.deductions)}
-                    </TableCell>
-                    <TableCell className="text-xs tabular-nums">
-                      {formatCurrency(p.tax)}
-                    </TableCell>
-                    <TableCell className="text-xs tabular-nums font-semibold">
-                      {formatCurrency(p.netSalary)}
-                    </TableCell>
-                    <TableCell className="text-xs">
-                      {formatDate(p.paymentDate)}
-                    </TableCell>
-                    <TableCell>
-                      <StatusBadge status={p.status} />
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon" className="size-8">
-                            <MoreVertical className="size-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem
-                            onClick={() => generatePayslip(p.employeeId)}
-                          >
-                            <FileText className="size-4 mr-2" /> Generate Payslip
-                          </DropdownMenuItem>
-                          {p.status === "DRAFT" && (
-                            <DropdownMenuItem onClick={() => approve(p)}>
-                              <Check className="size-4 mr-2" /> Approve
-                            </DropdownMenuItem>
+                      </TableCell>
+                      <TableCell className="text-xs">
+                        {(() => {
+                          const [y, m] = (p.payrollMonth || "").split("-");
+                          if (!y || !m) return p.payrollMonth;
+                          const d = new Date(Number(y), Number(m) - 1, 1);
+                          return d.toLocaleDateString("en-US", {
+                            month: "short",
+                            year: "numeric",
+                          });
+                        })()}
+                      </TableCell>
+                      <TableCell className="text-xs tabular-nums">
+                        {formatCurrency(p.basicSalary)}
+                      </TableCell>
+                      <TableCell className="text-xs tabular-nums">
+                        {formatCurrency(p.allowances)}
+                      </TableCell>
+                      <TableCell className="text-xs tabular-nums">
+                        {formatCurrency(p.deductions)}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex flex-col">
+                          {tdsLoading ? (
+                            <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
+                              <Loader2 className="size-3 animate-spin" />
+                              <span>calculating…</span>
+                            </div>
+                          ) : tdsValue !== null ? (
+                            <>
+                              <span className="text-xs tabular-nums font-medium text-rose-600">
+                                {formatCurrency(tdsValue)}
+                              </span>
+                              {tdsSlab && (
+                                <span
+                                  className="text-[10px] text-muted-foreground font-mono"
+                                  title={`Tax slab: ${tdsSlab.label}`}
+                                >
+                                  @ {Math.round(tdsSlab.rate * 100)}%
+                                </span>
+                              )}
+                            </>
+                          ) : (
+                            <span className="text-xs text-muted-foreground tabular-nums">
+                              {formatCurrency(p.tax)}
+                              <span className="text-[10px] ml-1 text-muted-foreground/70">
+                                (stored)
+                              </span>
+                            </span>
                           )}
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem
-                            className="text-rose-600"
-                            onClick={() => deleteFn(p.id)}
-                          >
-                            <Trash2 className="size-4 mr-2" /> Delete
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
-                  </TableRow>
-                ))}
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-xs tabular-nums font-semibold">
+                        {formatCurrency(p.netSalary)}
+                      </TableCell>
+                      <TableCell className="text-xs">
+                        {formatDate(p.paymentDate)}
+                      </TableCell>
+                      <TableCell>
+                        <StatusBadge status={p.status} />
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon" className="size-8">
+                              <MoreVertical className="size-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem
+                              onClick={() => generatePayslip(p.employeeId)}
+                            >
+                              <FileText className="size-4 mr-2" /> Generate Payslip
+                            </DropdownMenuItem>
+                            {p.status === "DRAFT" && (
+                              <DropdownMenuItem onClick={() => approve(p)}>
+                                <Check className="size-4 mr-2" /> Approve
+                              </DropdownMenuItem>
+                            )}
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                              className="text-rose-600"
+                              onClick={() => deleteFn(p.id)}
+                            >
+                              <Trash2 className="size-4 mr-2" /> Delete
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
           </div>
@@ -445,6 +555,297 @@ export function PayrollModule() {
           if (!o) qc.invalidateQueries({ queryKey: ["payroll"] });
         }}
       />
+
+      <TaxConfigDialog
+        open={taxConfigOpen}
+        onOpenChange={setTaxConfigOpen}
+        onSaved={() => {
+          // Invalidate payroll-calc queries so the TDS column refreshes
+          qc.invalidateQueries({ queryKey: ["payroll-calc"] });
+          qc.invalidateQueries({ queryKey: ["tax-slabs"] });
+        }}
+      />
     </div>
+  );
+}
+
+// =========================================================
+// Tax Configuration Dialog
+// =========================================================
+
+function TaxConfigDialog({
+  open,
+  onOpenChange,
+  onSaved,
+}: {
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+  onSaved?: () => void;
+}) {
+  const qc = useQueryClient();
+  const [draft, setDraft] = useState<TaxSlab[]>([]);
+  const [saving, setSaving] = useState(false);
+  const [dirty, setDirty] = useState(false);
+
+  const { data, isLoading } = useQuery({
+    queryKey: ["tax-slabs"],
+    queryFn: () => fetch("/api/payroll/tax-slabs").then((r) => r.json()),
+    enabled: open,
+  });
+
+  // Sync draft with fetched data — only when fresh data arrives and the
+  // draft is empty (i.e. dialog just opened or first load).
+  useEffect(() => {
+    if (open && data?.slabs && draft.length === 0 && !dirty) {
+      setDraft(data.slabs);
+    }
+  }, [open, data, draft.length, dirty]);
+
+  function close() {
+    onOpenChange(false);
+    setDraft([]);
+    setDirty(false);
+  }
+
+  function updateSlab(idx: number, patch: Partial<TaxSlab>) {
+    setDraft((prev) => {
+      const next = prev.map((s, i) => (i === idx ? { ...s, ...patch } : s));
+      return next;
+    });
+    setDirty(true);
+  }
+
+  function addSlab() {
+    const lastMax = draft.reduce((m, s) => Math.max(m, s.max ?? 0), 0);
+    setDraft((prev) => [
+      ...prev,
+      {
+        id: `slab-${Date.now()}`,
+        min: lastMax,
+        max: lastMax + 300000,
+        rate: 0.1,
+        label: `${lastMax.toLocaleString()} - ${(lastMax + 300000).toLocaleString()}`,
+      },
+    ]);
+    setDirty(true);
+  }
+
+  function removeSlab(idx: number) {
+    setDraft((prev) => prev.filter((_, i) => i !== idx));
+    setDirty(true);
+  }
+
+  function resetDefaults() {
+    if (!data?.defaults) return;
+    setDraft(data.defaults);
+    setDirty(true);
+    toast.info("Reset to default tax slabs. Save to persist.");
+  }
+
+  async function save() {
+    setSaving(true);
+    try {
+      // Validate locally: each slab must have min, max (or null), rate
+      const slabs = draft.map((s, idx) => {
+        const min = Number(s.min);
+        const max =
+          s.max === null || s.max === undefined
+            ? null
+            : Number(s.max);
+        const rate = Number(s.rate);
+        if (!Number.isFinite(min) || min < 0) {
+          throw new Error(`Slab #${idx + 1}: min must be a non-negative number`);
+        }
+        if (max !== null && (!Number.isFinite(max) || max <= min)) {
+          throw new Error(`Slab #${idx + 1}: max must be null or > min`);
+        }
+        if (!Number.isFinite(rate) || rate < 0 || rate > 1) {
+          throw new Error(`Slab #${idx + 1}: rate must be between 0 and 1`);
+        }
+        return {
+          id: String(s.id || `slab-${idx + 1}`),
+          min,
+          max,
+          rate,
+          label: String(s.label || "").trim() ||
+            (max === null ? `Above ${min.toLocaleString()}` : `${min.toLocaleString()} - ${max.toLocaleString()}`),
+        };
+      });
+
+      const r = await fetch("/api/payroll/tax-slabs", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ slabs }),
+      });
+      if (!r.ok) {
+        const err = await r.json().catch(() => ({}));
+        throw new Error(err.error || "Failed to save tax slabs");
+      }
+      toast.success("Tax slabs updated.");
+      setDirty(false);
+      qc.invalidateQueries({ queryKey: ["tax-slabs"] });
+      onSaved?.();
+      onOpenChange(false);
+    } catch (err: any) {
+      toast.error(err?.message || "Save failed");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={(o) => (o ? null : close())}>
+      <DialogContent className="max-w-[95vw] sm:max-w-3xl max-h-[90vh] overflow-hidden p-0 gap-0">
+        <DialogHeader className="px-6 py-4 border-b border-border">
+          <DialogTitle className="flex items-center gap-2">
+            <Calculator className="size-5 text-primary" />
+            Tax Slab Configuration
+          </DialogTitle>
+          <DialogDescription>
+            Progressive tax slabs used to compute TDS (Tax Deducted at Source)
+            for payroll. Annual income is taxed slab-by-slab, then divided by 12
+            for the monthly TDS deduction.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="px-6 py-4 overflow-y-auto max-h-[60vh] space-y-4">
+          {isLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="size-5 animate-spin text-muted-foreground" />
+              <span className="ml-2 text-sm text-muted-foreground">Loading tax slabs…</span>
+            </div>
+          ) : (
+            <>
+              <div className="rounded-md border border-emerald-500/20 bg-emerald-500/5 p-3 text-xs text-emerald-800 flex items-start gap-2">
+                <Calculator className="size-4 flex-shrink-0 mt-0.5" />
+                <div>
+                  <div className="font-medium">How TDS is calculated</div>
+                  <div className="mt-0.5 text-emerald-700/80">
+                    Monthly gross × 12 = annual income. Each slab applies its rate
+                    to the portion of income within that slab's range. Total annual
+                    tax ÷ 12 = monthly TDS deduction.
+                  </div>
+                </div>
+              </div>
+
+              {/* Slab table */}
+              <div className="rounded-md border border-border overflow-hidden">
+                <div className="grid grid-cols-12 gap-2 px-3 py-2 bg-muted/40 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                  <div className="col-span-4">Label</div>
+                  <div className="col-span-3">Min (annual)</div>
+                  <div className="col-span-3">Max (annual, blank = ∞)</div>
+                  <div className="col-span-1">Rate</div>
+                  <div className="col-span-1 text-right">—</div>
+                </div>
+                <div className="divide-y divide-border">
+                  {draft.map((s, idx) => (
+                    <div
+                      key={s.id}
+                      className="grid grid-cols-12 gap-2 px-3 py-2 items-center hover:bg-muted/20"
+                    >
+                      <div className="col-span-4">
+                        <Input
+                          value={s.label}
+                          onChange={(e) => updateSlab(idx, { label: e.target.value })}
+                          className="h-8 text-xs"
+                          placeholder="Slab label"
+                        />
+                      </div>
+                      <div className="col-span-3">
+                        <Input
+                          type="number"
+                          value={s.min}
+                          onChange={(e) => updateSlab(idx, { min: Number(e.target.value) })}
+                          className="h-8 text-xs tabular-nums"
+                          placeholder="0"
+                        />
+                      </div>
+                      <div className="col-span-3">
+                        <Input
+                          type="number"
+                          value={s.max ?? ""}
+                          onChange={(e) => {
+                            const v = e.target.value;
+                            updateSlab(idx, {
+                              max: v === "" ? null : Number(v),
+                            });
+                          }}
+                          className="h-8 text-xs tabular-nums"
+                          placeholder="∞ (no upper bound)"
+                        />
+                      </div>
+                      <div className="col-span-1">
+                        <Input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          max="1"
+                          value={s.rate}
+                          onChange={(e) => updateSlab(idx, { rate: Number(e.target.value) })}
+                          className="h-8 text-xs tabular-nums"
+                          title="Tax rate as a decimal (0 = 0%, 0.05 = 5%, 0.25 = 25%)"
+                        />
+                      </div>
+                      <div className="col-span-1 flex justify-end">
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="size-7 text-rose-600 hover:bg-rose-500/10"
+                          onClick={() => removeSlab(idx)}
+                          title="Remove slab"
+                          disabled={draft.length <= 1}
+                        >
+                          <Trash2 className="size-3.5" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="text-xs text-muted-foreground">
+                  {draft.length} slab{draft.length === 1 ? "" : "s"} configured
+                  {dirty && <span className="text-amber-600 ml-1">· unsaved changes</span>}
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={resetDefaults}
+                    title="Reset to default slabs"
+                  >
+                    <RotateCcw className="size-3.5 mr-1.5" />
+                    Reset Defaults
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={addSlab}
+                  >
+                    <Plus className="size-3.5 mr-1.5" />
+                    Add Slab
+                  </Button>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+
+        <DialogFooter className="px-6 py-4 border-t border-border">
+          <Button variant="outline" onClick={close}>
+            Cancel
+          </Button>
+          <Button onClick={save} disabled={saving || !dirty || isLoading}>
+            {saving ? (
+              <Loader2 className="size-4 mr-2 animate-spin" />
+            ) : (
+              <Save className="size-4 mr-2" />
+            )}
+            Save Tax Slabs
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

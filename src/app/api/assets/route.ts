@@ -49,6 +49,7 @@ export interface AssetDTO {
   type: AssetType;
   serialNumber: string;
   condition: AssetCondition;
+  purchaseValue: number;
   assignedToId: string | null;
   assignedToName: string | null;
   assignedDate: string | null;
@@ -66,6 +67,7 @@ interface AssetMeta {
   condition: AssetCondition;
   status: AssetStatus;
   notes: string | null;
+  purchaseValue: number;
   assignedToId: string | null;
   assignedToName: string | null;
   assignedDate: string | null;
@@ -102,6 +104,16 @@ function parseMeta(description: string | null): AssetMeta | null {
   if (!description) return null;
   try {
     const parsed = JSON.parse(description);
+    const pv =
+      typeof parsed.purchaseValue === "number" &&
+      isFinite(parsed.purchaseValue) &&
+      parsed.purchaseValue >= 0
+        ? parsed.purchaseValue
+        : typeof parsed.purchaseValue === "string" &&
+            parsed.purchaseValue.trim() !== "" &&
+            !isNaN(Number(parsed.purchaseValue))
+          ? Number(parsed.purchaseValue)
+          : 1000;
     return {
       name: String(parsed.name ?? ""),
       type: (parsed.type as AssetType) ?? "OTHER",
@@ -109,6 +121,7 @@ function parseMeta(description: string | null): AssetMeta | null {
       condition: (parsed.condition as AssetCondition) ?? "GOOD",
       status: (parsed.status as AssetStatus) ?? "AVAILABLE",
       notes: parsed.notes ?? null,
+      purchaseValue: pv,
       assignedToId: parsed.assignedToId ?? null,
       assignedToName: parsed.assignedToName ?? null,
       assignedDate: parsed.assignedDate ?? null,
@@ -129,6 +142,7 @@ export function toDTO(a: any): AssetDTO | null {
     type: m.type,
     serialNumber: m.serialNumber,
     condition: m.condition,
+    purchaseValue: m.purchaseValue,
     assignedToId: m.assignedToId ?? a.employeeId ?? null,
     assignedToName: m.assignedToName ?? null,
     assignedDate: m.assignedDate ?? null,
@@ -219,6 +233,14 @@ export async function POST(req: NextRequest) {
       ? null
       : String(body.notes ?? null);
 
+  const rawPv = body.purchaseValue;
+  const purchaseValue =
+    typeof rawPv === "number" && isFinite(rawPv) && rawPv >= 0
+      ? rawPv
+      : typeof rawPv === "string" && rawPv.trim() !== "" && !isNaN(Number(rawPv))
+        ? Number(rawPv)
+        : 1000;
+
   const meta: AssetMeta = {
     name,
     type,
@@ -226,6 +248,7 @@ export async function POST(req: NextRequest) {
     condition,
     status,
     notes,
+    purchaseValue,
     assignedToId: null,
     assignedToName: null,
     assignedDate: null,

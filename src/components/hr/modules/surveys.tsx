@@ -32,6 +32,8 @@ import {
   ClipboardList,
   CircleDashed,
   Lock,
+  ShieldCheck,
+  Info,
 } from "lucide-react";
 import { PageHeader } from "../shared/page-header";
 import { KpiCard } from "../shared/kpi-card";
@@ -46,6 +48,7 @@ import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
+import { Switch } from "@/components/ui/switch";
 import {
   Tabs,
   TabsContent,
@@ -103,6 +106,7 @@ interface Survey {
   title: string;
   description: string | null;
   status: SurveyStatus;
+  anonymous?: boolean;
   createdAt: string;
   createdBy: string | null;
   questions: SurveyQuestion[];
@@ -114,6 +118,8 @@ interface SurveyResponse {
   surveyId: string;
   employeeId?: string | null;
   employeeName?: string | null;
+  anonymous?: boolean;
+  displayName?: string;
   answers: { questionId: string; value: any }[];
   submittedAt: string;
   createdAt: string;
@@ -527,7 +533,18 @@ function SurveyCard({
             </p>
           )}
         </div>
-        <StatusBadge status={survey.status} />
+        <div className="flex items-center gap-1.5 flex-shrink-0">
+          {survey.anonymous && (
+            <Badge
+              variant="outline"
+              className="text-[10px] px-1.5 py-0 bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/20 gap-1"
+            >
+              <ShieldCheck className="size-3" />
+              Anonymous
+            </Badge>
+          )}
+          <StatusBadge status={survey.status} />
+        </div>
       </div>
 
       <div className="grid grid-cols-2 gap-2 my-3 text-xs">
@@ -712,15 +729,25 @@ function ResponsesTab() {
 
 function ResponsesAnalytics({ detail }: { detail: SurveyDetail }) {
   const responses = detail.responses ?? [];
+  const isAnonymous = detail.anonymous === true;
 
   return (
     <div className="space-y-5">
       <Card className="p-5 gap-0">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
           <div className="min-w-0">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <h3 className="font-semibold truncate">{detail.title}</h3>
               <StatusBadge status={detail.status} />
+              {isAnonymous && (
+                <Badge
+                  variant="outline"
+                  className="text-[10px] px-1.5 py-0 bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/20 gap-1"
+                >
+                  <ShieldCheck className="size-3" />
+                  Anonymous
+                </Badge>
+              )}
             </div>
             {detail.description && (
               <p className="text-sm text-muted-foreground mt-0.5">
@@ -747,6 +774,14 @@ function ResponsesAnalytics({ detail }: { detail: SurveyDetail }) {
             </div>
           </div>
         </div>
+        {isAnonymous && (
+          <div className="mt-4 flex items-start gap-2 rounded-md bg-emerald-500/10 border border-emerald-500/20 p-3 text-xs text-emerald-800 dark:text-emerald-200">
+            <ShieldCheck className="size-4 flex-shrink-0 mt-0.5" />
+            <span>
+              Responses are anonymous. Employee identities will not be stored or displayed.
+            </span>
+          </div>
+        )}
       </Card>
 
       {responses.length === 0 && (
@@ -824,7 +859,21 @@ function QuestionAnalytics({
           answers={answers as string[][]}
         />
       )}
-      {question.type === "TEXT" && <TextAnalytics answers={answers as string[]} />}
+      {question.type === "TEXT" && (
+        <TextAnalytics
+          entries={responses
+            .map((r) => {
+              const a = r.answers?.find((aa) => aa.questionId === question.id);
+              if (!a || a.value === undefined || a.value === null || a.value === "") return null;
+              return {
+                text: String(a.value),
+                displayName: r.displayName ?? (r.employeeName ?? "—"),
+                submittedAt: r.submittedAt,
+              };
+            })
+            .filter((x): x is { text: string; displayName: string; submittedAt: string } => x !== null)}
+        />
+      )}
     </Card>
   );
 }
@@ -952,8 +1001,12 @@ function ChoiceAnalytics({
   );
 }
 
-function TextAnalytics({ answers }: { answers: string[] }) {
-  if (answers.length === 0) {
+function TextAnalytics({
+  entries,
+}: {
+  entries: { text: string; displayName: string; submittedAt: string }[];
+}) {
+  if (entries.length === 0) {
     return (
       <div className="text-sm text-muted-foreground italic">
         No text responses.
@@ -962,12 +1015,20 @@ function TextAnalytics({ answers }: { answers: string[] }) {
   }
   return (
     <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
-      {answers.map((a, i) => (
+      {entries.map((e, i) => (
         <div
           key={i}
           className="text-sm rounded-md border border-border/50 bg-muted/20 px-3 py-2"
         >
-          {a}
+          <div className="flex items-center justify-between gap-2 mb-1">
+            <span className="text-[11px] font-medium text-muted-foreground">
+              — {e.displayName}
+            </span>
+            <span className="text-[10px] text-muted-foreground tabular-nums">
+              {relativeTime(e.submittedAt)}
+            </span>
+          </div>
+          <div>{e.text}</div>
         </div>
       ))}
     </div>
@@ -1011,6 +1072,7 @@ function SurveyFormDialog({
   const [step, setStep] = useState(1);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
+  const [anonymous, setAnonymous] = useState(false);
   const [questions, setQuestions] = useState<DraftQuestion[]>([
     newDraftQuestion(),
   ]);
@@ -1022,6 +1084,7 @@ function SurveyFormDialog({
     if (survey) {
       setTitle(survey.title);
       setDescription(survey.description ?? "");
+      setAnonymous(survey.anonymous === true);
       setQuestions(
         survey.questions.map((q) => ({
           id: q.id,
@@ -1035,6 +1098,7 @@ function SurveyFormDialog({
     } else {
       setTitle("");
       setDescription("");
+      setAnonymous(false);
       setQuestions([newDraftQuestion()]);
       setStep(1);
       setPublish(false);
@@ -1098,6 +1162,7 @@ function SurveyFormDialog({
       const payload = {
         title: title.trim(),
         description: description.trim() || null,
+        anonymous,
         status: finalPublish ? "ACTIVE" : isEdit ? undefined : "DRAFT",
         questions: questions.map((q) => ({
           id: q.id,
@@ -1211,6 +1276,34 @@ function SurveyFormDialog({
                 rows={3}
               />
             </div>
+            <div className="flex items-start gap-3 rounded-lg border border-border/60 bg-muted/30 p-3">
+              <div className="flex-shrink-0 pt-0.5">
+                <Switch
+                  checked={anonymous}
+                  onCheckedChange={setAnonymous}
+                  aria-label="Anonymous responses"
+                />
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2 text-sm font-medium">
+                  <ShieldCheck className="size-4 text-emerald-600" />
+                  Anonymous responses
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  When enabled, employee identities will not be stored with
+                  responses. All answers will appear as &ldquo;Anonymous&rdquo;
+                  in analytics and cannot be traced back to a person.
+                </p>
+              </div>
+            </div>
+            {anonymous && (
+              <div className="flex items-start gap-2 rounded-md bg-emerald-500/10 border border-emerald-500/20 p-2.5 text-xs text-emerald-800 dark:text-emerald-200">
+                <Info className="size-4 flex-shrink-0 mt-0.5" />
+                <span>
+                  Responses are anonymous. Employee identities will not be stored.
+                </span>
+              </div>
+            )}
           </div>
         )}
 

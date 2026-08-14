@@ -19,6 +19,7 @@ function parseMeta(description: string | null): AssetMeta {
     condition: "GOOD",
     status: "AVAILABLE",
     notes: null,
+    purchaseValue: 1000,
     assignedToId: null,
     assignedToName: null,
     assignedDate: null,
@@ -28,6 +29,16 @@ function parseMeta(description: string | null): AssetMeta {
   if (!description) return fallback;
   try {
     const parsed = JSON.parse(description);
+    const pv =
+      typeof parsed.purchaseValue === "number" &&
+      isFinite(parsed.purchaseValue) &&
+      parsed.purchaseValue >= 0
+        ? parsed.purchaseValue
+        : typeof parsed.purchaseValue === "string" &&
+            parsed.purchaseValue.trim() !== "" &&
+            !isNaN(Number(parsed.purchaseValue))
+          ? Number(parsed.purchaseValue)
+          : 1000;
     return {
       name: String(parsed.name ?? ""),
       type: (parsed.type as AssetType) ?? "OTHER",
@@ -35,6 +46,7 @@ function parseMeta(description: string | null): AssetMeta {
       condition: (parsed.condition as AssetCondition) ?? "GOOD",
       status: (parsed.status as AssetStatus) ?? "AVAILABLE",
       notes: parsed.notes ?? null,
+      purchaseValue: pv,
       assignedToId: parsed.assignedToId ?? null,
       assignedToName: parsed.assignedToName ?? null,
       assignedDate: parsed.assignedDate ?? null,
@@ -128,6 +140,16 @@ export async function PATCH(
       body.notes === null || body.notes === ""
         ? null
         : String(body.notes);
+  }
+  if (body.purchaseValue !== undefined) {
+    const raw = body.purchaseValue;
+    const pv =
+      typeof raw === "number" && isFinite(raw) && raw >= 0
+        ? raw
+        : typeof raw === "string" && raw.trim() !== "" && !isNaN(Number(raw))
+          ? Number(raw)
+          : 1000;
+    meta.purchaseValue = pv;
   }
 
   const updated = await db.activity.update({

@@ -47,6 +47,7 @@ export interface SurveyDTO {
   title: string;
   description: string | null;
   status: SurveyStatus;
+  anonymous: boolean;
   createdAt: string;
   createdBy: string | null;
   questions: SurveyQuestion[];
@@ -56,6 +57,7 @@ export interface SurveyDTO {
 interface SurveyMeta {
   description: string | null;
   status: SurveyStatus;
+  anonymous: boolean;
   createdBy: string | null;
   questions: SurveyQuestion[];
 }
@@ -95,6 +97,7 @@ export function parseSurveyMeta(description: string | null): SurveyMeta | null {
     return {
       description: typeof p.description === "string" ? p.description : null,
       status: (VALID_STATUSES.includes(p.status) ? p.status : "DRAFT") as SurveyStatus,
+      anonymous: p.anonymous === true,
       createdBy: p.createdBy ?? null,
       questions,
     };
@@ -111,6 +114,7 @@ export function toSurveyDTO(a: any, responseCount?: number): SurveyDTO | null {
     title: a.title,
     description: m.description,
     status: m.status,
+    anonymous: m.anonymous,
     createdAt: a.createdAt?.toISOString?.() ?? a.createdAt,
     createdBy: m.createdBy,
     questions: m.questions,
@@ -221,6 +225,7 @@ export async function POST(req: NextRequest) {
   const meta: SurveyMeta = {
     description: body.description ? String(body.description) : null,
     status,
+    anonymous: body.anonymous === true,
     createdBy: body.createdBy ? String(body.createdBy) : null,
     questions,
   };

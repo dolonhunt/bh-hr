@@ -903,9 +903,80 @@ function EnrollmentsTab() {
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("");
   const [completeEnrollment, setCompleteEnrollment] = useState<Enrollment | null>(null);
+  // Per-row loading state: tracks which enrollment is currently generating
+  // a certificate PDF (so we can show a spinner on the specific button).
+  const [certLoading, setCertLoading] = useState<Record<string, boolean>>({});
+  const [downloadingAll, setDownloadingAll] = useState(false);
 
   const { data, isLoading, isError } = useEnrollments(search, status);
   const enrollments: Enrollment[] = data?.items ?? [];
+  const completedEnrollments = enrollments.filter((e) => e.status === "COMPLETED");
+
+  async function downloadCertificate(e: Enrollment) {
+    setCertLoading((s) => ({ ...s, [e.id]: true }));
+    try {
+      const url = `/api/training/${encodeURIComponent(e.courseId)}/certificate?employeeId=${encodeURIComponent(e.employeeId)}`;
+      const r = await fetch(url);
+      if (!r.ok) {
+        const err = await r.json().catch(() => ({}));
+        throw new Error(err.error || "Failed to generate certificate");
+      }
+      const blob = await r.blob();
+      const downloadUrl = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = downloadUrl;
+      a.download = `certificate-${(e.employeeName || "employee").replace(/\s+/g, "-").toLowerCase()}-${e.courseTitle.replace(/\s+/g, "-").toLowerCase()}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(downloadUrl);
+      toast.success(`Certificate downloaded for ${e.employeeName ?? "employee"}.`);
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to generate certificate.");
+    } finally {
+      setCertLoading((s) => ({ ...s, [e.id]: false }));
+    }
+  }
+
+  async function downloadAllCertificates() {
+    if (completedEnrollments.length === 0) {
+      toast.info("No completed enrollments to certificate.");
+      return;
+    }
+    setDownloadingAll(true);
+    let successCount = 0;
+    let failCount = 0;
+    // Sequential download to avoid browser blocking multiple downloads.
+    for (const e of completedEnrollments) {
+      try {
+        const url = `/api/training/${encodeURIComponent(e.courseId)}/certificate?employeeId=${encodeURIComponent(e.employeeId)}`;
+        const r = await fetch(url);
+        if (!r.ok) throw new Error("failed");
+        const blob = await r.blob();
+        const downloadUrl = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = downloadUrl;
+        a.download = `certificate-${(e.employeeName || "employee").replace(/\s+/g, "-").toLowerCase()}-${e.courseTitle.replace(/\s+/g, "-").toLowerCase()}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(downloadUrl);
+        successCount++;
+        // Small delay between downloads so the browser doesn't block them.
+        await new Promise((res) => setTimeout(res, 250));
+      } catch {
+        failCount++;
+      }
+    }
+    setDownloadingAll(false);
+    if (successCount > 0) {
+      toast.success(
+        `Generated ${successCount} certificate${successCount === 1 ? "" : "s"}${failCount > 0 ? ` (${failCount} failed)` : ""}.`
+      );
+    } else {
+      toast.error("Failed to generate certificates.");
+    }
+  }
 
   async function dropEnrollment(e: Enrollment) {
     if (
@@ -962,6 +1033,39 @@ function EnrollmentsTab() {
 
   return (
     <div className="space-y-6">
+      {/* Top action bar — Download All Certificates */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 rounded-lg border border-emerald-500/20 bg-emerald-500/5">
+        <div className="flex items-center gap-2.5 min-w-0">
+          <div className="flex-shrink-0 size-9 rounded-full bg-emerald-500/15 text-emerald-700 flex items-center justify-center">
+            <Award className="size-4" />
+          </div>
+          <div className="min-w-0">
+            <div className="text-sm font-medium text-foreground">
+              {completedEnrollments.length} completed enrollment
+              {completedEnrollments.length === 1 ? "" : "s"} ready for certification
+            </div>
+            <div className="text-xs text-muted-foreground">
+              Generate professional PDF certificates in one click.
+            </div>
+          </div>
+        </div>
+        <Button
+          size="sm"
+          variant="outline"
+          className="border-emerald-500/30 text-emerald-700 hover:bg-emerald-500/10 hover:text-emerald-800"
+          disabled={downloadingAll || completedEnrollments.length === 0}
+          onClick={downloadAllCertificates}
+        >
+          {downloadingAll ? (
+            <Loader2 className="size-4 mr-1.5 animate-spin" />
+          ) : (
+            <Award className="size-4 mr-1.5" />
+          )}
+          <span className="hidden sm:inline">Download All Certificates</span>
+          <span className="sm:hidden">Download All</span>
+        </Button>
+      </div>
+
       {/* Filter bar */}
       <div className="flex flex-col md:flex-row gap-3">
         <div className="relative flex-1">
@@ -1145,6 +1249,23 @@ function EnrollmentsTab() {
                             <span className="hidden xl:inline">Complete</span>
                           </Button>
                         )}
+                        {e.status === "COMPLETED" && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-8 gap-1.5 border-emerald-500/30 text-emerald-700 hover:bg-emerald-500/10 hover:text-emerald-800"
+                            disabled={certLoading[e.id]}
+                            onClick={() => downloadCertificate(e)}
+                            title="Download certificate PDF"
+                          >
+                            {certLoading[e.id] ? (
+                              <Loader2 className="size-3.5 animate-spin" />
+                            ) : (
+                              <Award className="size-3.5" />
+                            )}
+                            <span className="hidden xl:inline">Certificate</span>
+                          </Button>
+                        )}
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
                             <Button
@@ -1162,6 +1283,19 @@ function EnrollmentsTab() {
                                 onClick={() => setCompleteEnrollment(e)}
                               >
                                 <CheckCircle2 className="size-4 mr-2" /> Mark Complete
+                              </DropdownMenuItem>
+                            )}
+                            {e.status === "COMPLETED" && (
+                              <DropdownMenuItem
+                                onClick={() => downloadCertificate(e)}
+                                disabled={certLoading[e.id]}
+                              >
+                                {certLoading[e.id] ? (
+                                  <Loader2 className="size-4 mr-2 animate-spin" />
+                                ) : (
+                                  <Award className="size-4 mr-2" />
+                                )}
+                                Download Certificate
                               </DropdownMenuItem>
                             )}
                             {e.status === "DROPPED" && (

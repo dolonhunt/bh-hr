@@ -1,0 +1,1336 @@
+     1→"use client";
+     2→
+     3→import { useState, useMemo } from "react";
+     4→import { useQuery, useQueryClient } from "@tanstack/react-query";
+     5→import { toast } from "sonner";
+     6→import {
+     7→  Package,
+     8→  PackageCheck,
+     9→  PackageOpen,
+    10→  AlertTriangle,
+    11→  Plus,
+    12→  Search,
+    13→  Pencil,
+    14→  Trash2,
+    15→  MoreVertical,
+    16→  Laptop,
+    17→  Monitor,
+    18→  Smartphone,
+    19→  Tablet,
+    20→  Keyboard,
+    21→  Mouse,
+    22→  Headset,
+    23→  LampDesk,
+    24→  Armchair,
+    25→  Printer,
+    26→  Camera,
+    27→  Box,
+    28→  LayoutGrid,
+    29→  List,
+    30→  UserPlus,
+    31→  Undo2,
+    32→  Loader2,
+    33→  ChevronDown,
+    34→  ChevronsUpDown,
+    35→  Check,
+    36→} from "lucide-react";
+    37→import { PageHeader } from "../shared/page-header";
+    38→import { KpiCard } from "../shared/kpi-card";
+    39→import { AvatarBadge } from "../shared/avatar-badge";
+    40→import { StatusBadge } from "../shared/status-badge";
+    41→import { EmptyState } from "../shared/empty-state";
+    42→import { ExportButton } from "../shared/export-button";
+    43→import { Button } from "@/components/ui/button";
+    44→import { Input } from "@/components/ui/input";
+    45→import { Label } from "@/components/ui/label";
+    46→import { Textarea } from "@/components/ui/textarea";
+    47→import { Card } from "@/components/ui/card";
+    48→import { Skeleton } from "@/components/ui/skeleton";
+    49→import { Badge } from "@/components/ui/badge";
+    50→import {
+    51→  Table,
+    52→  TableBody,
+    53→  TableCell,
+    54→  TableHead,
+    55→  TableHeader,
+    56→  TableRow,
+    57→} from "@/components/ui/table";
+    58→import {
+    59→  Dialog,
+    60→  DialogContent,
+    61→  DialogDescription,
+    62→  DialogFooter,
+    63→  DialogHeader,
+    64→  DialogTitle,
+    65→} from "@/components/ui/dialog";
+    66→import {
+    67→  Select,
+    68→  SelectContent,
+    69→  SelectItem,
+    70→  SelectTrigger,
+    71→  SelectValue,
+    72→} from "@/components/ui/select";
+    73→import {
+    74→  DropdownMenu,
+    75→  DropdownMenuContent,
+    76→  DropdownMenuItem,
+    77→  DropdownMenuSeparator,
+    78→  DropdownMenuTrigger,
+    79→} from "@/components/ui/dropdown-menu";
+    80→import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+    81→import {
+    82→  Command,
+    83→  CommandEmpty,
+    84→  CommandGroup,
+    85→  CommandInput,
+    86→  CommandItem,
+    87→  CommandList,
+    88→} from "@/components/ui/command";
+    89→import { cn, formatDate } from "@/lib/utils";
+    90→
+    91→// =========================================================
+    92→// Constants & types
+    93→// =========================================================
+    94→
+    95→const ASSET_TYPES = [
+    96→  { value: "LAPTOP", label: "Laptop", icon: Laptop, color: "text-sky-600 bg-sky-500/10" },
+    97→  { value: "MONITOR", label: "Monitor", icon: Monitor, color: "text-violet-600 bg-violet-500/10" },
+    98→  { value: "PHONE", label: "Phone", icon: Smartphone, color: "text-emerald-600 bg-emerald-500/10" },
+    99→  { value: "TABLET", label: "Tablet", icon: Tablet, color: "text-amber-600 bg-amber-500/10" },
+   100→  { value: "KEYBOARD", label: "Keyboard", icon: Keyboard, color: "text-teal-600 bg-teal-500/10" },
+   101→  { value: "MOUSE", label: "Mouse", icon: Mouse, color: "text-fuchsia-600 bg-fuchsia-500/10" },
+   102→  { value: "HEADSET", label: "Headset", icon: Headset, color: "text-rose-600 bg-rose-500/10" },
+   103→  { value: "DESK", label: "Desk", icon: LampDesk, color: "text-orange-600 bg-orange-500/10" },
+   104→  { value: "CHAIR", label: "Chair", icon: Armchair, color: "text-lime-600 bg-lime-500/10" },
+   105→  { value: "PRINTER", label: "Printer", icon: Printer, color: "text-cyan-600 bg-cyan-500/10" },
+   106→  { value: "CAMERA", label: "Camera", icon: Camera, color: "text-pink-600 bg-pink-500/10" },
+   107→  { value: "OTHER", label: "Other", icon: Box, color: "text-muted-foreground bg-muted" },
+   108→] as const;
+   109→
+   110→const CONDITIONS = ["NEW", "GOOD", "FAIR", "DAMAGED"] as const;
+   111→const STATUSES = ["AVAILABLE", "ASSIGNED", "RETURNED", "RETIRED"] as const;
+   112→
+   113→type AssetType = (typeof ASSET_TYPES)[number]["value"];
+   114→type AssetCondition = (typeof CONDITIONS)[number];
+   115→type AssetStatus = (typeof STATUSES)[number];
+   116→
+   117→const CONDITION_COLOR: Record<AssetCondition, string> = {
+   118→  NEW: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/20",
+   119→  GOOD: "bg-sky-500/15 text-sky-700 dark:text-sky-300 border-sky-500/20",
+   120→  FAIR: "bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/20",
+   121→  DAMAGED: "bg-rose-500/15 text-rose-700 dark:text-rose-300 border-rose-500/20",
+   122→};
+   123→
+   124→const STATUS_COLOR: Record<AssetStatus, string> = {
+   125→  AVAILABLE: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/20",
+   126→  ASSIGNED: "bg-sky-500/15 text-sky-700 dark:text-sky-300 border-sky-500/20",
+   127→  RETURNED: "bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/20",
+   128→  RETIRED: "bg-rose-500/15 text-rose-700 dark:text-rose-300 border-rose-500/20",
+   129→};
+   130→
+   131→function getTypeMeta(t: string) {
+   132→  return (
+   133→    ASSET_TYPES.find((x) => x.value === t) ?? ASSET_TYPES[ASSET_TYPES.length - 1]
+   134→  );
+   135→}
+   136→
+   137→interface Asset {
+   138→  id: string;
+   139→  name: string;
+   140→  type: AssetType;
+   141→  serialNumber: string;
+   142→  condition: AssetCondition;
+   143→  assignedToId: string | null;
+   144→  assignedToName: string | null;
+   145→  assignedDate: string | null;
+   146→  returnDate: string | null;
+   147→  expectedReturnDate: string | null;
+   148→  status: AssetStatus;
+   149→  notes: string | null;
+   150→  createdAt: string;
+   151→}
+   152→
+   153→interface EmployeeOption {
+   154→  id: string;
+   155→  employeeId: string;
+   156→  fullName: string;
+   157→  photo?: string | null;
+   158→  department?: { name: string; color?: string | null } | null;
+   159→  designation?: { name: string } | null;
+   160→}
+   161→
+   162→// =========================================================
+   163→// Main module
+   164→// =========================================================
+   165→
+   166→export function AssetsModule() {
+   167→  const [search, setSearch] = useState("");
+   168→  const [type, setType] = useState("");
+   169→  const [status, setStatus] = useState("");
+   170→  const [view, setView] = useState<"table" | "grid">("table");
+   171→
+   172→  const [formOpen, setFormOpen] = useState(false);
+   173→  const [editAsset, setEditAsset] = useState<Asset | null>(null);
+   174→  const [assignAsset, setAssignAsset] = useState<Asset | null>(null);
+   175→  const [returnAsset, setReturnAsset] = useState<Asset | null>(null);
+   176→
+   177→  const qc = useQueryClient();
+   178→  const { data, isLoading, isError } = useQuery({
+   179→    queryKey: ["assets", search, type, status],
+   180→    queryFn: async () => {
+   181→      const params = new URLSearchParams();
+   182→      if (search) params.set("search", search);
+   183→      if (type) params.set("type", type);
+   184→      if (status) params.set("status", status);
+   185→      const r = await fetch(`/api/assets?${params.toString()}`);
+   186→      if (!r.ok) throw new Error("Failed to load assets");
+   187→      return r.json();
+   188→    },
+   189→  });
+   190→
+   191→  const assets: Asset[] = data?.items ?? [];
+   192→  const total = assets.length;
+   193→  const assigned = assets.filter((a) => a.status === "ASSIGNED").length;
+   194→  const available = assets.filter((a) => a.status === "AVAILABLE").length;
+   195→  const damaged = assets.filter((a) => a.condition === "DAMAGED").length;
+   196→
+   197→  function openCreate() {
+   198→    setEditAsset(null);
+   199→    setFormOpen(true);
+   200→  }
+   201→  function openEdit(a: Asset) {
+   202→    setEditAsset(a);
+   203→    setFormOpen(true);
+   204→  }
+   205→  async function deleteAsset(a: Asset) {
+   206→    if (!confirm(`Permanently delete asset "${a.name}"?`)) return;
+   207→    try {
+   208→      const r = await fetch(`/api/assets/${a.id}`, { method: "DELETE" });
+   209→      if (!r.ok) throw new Error("Failed to delete asset");
+   210→      toast.success(`Asset "${a.name}" deleted.`);
+   211→      qc.invalidateQueries({ queryKey: ["assets"] });
+   212→    } catch (err: any) {
+   213→      toast.error(err?.message || "Failed to delete asset.");
+   214→    }
+   215→  }
+   216→  async function retireAsset(a: Asset) {
+   217→    if (!confirm(`Retire asset "${a.name}"? It will be marked RETIRED.`))
+   218→      return;
+   219→    try {
+   220→      const r = await fetch(`/api/assets/${a.id}`, {
+   221→        method: "PATCH",
+   222→        headers: { "Content-Type": "application/json" },
+   223→        body: JSON.stringify({ status: "RETIRED" }),
+   224→      });
+   225→      if (!r.ok) throw new Error("Failed to retire asset");
+   226→      toast.success(`Asset "${a.name}" retired.`);
+   227→      qc.invalidateQueries({ queryKey: ["assets"] });
+   228→    } catch (err: any) {
+   229→      toast.error(err?.message || "Failed to retire asset.");
+   230→    }
+   231→  }
+   232→
+   233→  return (
+   234→    <div className="space-y-6">
+   235→      <PageHeader
+   236→        title="Asset Management"
+   237→        description="Track company assets and equipment assignments"
+   238→        icon={<Package className="size-5" />}
+   239→        actions={
+   240→          <>
+   241→            <ExportButton
+   242→              module="assets"
+   243→              filters={{ search, status, type }}
+   244→            />
+   245→            <div className="flex rounded-md border border-border overflow-hidden">
+   246→              <Button
+   247→                variant={view === "table" ? "default" : "ghost"}
+   248→                size="sm"
+   249→                className="rounded-none gap-1.5"
+   250→                onClick={() => setView("table")}
+   251→                aria-label="Table view"
+   252→              >
+   253→                <List className="size-4" />
+   254→                <span className="hidden sm:inline">Table</span>
+   255→              </Button>
+   256→              <Button
+   257→                variant={view === "grid" ? "default" : "ghost"}
+   258→                size="sm"
+   259→                className="rounded-none gap-1.5"
+   260→                onClick={() => setView("grid")}
+   261→                aria-label="Grid view"
+   262→              >
+   263→                <LayoutGrid className="size-4" />
+   264→                <span className="hidden sm:inline">Grid</span>
+   265→              </Button>
+   266→            </div>
+   267→            <Button size="sm" onClick={openCreate} className="gap-1.5">
+   268→              <Plus className="size-4" />
+   269→              <span className="hidden sm:inline">Add Asset</span>
+   270→              <span className="sm:hidden">New</span>
+   271→            </Button>
+   272→          </>
+   273→        }
+   274→      />
+   275→
+   276→      {/* KPI cards */}
+   277→      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
+   278→        <KpiCard
+   279→          label="Total Assets"
+   280→          value={total}
+   281→          icon={Package}
+   282→          iconClass="bg-primary/10 text-primary"
+   283→          footer={<span className="text-muted-foreground">All equipment</span>}
+   284→        />
+   285→        <KpiCard
+   286→          label="Assigned"
+   287→          value={assigned}
+   288→          icon={PackageCheck}
+   289→          iconClass="bg-sky-500/15 text-sky-600"
+   290→          footer={<span className="text-muted-foreground">In use</span>}
+   291→        />
+   292→        <KpiCard
+   293→          label="Available"
+   294→          value={available}
+   295→          icon={PackageOpen}
+   296→          iconClass="bg-emerald-500/15 text-emerald-600"
+   297→          footer={<span className="text-muted-foreground">Free to assign</span>}
+   298→        />
+   299→        <KpiCard
+   300→          label="Damaged"
+   301→          value={damaged}
+   302→          icon={AlertTriangle}
+   303→          iconClass="bg-rose-500/15 text-rose-600"
+   304→          footer={<span className="text-muted-foreground">Needs repair</span>}
+   305→        />
+   306→      </div>
+   307→
+   308→      {/* Filter bar */}
+   309→      <div className="flex flex-col md:flex-row gap-3">
+   310→        <div className="relative flex-1">
+   311→          <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+   312→          <Input
+   313→            placeholder="Search by name, serial, or assignee…"
+   314→            value={search}
+   315→            onChange={(e) => setSearch(e.target.value)}
+   316→            className="pl-9"
+   317→          />
+   318→        </div>
+   319→        <Select
+   320→          value={type || "ALL"}
+   321→          onValueChange={(v) => setType(v === "ALL" ? "" : v)}
+   322→        >
+   323→          <SelectTrigger className="md:w-44">
+   324→            <SelectValue placeholder="All types" />
+   325→          </SelectTrigger>
+   326→          <SelectContent>
+   327→            <SelectItem value="ALL">All types</SelectItem>
+   328→            {ASSET_TYPES.map((t) => (
+   329→              <SelectItem key={t.value} value={t.value}>
+   330→                {t.label}
+   331→              </SelectItem>
+   332→            ))}
+   333→          </SelectContent>
+   334→        </Select>
+   335→        <Select
+   336→          value={status || "ALL"}
+   337→          onValueChange={(v) => setStatus(v === "ALL" ? "" : v)}
+   338→        >
+   339→          <SelectTrigger className="md:w-44">
+   340→            <SelectValue placeholder="All statuses" />
+   341→          </SelectTrigger>
+   342→          <SelectContent>
+   343→            <SelectItem value="ALL">All statuses</SelectItem>
+   344→            {STATUSES.map((s) => (
+   345→              <SelectItem key={s} value={s}>
+   346→                {s.charAt(0) + s.slice(1).toLowerCase()}
+   347→              </SelectItem>
+   348→            ))}
+   349→          </SelectContent>
+   350→        </Select>
+   351→      </div>
+   352→
+   353→      {/* Result count */}
+   354→      <div className="flex items-center justify-between text-sm">
+   355→        <div className="text-muted-foreground">
+   356→          {isLoading ? (
+   357→            <Skeleton className="h-4 w-32" />
+   358→          ) : (
+   359→            <span>
+   360→              Showing <span className="font-semibold text-foreground">{assets.length}</span>{" "}
+   361→              asset{assets.length === 1 ? "" : "s"}
+   362→              {(type || status || search) && " (filtered)"}
+   363→            </span>
+   364→          )}
+   365→        </div>
+   366→      </div>
+   367→
+   368→      {/* Content */}
+   369→      {isLoading ? (
+   370→        <AssetsSkeleton view={view} />
+   371→      ) : isError ? (
+   372→        <EmptyState
+   373→          icon={AlertTriangle}
+   374→          title="Failed to load assets"
+   375→          description="Please try again. If the problem persists, check the dev server."
+   376→          actionLabel="Retry"
+   377→          onAction={() => qc.invalidateQueries({ queryKey: ["assets"] })}
+   378→        />
+   379→      ) : assets.length === 0 ? (
+   380→        <EmptyState
+   381→          icon={Package}
+   382→          title={search || type || status ? "No matching assets" : "No assets yet"}
+   383→          description={
+   384→            search || type || status
+   385→              ? "Try adjusting your filters."
+   386→              : "Start by adding your first company asset."
+   387→          }
+   388→          actionLabel="Add Asset"
+   389→          onAction={openCreate}
+   390→        />
+   391→      ) : view === "table" ? (
+   392→        <AssetsTable
+   393→          assets={assets}
+   394→          onEdit={openEdit}
+   395→          onDelete={deleteAsset}
+   396→          onAssign={(a) => setAssignAsset(a)}
+   397→          onReturn={(a) => setReturnAsset(a)}
+   398→          onRetire={retireAsset}
+   399→        />
+   400→      ) : (
+   401→        <AssetsGrid
+   402→          assets={assets}
+   403→          onEdit={openEdit}
+   404→          onDelete={deleteAsset}
+   405→          onAssign={(a) => setAssignAsset(a)}
+   406→          onReturn={(a) => setReturnAsset(a)}
+   407→          onRetire={retireAsset}
+   408→        />
+   409→      )}
+   410→
+   411→      {/* Create / Edit dialog */}
+   412→      <AssetFormDialog
+   413→        open={formOpen}
+   414→        onOpenChange={(o) => {
+   415→          setFormOpen(o);
+   416→          if (!o) setEditAsset(null);
+   417→        }}
+   418→        asset={editAsset}
+   419→        onSaved={() => qc.invalidateQueries({ queryKey: ["assets"] })}
+   420→      />
+   421→
+   422→      {/* Assign dialog */}
+   423→      <AssignDialog
+   424→        asset={assignAsset}
+   425→        onClose={() => setAssignAsset(null)}
+   426→        onSaved={() => {
+   427→          qc.invalidateQueries({ queryKey: ["assets"] });
+   428→          setAssignAsset(null);
+   429→        }}
+   430→      />
+   431→
+   432→      {/* Return dialog */}
+   433→      <ReturnDialog
+   434→        asset={returnAsset}
+   435→        onClose={() => setReturnAsset(null)}
+   436→        onSaved={() => {
+   437→          qc.invalidateQueries({ queryKey: ["assets"] });
+   438→          setReturnAsset(null);
+   439→        }}
+   440→      />
+   441→    </div>
+   442→  );
+   443→}
+   444→
+   445→// =========================================================
+   446→// Table view
+   447→// =========================================================
+   448→
+   449→function AssetsTable({
+   450→  assets,
+   451→  onEdit,
+   452→  onDelete,
+   453→  onAssign,
+   454→  onReturn,
+   455→  onRetire,
+   456→}: {
+   457→  assets: Asset[];
+   458→  onEdit: (a: Asset) => void;
+   459→  onDelete: (a: Asset) => void;
+   460→  onAssign: (a: Asset) => void;
+   461→  onReturn: (a: Asset) => void;
+   462→  onRetire: (a: Asset) => void;
+   463→}) {
+   464→  return (
+   465→    <Card className="p-0 overflow-hidden border-border/60">
+   466→      <div className="overflow-x-auto max-h-[70vh] overflow-y-auto">
+   467→        <Table>
+   468→          <TableHeader className="sticky top-0 bg-card z-10">
+   469→            <TableRow>
+   470→              <TableHead>Asset</TableHead>
+   471→              <TableHead>Type</TableHead>
+   472→              <TableHead className="hidden md:table-cell">Serial</TableHead>
+   473→              <TableHead>Condition</TableHead>
+   474→              <TableHead>Assigned To</TableHead>
+   475→              <TableHead className="hidden lg:table-cell">Assigned Date</TableHead>
+   476→              <TableHead>Status</TableHead>
+   477→              <TableHead className="text-right">Actions</TableHead>
+   478→            </TableRow>
+   479→          </TableHeader>
+   480→          <TableBody>
+   481→            {assets.map((a) => {
+   482→              const tm = getTypeMeta(a.type);
+   483→              const TIcon = tm.icon;
+   484→              return (
+   485→                <TableRow key={a.id} className="hover:bg-muted/30">
+   486→                  <TableCell>
+   487→                    <div className="flex items-center gap-2.5 min-w-0">
+   488→                      <div
+   489→                        className={cn(
+   490→                          "size-9 rounded-lg flex items-center justify-center flex-shrink-0",
+   491→                          tm.color
+   492→                        )}
+   493→                      >
+   494→                        <TIcon className="size-4" />
+   495→                      </div>
+   496→                      <div className="min-w-0">
+   497→                        <div className="font-medium text-sm truncate">{a.name}</div>
+   498→                        {a.notes && (
+   499→                          <div className="text-xs text-muted-foreground truncate max-w-[200px]">
+   500→                            {a.notes.split("\n")[0]}
+   501→                          </div>
+   502→                        )}
+   503→                      </div>
+   504→                    </div>
+   505→                  </TableCell>
+   506→                  <TableCell>
+   507→                    <Badge variant="outline" className="gap-1 font-medium">
+   508→                      <TIcon className="size-3" />
+   509→                      {tm.label}
+   510→                    </Badge>
+   511→                  </TableCell>
+   512→                  <TableCell className="hidden md:table-cell font-mono text-xs">
+   513→                    {a.serialNumber || "—"}
+   514→                  </TableCell>
+   515→                  <TableCell>
+   516→                    <Badge
+   517→                      variant="outline"
+   518→                      className={cn(
+   519→                        "font-medium border text-[11px]",
+   520→                        CONDITION_COLOR[a.condition]
+   521→                      )}
+   522→                    >
+   523→                      {a.condition.charAt(0) + a.condition.slice(1).toLowerCase()}
+   524→                    </Badge>
+   525→                  </TableCell>
+   526→                  <TableCell>
+   527→                    {a.assignedToName ? (
+   528→                      <div className="flex items-center gap-2 min-w-0">
+   529→                        <AvatarBadge name={a.assignedToName} size="sm" />
+   530→                        <div className="min-w-0">
+   531→                          <div className="text-sm font-medium truncate max-w-[140px]">
+   532→                            {a.assignedToName}
+   533→                          </div>
+   534→                        </div>
+   535→                      </div>
+   536→                    ) : (
+   537→                      <span className="text-xs text-muted-foreground italic">
+   538→                        Available
+   539→                      </span>
+   540→                    )}
+   541→                  </TableCell>
+   542→                  <TableCell className="hidden lg:table-cell text-xs text-muted-foreground">
+   543→                    {a.assignedDate ? formatDate(a.assignedDate) : "—"}
+   544→                  </TableCell>
+   545→                  <TableCell>
+   546→                    <Badge
+   547→                      variant="outline"
+   548→                      className={cn(
+   549→                        "font-medium border text-[11px]",
+   550→                        STATUS_COLOR[a.status]
+   551→                      )}
+   552→                    >
+   553→                      {a.status.charAt(0) + a.status.slice(1).toLowerCase()}
+   554→                    </Badge>
+   555→                  </TableCell>
+   556→                  <TableCell className="text-right">
+   557→                    <div className="flex items-center justify-end gap-1">
+   558→                      {a.status === "AVAILABLE" && (
+   559→                        <Button
+   560→                          size="sm"
+   561→                          variant="outline"
+   562→                          className="h-8 gap-1.5"
+   563→                          onClick={() => onAssign(a)}
+   564→                        >
+   565→                          <UserPlus className="size-3.5" />
+   566→                          <span className="hidden xl:inline">Assign</span>
+   567→                        </Button>
+   568→                      )}
+   569→                      {a.status === "ASSIGNED" && (
+   570→                        <Button
+   571→                          size="sm"
+   572→                          variant="outline"
+   573→                          className="h-8 gap-1.5"
+   574→                          onClick={() => onReturn(a)}
+   575→                        >
+   576→                          <Undo2 className="size-3.5" />
+   577→                          <span className="hidden xl:inline">Return</span>
+   578→                        </Button>
+   579→                      )}
+   580→                      <DropdownMenu>
+   581→                        <DropdownMenuTrigger asChild>
+   582→                          <Button
+   583→                            size="icon"
+   584→                            variant="ghost"
+   585→                            className="size-8"
+   586→                            aria-label="Actions"
+   587→                          >
+   588→                            <MoreVertical className="size-4" />
+   589→                          </Button>
+   590→                        </DropdownMenuTrigger>
+   591→                        <DropdownMenuContent align="end" className="w-44">
+   592→                          <DropdownMenuItem onClick={() => onEdit(a)}>
+   593→                            <Pencil className="size-4 mr-2" /> Edit
+   594→                          </DropdownMenuItem>
+   595→                          {a.status !== "RETIRED" && (
+   596→                            <DropdownMenuItem onClick={() => onRetire(a)}>
+   597→                              <Box className="size-4 mr-2" /> Retire
+   598→                            </DropdownMenuItem>
+   599→                          )}
+   600→                          <DropdownMenuSeparator />
+   601→                          <DropdownMenuItem
+   602→                            className="text-rose-600 focus:text-rose-700"
+   603→                            onClick={() => onDelete(a)}
+   604→                          >
+   605→                            <Trash2 className="size-4 mr-2" /> Delete
+   606→                          </DropdownMenuItem>
+   607→                        </DropdownMenuContent>
+   608→                      </DropdownMenu>
+   609→                    </div>
+   610→                  </TableCell>
+   611→                </TableRow>
+   612→              );
+   613→            })}
+   614→          </TableBody>
+   615→        </Table>
+   616→      </div>
+   617→    </Card>
+   618→  );
+   619→}
+   620→
+   621→// =========================================================
+   622→// Grid view
+   623→// =========================================================
+   624→
+   625→function AssetsGrid({
+   626→  assets,
+   627→  onEdit,
+   628→  onDelete,
+   629→  onAssign,
+   630→  onReturn,
+   631→  onRetire,
+   632→}: {
+   633→  assets: Asset[];
+   634→  onEdit: (a: Asset) => void;
+   635→  onDelete: (a: Asset) => void;
+   636→  onAssign: (a: Asset) => void;
+   637→  onReturn: (a: Asset) => void;
+   638→  onRetire: (a: Asset) => void;
+   639→}) {
+   640→  return (
+   641→    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+   642→      {assets.map((a) => {
+   643→        const tm = getTypeMeta(a.type);
+   644→        const TIcon = tm.icon;
+   645→        return (
+   646→          <Card
+   647→            key={a.id}
+   648→            className="p-4 border-border/60 hover:border-border hover:shadow-card-hover transition-all flex flex-col gap-3"
+   649→          >
+   650→            <div className="flex items-start justify-between gap-2">
+   651→              <div
+   652→                className={cn(
+   653→                  "size-12 rounded-xl flex items-center justify-center",
+   654→                  tm.color
+   655→                )}
+   656→              >
+   657→                <TIcon className="size-6" />
+   658→              </div>
+   659→              <Badge
+   660→                variant="outline"
+   661→                className={cn(
+   662→                  "font-medium border text-[10px]",
+   663→                  STATUS_COLOR[a.status]
+   664→                )}
+   665→              >
+   666→                {a.status.charAt(0) + a.status.slice(1).toLowerCase()}
+   667→              </Badge>
+   668→            </div>
+   669→
+   670→            <div>
+   671→              <div className="font-semibold leading-tight truncate" title={a.name}>
+   672→                {a.name}
+   673→              </div>
+   674→              <div className="text-xs text-muted-foreground mt-0.5">
+   675→                {tm.label}
+   676→                {a.serialNumber && (
+   677→                  <span className="font-mono"> · {a.serialNumber}</span>
+   678→                )}
+   679→              </div>
+   680→            </div>
+   681→
+   682→            <div className="flex items-center gap-2">
+   683→              <Badge
+   684→                variant="outline"
+   685→                className={cn(
+   686→                  "font-medium border text-[10px]",
+   687→                  CONDITION_COLOR[a.condition]
+   688→                )}
+   689→              >
+   690→                {a.condition.charAt(0) + a.condition.slice(1).toLowerCase()}
+   691→              </Badge>
+   692→            </div>
+   693→
+   694→            {a.assignedToName ? (
+   695→              <div className="flex items-center gap-2 pt-1 border-t border-border/60">
+   696→                <AvatarBadge name={a.assignedToName} size="sm" />
+   697→                <div className="min-w-0 flex-1">
+   698→                  <div className="text-xs font-medium truncate">
+   699→                    {a.assignedToName}
+   700→                  </div>
+   701→                  <div className="text-[10px] text-muted-foreground">
+   702→                    {a.assignedDate ? formatDate(a.assignedDate) : "—"}
+   703→                  </div>
+   704→                </div>
+   705→              </div>
+   706→            ) : (
+   707→              <div className="text-xs text-emerald-600 dark:text-emerald-400 italic pt-1 border-t border-border/60">
+   708→                Available for assignment
+   709→              </div>
+   710→            )}
+   711→
+   712→            <div className="flex items-center gap-1.5 mt-auto pt-2">
+   713→              {a.status === "AVAILABLE" && (
+   714→                <Button
+   715→                  size="sm"
+   716→                  variant="default"
+   717→                  className="h-8 flex-1 gap-1.5"
+   718→                  onClick={() => onAssign(a)}
+   719→                >
+   720→                  <UserPlus className="size-3.5" /> Assign
+   721→                </Button>
+   722→              )}
+   723→              {a.status === "ASSIGNED" && (
+   724→                <Button
+   725→                  size="sm"
+   726→                  variant="outline"
+   727→                  className="h-8 flex-1 gap-1.5"
+   728→                  onClick={() => onReturn(a)}
+   729→                >
+   730→                  <Undo2 className="size-3.5" /> Return
+   731→                </Button>
+   732→              )}
+   733→              <DropdownMenu>
+   734→                <DropdownMenuTrigger asChild>
+   735→                  <Button
+   736→                    size="icon"
+   737→                    variant="ghost"
+   738→                    className="size-8"
+   739→                    aria-label="More actions"
+   740→                  >
+   741→                    <MoreVertical className="size-4" />
+   742→                  </Button>
+   743→                </DropdownMenuTrigger>
+   744→                <DropdownMenuContent align="end" className="w-44">
+   745→                  <DropdownMenuItem onClick={() => onEdit(a)}>
+   746→                    <Pencil className="size-4 mr-2" /> Edit
+   747→                  </DropdownMenuItem>
+   748→                  {a.status !== "RETIRED" && (
+   749→                    <DropdownMenuItem onClick={() => onRetire(a)}>
+   750→                      <Box className="size-4 mr-2" /> Retire
+   751→                    </DropdownMenuItem>
+   752→                  )}
+   753→                  <DropdownMenuSeparator />
+   754→                  <DropdownMenuItem
+   755→                    className="text-rose-600 focus:text-rose-700"
+   756→                    onClick={() => onDelete(a)}
+   757→                  >
+   758→                    <Trash2 className="size-4 mr-2" /> Delete
+   759→                  </DropdownMenuItem>
+   760→                </DropdownMenuContent>
+   761→              </DropdownMenu>
+   762→            </div>
+   763→          </Card>
+   764→        );
+   765→      })}
+   766→    </div>
+   767→  );
+   768→}
+   769→
+   770→// =========================================================
+   771→// Skeleton + dialog components
+   772→// =========================================================
+   773→
+   774→function AssetsSkeleton({ view }: { view: "table" | "grid" }) {
+   775→  if (view === "grid") {
+   776→    return (
+   777→      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+   778→        {Array.from({ length: 8 }).map((_, i) => (
+   779→          <Card key={i} className="p-4 h-48">
+   780→            <Skeleton className="h-12 w-12 rounded-xl" />
+   781→            <Skeleton className="h-4 w-2/3 mt-3" />
+   782→            <Skeleton className="h-3 w-1/2 mt-2" />
+   783→            <Skeleton className="h-8 w-full mt-4" />
+   784→          </Card>
+   785→        ))}
+   786→      </div>
+   787→    );
+   788→  }
+   789→  return (
+   790→    <Card className="p-0 overflow-hidden">
+   791→      {Array.from({ length: 6 }).map((_, i) => (
+   792→        <div key={i} className="flex items-center gap-3 p-3 border-b border-border/40">
+   793→          <Skeleton className="size-9 rounded-lg" />
+   794→          <div className="flex-1 space-y-1.5">
+   795→            <Skeleton className="h-3.5 w-1/3" />
+   796→            <Skeleton className="h-2.5 w-1/4" />
+   797→          </div>
+   798→          <Skeleton className="h-6 w-20 rounded-full" />
+   799→          <Skeleton className="h-8 w-16" />
+   800→        </div>
+   801→      ))}
+   802→    </Card>
+   803→  );
+   804→}
+   805→
+   806→// =========================================================
+   807→// Create / Edit form dialog
+   808→// =========================================================
+   809→
+   810→function AssetFormDialog({
+   811→  open,
+   812→  onOpenChange,
+   813→  asset,
+   814→  onSaved,
+   815→}: {
+   816→  open: boolean;
+   817→  onOpenChange: (o: boolean) => void;
+   818→  asset: Asset | null;
+   819→  onSaved: () => void;
+   820→}) {
+   821→  const formKey = `${open ? "open" : "closed"}-${asset?.id ?? "new"}`;
+   822→  const [saving, setSaving] = useState(false);
+   823→
+   824→  return (
+   825→    <Dialog
+   826→      open={open}
+   827→      onOpenChange={(o) => {
+   828→        if (!saving) onOpenChange(o);
+   829→      }}
+   830→    >
+   831→      <DialogContent className="sm:max-w-lg">
+   832→        <DialogHeader>
+   833→          <DialogTitle>
+   834→            {asset ? "Edit Asset" : "Add New Asset"}
+   835→          </DialogTitle>
+   836→          <DialogDescription>
+   837→            {asset
+   838→              ? "Update asset details. Status changes are handled via Assign/Return actions."
+   839→              : "Register a new company asset for tracking and assignment."}
+   840→          </DialogDescription>
+   841→        </DialogHeader>
+   842→        <AssetFormBody
+   843→          key={formKey}
+   844→          asset={asset}
+   845→          savingState={[saving, setSaving]}
+   846→          onSaved={() => {
+   847→            onSaved();
+   848→            onOpenChange(false);
+   849→            toast.success(asset ? "Asset updated." : "Asset created.");
+   850→          }}
+   851→          onCancel={() => onOpenChange(false)}
+   852→        />
+   853→      </DialogContent>
+   854→    </Dialog>
+   855→  );
+   856→}
+   857→
+   858→function AssetFormBody({
+   859→  asset,
+   860→  savingState,
+   861→  onSaved,
+   862→  onCancel,
+   863→}: {
+   864→  asset: Asset | null;
+   865→  savingState: [boolean, (b: boolean) => void];
+   866→  onSaved: () => void;
+   867→  onCancel: () => void;
+   868→}) {
+   869→  const [name, setName] = useState(asset?.name ?? "");
+   870→  const [type, setType] = useState<AssetType>(asset?.type ?? "LAPTOP");
+   871→  const [serialNumber, setSerialNumber] = useState(asset?.serialNumber ?? "");
+   872→  const [condition, setCondition] = useState<AssetCondition>(
+   873→    asset?.condition ?? "GOOD"
+   874→  );
+   875→  const [notes, setNotes] = useState(asset?.notes ?? "");
+   876→  const [saving, setSaving] = savingState;
+   877→
+   878→  async function submit() {
+   879→    if (!name.trim()) {
+   880→      toast.error("Asset name is required.");
+   881→      return;
+   882→    }
+   883→    setSaving(true);
+   884→    try {
+   885→      const body = { name, type, serialNumber, condition, notes };
+   886→      const r = asset
+   887→        ? await fetch(`/api/assets/${asset.id}`, {
+   888→            method: "PATCH",
+   889→            headers: { "Content-Type": "application/json" },
+   890→            body: JSON.stringify(body),
+   891→          })
+   892→        : await fetch("/api/assets", {
+   893→            method: "POST",
+   894→            headers: { "Content-Type": "application/json" },
+   895→            body: JSON.stringify(body),
+   896→          });
+   897→      if (!r.ok) {
+   898→        const e = await r.json().catch(() => ({}));
+   899→        throw new Error(e?.error || "Failed to save asset");
+   900→      }
+   901→      onSaved();
+   902→    } catch (err: any) {
+   903→      toast.error(err?.message || "Failed to save asset.");
+   904→    } finally {
+   905→      setSaving(false);
+   906→    }
+   907→  }
+   908→
+   909→  return (
+   910→    <div className="space-y-4">
+   911→      <div className="space-y-1.5">
+   912→        <Label htmlFor="asset-name">Asset name *</Label>
+   913→        <Input
+   914→          id="asset-name"
+   915→          placeholder="e.g. MacBook Pro 16&quot; M3"
+   916→          value={name}
+   917→          onChange={(e) => setName(e.target.value)}
+   918→        />
+   919→      </div>
+   920→      <div className="grid grid-cols-2 gap-3">
+   921→        <div className="space-y-1.5">
+   922→          <Label htmlFor="asset-type">Type</Label>
+   923→          <Select value={type} onValueChange={(v) => setType(v as AssetType)}>
+   924→            <SelectTrigger id="asset-type">
+   925→              <SelectValue />
+   926→            </SelectTrigger>
+   927→            <SelectContent>
+   928→              {ASSET_TYPES.map((t) => (
+   929→                <SelectItem key={t.value} value={t.value}>
+   930→                  <span className="flex items-center gap-2">
+   931→                    <t.icon className="size-3.5" />
+   932→                    {t.label}
+   933→                  </span>
+   934→                </SelectItem>
+   935→              ))}
+   936→            </SelectContent>
+   937→          </Select>
+   938→        </div>
+   939→        <div className="space-y-1.5">
+   940→          <Label htmlFor="asset-condition">Condition</Label>
+   941→          <Select
+   942→            value={condition}
+   943→            onValueChange={(v) => setCondition(v as AssetCondition)}
+   944→          >
+   945→            <SelectTrigger id="asset-condition">
+   946→              <SelectValue />
+   947→            </SelectTrigger>
+   948→            <SelectContent>
+   949→              {CONDITIONS.map((c) => (
+   950→                <SelectItem key={c} value={c}>
+   951→                  {c.charAt(0) + c.slice(1).toLowerCase()}
+   952→                </SelectItem>
+   953→              ))}
+   954→            </SelectContent>
+   955→          </Select>
+   956→        </div>
+   957→      </div>
+   958→      <div className="space-y-1.5">
+   959→        <Label htmlFor="asset-serial">Serial number</Label>
+   960→        <Input
+   961→          id="asset-serial"
+   962→          placeholder="e.g. SN-2024-001234"
+   963→          value={serialNumber}
+   964→          onChange={(e) => setSerialNumber(e.target.value)}
+   965→        />
+   966→      </div>
+   967→      <div className="space-y-1.5">
+   968→        <Label htmlFor="asset-notes">Notes</Label>
+   969→        <Textarea
+   970→          id="asset-notes"
+   971→          placeholder="Optional notes (specs, warranty, purchase date, etc.)"
+   972→          value={notes}
+   973→          onChange={(e) => setNotes(e.target.value)}
+   974→          rows={3}
+   975→        />
+   976→      </div>
+   977→      <DialogFooter>
+   978→        <Button variant="outline" onClick={onCancel} disabled={saving}>
+   979→          Cancel
+   980→        </Button>
+   981→        <Button onClick={submit} disabled={saving} className="gap-1.5">
+   982→          {saving && <Loader2 className="size-4 animate-spin" />}
+   983→          {asset ? "Save Changes" : "Create Asset"}
+   984→        </Button>
+   985→      </DialogFooter>
+   986→    </div>
+   987→  );
+   988→}
+   989→
+   990→// =========================================================
+   991→// Employee searchable multi-select (used by Assign dialog)
+   992→// =========================================================
+   993→
+   994→function useEmployees(enabled: boolean) {
+   995→  return useQuery({
+   996→    queryKey: ["employees-select"],
+   997→    queryFn: async () => {
+   998→      const r = await fetch(`/api/employees?pageSize=500`);
+   999→      return r.json();
+  1000→    },
+  1001→    enabled,
+  1002→  });
+  1003→}
+  1004→
+  1005→function EmployeeSearchSelect({
+  1006→  value,
+  1007→  onChange,
+  1008→  employees,
+  1009→}: {
+  1010→  value: string;
+  1011→  onChange: (id: string) => void;
+  1012→  employees: EmployeeOption[];
+  1013→}) {
+  1014→  const [open, setOpen] = useState(false);
+  1015→  const selected = employees.find((e) => e.id === value);
+  1016→  return (
+  1017→    <Popover open={open} onOpenChange={setOpen}>
+  1018→      <PopoverTrigger asChild>
+  1019→        <Button
+  1020→          type="button"
+  1021→          variant="outline"
+  1022→          role="combobox"
+  1023→          aria-expanded={open}
+  1024→          className="w-full justify-between font-normal"
+  1025→        >
+  1026→          {selected ? (
+  1027→            <span className="flex items-center gap-2 min-w-0">
+  1028→              <AvatarBadge
+  1029→                name={selected.fullName}
+  1030→                photo={selected.photo}
+  1031→                size="sm"
+  1032→              />
+  1033→              <span className="truncate">{selected.fullName}</span>
+  1034→              <span className="text-xs text-muted-foreground font-mono">
+  1035→                {selected.employeeId}
+  1036→              </span>
+  1037→            </span>
+  1038→          ) : (
+  1039→            <span className="text-muted-foreground">Select employee…</span>
+  1040→          )}
+  1041→          <ChevronsUpDown className="size-4 opacity-50 shrink-0" />
+  1042→        </Button>
+  1043→      </PopoverTrigger>
+  1044→      <PopoverContent
+  1045→        className="w-[var(--radix-popover-trigger-width)] p-0"
+  1046→        align="start"
+  1047→      >
+  1048→        <Command>
+  1049→          <CommandInput placeholder="Search employee name or ID…" />
+  1050→          <CommandList className="max-h-64">
+  1051→            <CommandEmpty>No employee found.</CommandEmpty>
+  1052→            <CommandGroup>
+  1053→              {employees.map((e) => (
+  1054→                <CommandItem
+  1055→                  key={e.id}
+  1056→                  value={`${e.fullName} ${e.employeeId} ${e.department?.name ?? ""}`}
+  1057→                  onSelect={() => {
+  1058→                    onChange(e.id);
+  1059→                    setOpen(false);
+  1060→                  }}
+  1061→                >
+  1062→                  <AvatarBadge
+  1063→                    name={e.fullName}
+  1064→                    photo={e.photo}
+  1065→                    size="sm"
+  1066→                  />
+  1067→                  <div className="min-w-0 flex-1">
+  1068→                    <div className="truncate text-sm font-medium">
+  1069→                      {e.fullName}
+  1070→                    </div>
+  1071→                    <div className="text-xs text-muted-foreground font-mono">
+  1072→                      {e.employeeId} · {e.department?.name ?? "—"}
+  1073→                    </div>
+  1074→                  </div>
+  1075→                  {value === e.id && (
+  1076→                    <Check className="size-4 text-primary shrink-0" />
+  1077→                  )}
+  1078→                </CommandItem>
+  1079→              ))}
+  1080→            </CommandGroup>
+  1081→          </CommandList>
+  1082→        </Command>
+  1083→      </PopoverContent>
+  1084→    </Popover>
+  1085→  );
+  1086→}
+  1087→
+  1088→// =========================================================
+  1089→// Assign dialog
+  1090→// =========================================================
+  1091→
+  1092→function AssignDialog({
+  1093→  asset,
+  1094→  onClose,
+  1095→  onSaved,
+  1096→}: {
+  1097→  asset: Asset | null;
+  1098→  onClose: () => void;
+  1099→  onSaved: () => void;
+  1100→}) {
+  1101→  const { data: employeesData } = useEmployees(!!asset);
+  1102→  const employees: EmployeeOption[] = useMemo(
+  1103→    () =>
+  1104→      (employeesData?.items ?? []).map((e: any) => ({
+  1105→        id: e.id,
+  1106→        employeeId: e.employeeId,
+  1107→        fullName: e.fullName,
+  1108→        photo: e.photo,
+  1109→        department: e.department,
+  1110→        designation: e.designation,
+  1111→      })) ?? [],
+  1112→    [employeesData]
+  1113→  );
+  1114→
+  1115→  const [employeeId, setEmployeeId] = useState("");
+  1116→  const [assignedDate, setAssignedDate] = useState(
+  1117→    new Date().toISOString().slice(0, 10)
+  1118→  );
+  1119→  const [expectedReturnDate, setExpectedReturnDate] = useState("");
+  1120→  const [saving, setSaving] = useState(false);
+  1121→
+  1122→  // Reset form when a new asset opens
+  1123→  const resetKey = asset?.id ?? "none";
+  1124→  const [lastKey, setLastKey] = useState(resetKey);
+  1125→  if (resetKey !== lastKey) {
+  1126→    setLastKey(resetKey);
+  1127→    setEmployeeId("");
+  1128→    setAssignedDate(new Date().toISOString().slice(0, 10));
+  1129→    setExpectedReturnDate("");
+  1130→  }
+  1131→
+  1132→  async function submit() {
+  1133→    if (!asset) return;
+  1134→    if (!employeeId) {
+  1135→      toast.error("Please select an employee.");
+  1136→      return;
+  1137→    }
+  1138→    setSaving(true);
+  1139→    try {
+  1140→      const body: any = { employeeId, assignedDate };
+  1141→      if (expectedReturnDate) body.expectedReturnDate = expectedReturnDate;
+  1142→      const r = await fetch(`/api/assets/${asset.id}/assign`, {
+  1143→        method: "POST",
+  1144→        headers: { "Content-Type": "application/json" },
+  1145→        body: JSON.stringify(body),
+  1146→      });
+  1147→      if (!r.ok) {
+  1148→        const e = await r.json().catch(() => ({}));
+  1149→        throw new Error(e?.error || "Failed to assign asset");
+  1150→      }
+  1151→      toast.success(`Asset "${asset.name}" assigned.`);
+  1152→      onSaved();
+  1153→    } catch (err: any) {
+  1154→      toast.error(err?.message || "Failed to assign asset.");
+  1155→    } finally {
+  1156→      setSaving(false);
+  1157→    }
+  1158→  }
+  1159→
+  1160→  return (
+  1161→    <Dialog
+  1162→      open={!!asset}
+  1163→      onOpenChange={(o) => {
+  1164→        if (!saving && !o) onClose();
+  1165→      }}
+  1166→    >
+  1167→      <DialogContent className="sm:max-w-md">
+  1168→        <DialogHeader>
+  1169→          <DialogTitle className="flex items-center gap-2">
+  1170→            <UserPlus className="size-5 text-primary" />
+  1171→            Assign Asset
+  1172→          </DialogTitle>
+  1173→          <DialogDescription>
+  1174→            {asset
+  1175→              ? `Assign "${asset.name}" to an employee. The asset status will change to ASSIGNED.`
+  1176→              : ""}
+  1177→          </DialogDescription>
+  1178→        </DialogHeader>
+  1179→        <div className="space-y-4">
+  1180→          <div className="space-y-1.5">
+  1181→            <Label>Employee *</Label>
+  1182→            {employeesData ? (
+  1183→              <EmployeeSearchSelect
+  1184→                value={employeeId}
+  1185→                onChange={setEmployeeId}
+  1186→                employees={employees}
+  1187→              />
+  1188→            ) : (
+  1189→              <Skeleton className="h-9 w-full" />
+  1190→            )}
+  1191→          </div>
+  1192→          <div className="space-y-1.5">
+  1193→            <Label htmlFor="assign-date">Assigned date</Label>
+  1194→            <Input
+  1195→              id="assign-date"
+  1196→              type="date"
+  1197→              value={assignedDate}
+  1198→              onChange={(e) => setAssignedDate(e.target.value)}
+  1199→            />
+  1200→          </div>
+  1201→          <div className="space-y-1.5">
+  1202→            <Label htmlFor="expected-return">Expected return date (optional)</Label>
+  1203→            <Input
+  1204→              id="expected-return"
+  1205→              type="date"
+  1206→              value={expectedReturnDate}
+  1207→              onChange={(e) => setExpectedReturnDate(e.target.value)}
+  1208→            />
+  1209→          </div>
+  1210→        </div>
+  1211→        <DialogFooter>
+  1212→          <Button variant="outline" onClick={onClose} disabled={saving}>
+  1213→            Cancel
+  1214→          </Button>
+  1215→          <Button onClick={submit} disabled={saving} className="gap-1.5">
+  1216→            {saving && <Loader2 className="size-4 animate-spin" />}
+  1217→            Assign Asset
+  1218→          </Button>
+  1219→        </DialogFooter>
+  1220→      </DialogContent>
+  1221→    </Dialog>
+  1222→  );
+  1223→}
+  1224→
+  1225→// =========================================================
+  1226→// Return dialog
+  1227→// =========================================================
+  1228→
+  1229→function ReturnDialog({
+  1230→  asset,
+  1231→  onClose,
+  1232→  onSaved,
+  1233→}: {
+  1234→  asset: Asset | null;
+  1235→  onClose: () => void;
+  1236→  onSaved: () => void;
+  1237→}) {
+  1238→  const [condition, setCondition] = useState<AssetCondition>("GOOD");
+  1239→  const [notes, setNotes] = useState("");
+  1240→  const [saving, setSaving] = useState(false);
+  1241→
+  1242→  const resetKey = asset?.id ?? "none";
+  1243→  const [lastKey, setLastKey] = useState(resetKey);
+  1244→  if (resetKey !== lastKey) {
+  1245→    setLastKey(resetKey);
+  1246→    setCondition(asset?.condition ?? "GOOD");
+  1247→    setNotes("");
+  1248→  }
+  1249→
+  1250→  async function submit() {
+  1251→    if (!asset) return;
+  1252→    setSaving(true);
+  1253→    try {
+  1254→      const body: any = { condition };
+  1255→      if (notes.trim()) body.notes = notes.trim();
+  1256→      const r = await fetch(`/api/assets/${asset.id}/return`, {
+  1257→        method: "POST",
+  1258→        headers: { "Content-Type": "application/json" },
+  1259→        body: JSON.stringify(body),
+  1260→      });
+  1261→      if (!r.ok) {
+  1262→        const e = await r.json().catch(() => ({}));
+  1263→        throw new Error(e?.error || "Failed to return asset");
+  1264→      }
+  1265→      toast.success(`Asset "${asset.name}" returned.`);
+  1266→      onSaved();
+  1267→    } catch (err: any) {
+  1268→      toast.error(err?.message || "Failed to return asset.");
+  1269→    } finally {
+  1270→      setSaving(false);
+  1271→    }
+  1272→  }
+  1273→
+  1274→  return (
+  1275→    <Dialog
+  1276→      open={!!asset}
+  1277→      onOpenChange={(o) => {
+  1278→        if (!saving && !o) onClose();
+  1279→      }}
+  1280→    >
+  1281→      <DialogContent className="sm:max-w-md">
+  1282→        <DialogHeader>
+  1283→          <DialogTitle className="flex items-center gap-2">
+  1284→            <Undo2 className="size-5 text-primary" />
+  1285→            Return Asset
+  1286→          </DialogTitle>
+  1287→          <DialogDescription>
+  1288→            {asset
+  1289→              ? `Mark "${asset.name}" as returned by ${asset.assignedToName ?? "the assigned employee"}. The asset will become available again.`
+  1290→              : ""}
+  1291→          </DialogDescription>
+  1292→        </DialogHeader>
+  1293→        <div className="space-y-4">
+  1294→          <div className="space-y-1.5">
+  1295→            <Label htmlFor="return-condition">Condition on return</Label>
+  1296→            <Select
+  1297→              value={condition}
+  1298→              onValueChange={(v) => setCondition(v as AssetCondition)}
+  1299→            >
+  1300→              <SelectTrigger id="return-condition">
+  1301→                <SelectValue />
+  1302→              </SelectTrigger>
+  1303→              <SelectContent>
+  1304→                {CONDITIONS.map((c) => (
+  1305→                  <SelectItem key={c} value={c}>
+  1306→                    {c.charAt(0) + c.slice(1).toLowerCase()}
+  1307→                  </SelectItem>
+  1308→                ))}
+  1309→              </SelectContent>
+  1310→            </Select>
+  1311→          </div>
+  1312→          <div className="space-y-1.5">
+  1313→            <Label htmlFor="return-notes">Return notes (optional)</Label>
+  1314→            <Textarea
+  1315→              id="return-notes"
+  1316→              placeholder="Note any damage, missing accessories, or remarks…"
+  1317→              value={notes}
+  1318→              onChange={(e) => setNotes(e.target.value)}
+  1319→              rows={3}
+  1320→            />
+  1321→          </div>
+  1322→        </div>
+  1323→        <DialogFooter>
+  1324→          <Button variant="outline" onClick={onClose} disabled={saving}>
+  1325→            Cancel
+  1326→          </Button>
+  1327→          <Button onClick={submit} disabled={saving} className="gap-1.5">
+  1328→            {saving && <Loader2 className="size-4 animate-spin" />}
+  1329→            Confirm Return
+  1330→          </Button>
+  1331→        </DialogFooter>
+  1332→      </DialogContent>
+  1333→    </Dialog>
+  1334→  );
+  1335→}
+  1336→

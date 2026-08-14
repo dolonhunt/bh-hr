@@ -30,9 +30,45 @@ import {
   Eye,
   CheckCircle2,
   Printer,
+  Calculator,
+  TrendingDown,
+  Building2,
+  Receipt,
+  ShieldCheck,
 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { printDocument } from "@/lib/print";
+import { formatCurrency } from "@/lib/utils";
+
+// =========================================================
+// Types
+// =========================================================
+
+interface TdsBreakdownRow {
+  slabId: string;
+  slabLabel: string;
+  rate: number;
+  taxableAmountInSlab: number;
+  taxForSlab: number;
+}
+
+interface PayrollBreakdown {
+  basicSalary: number;
+  hra: number;
+  specialAllowance: number;
+  grossSalary: number;
+  pf: number;
+  professionalTax: number;
+  tds: number;
+  tdsBreakdown: TdsBreakdownRow[];
+  gratuity: number;
+  customDeductions: number;
+  totalDeductions: number;
+  netSalary: number;
+  taxSlab: { id: string; label: string; rate: number; min: number; max: number | null } | null;
+  annualIncome: number;
+  annualTax: number;
+}
 
 interface Props {
   open: boolean;
@@ -53,6 +89,10 @@ export function PayslipDialog({
   const [month, setMonth] = useState(currentMonth);
   const [generating, setGenerating] = useState(false);
   const [generatedDoc, setGeneratedDoc] = useState<any | null>(null);
+
+  // "Calculate Payroll" step state
+  const [breakdown, setBreakdown] = useState<PayrollBreakdown | null>(null);
+  const [calculating, setCalculating] = useState(false);
 
   // Email sub-dialog state
   const [emailOpen, setEmailOpen] = useState(false);
@@ -80,6 +120,7 @@ export function PayslipDialog({
       setEmployeeId(presetEmployeeId || "");
       setMonth(currentMonth);
       setGeneratedDoc(null);
+      setBreakdown(null);
     }
   }, [open, presetEmployeeId]);
 
@@ -99,6 +140,33 @@ export function PayslipDialog({
       setEmailBody(dataJson.emailBody || "");
     }
   }, [generatedDoc, employees]);
+
+  async function handleCalculate() {
+    if (!employeeId || !month) {
+      toast.error("Employee and month are required.");
+      return;
+    }
+    setCalculating(true);
+    try {
+      const r = await fetch("/api/payroll/calculate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ employeeId, month }),
+      });
+      if (!r.ok) {
+        const err = await r.json().catch(() => ({}));
+        throw new Error(err.error || "Failed to calculate payroll");
+      }
+      const data = await r.json();
+      setBreakdown(data);
+      toast.success("Payroll breakdown calculated.");
+    } catch (err: any) {
+      toast.error(err.message || "Calculation failed");
+      setBreakdown(null);
+    } finally {
+      setCalculating(false);
+    }
+  }
 
   async function handleGenerate() {
     if (!employeeId || !month) {
@@ -129,8 +197,6 @@ export function PayslipDialog({
 
   function downloadUrl(format: "docx" | "pdf") {
     if (!generatedDoc) return;
-    // Note: /api/documents/[id]/download is built by Task 1-A.
-    // We just open the URL; it will resolve once that endpoint exists.
     window.open(
       `/api/documents/${generatedDoc.id}/download?format=${format}`,
       "_blank"
@@ -171,6 +237,7 @@ export function PayslipDialog({
 
   function reset() {
     setGeneratedDoc(null);
+    setBreakdown(null);
     setEmailOpen(false);
     setPreviewOpen(false);
     onOpenChange(false);
@@ -179,7 +246,7 @@ export function PayslipDialog({
   return (
     <>
       <Dialog open={open} onOpenChange={(o) => !o && reset()}>
-        <DialogContent className="max-w-[95vw] sm:max-w-lg p-0 gap-0">
+        <DialogContent className="max-w-[95vw] sm:max-w-2xl p-0 gap-0">
           <DialogHeader className="px-6 py-4 border-b border-border">
             <DialogTitle className="flex items-center gap-2">
               <Wallet className="size-5 text-primary" />
@@ -187,57 +254,265 @@ export function PayslipDialog({
             </DialogTitle>
             <DialogDescription>
               Auto-creates a payroll record (if missing) and generates a payslip
-              document.
+              document. Use <span className="font-medium">Calculate Payroll</span> to preview the breakdown first.
             </DialogDescription>
           </DialogHeader>
 
           {!generatedDoc ? (
             <>
               <div className="px-6 py-4 space-y-4">
-                <div>
-                  <Label className="text-xs font-medium text-muted-foreground mb-1.5 block">
-                    Employee *
-                  </Label>
-                  {presetEmployeeId && selectedEmp ? (
-                    <div className="rounded-md border border-border bg-muted/30 px-3 py-2 text-sm">
-                      <span className="font-medium">
-                        {selectedEmp.fullName}
-                      </span>
-                      <span className="text-muted-foreground ml-2 font-mono text-xs">
-                        {selectedEmp.employeeId}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <Label className="text-xs font-medium text-muted-foreground mb-1.5 block">
+                      Employee *
+                    </Label>
+                    {presetEmployeeId && selectedEmp ? (
+                      <div className="rounded-md border border-border bg-muted/30 px-3 py-2 text-sm">
+                        <span className="font-medium">
+                          {selectedEmp.fullName}
+                        </span>
+                        <span className="text-muted-foreground ml-2 font-mono text-xs">
+                          {selectedEmp.employeeId}
+                        </span>
+                      </div>
+                    ) : (
+                      <Select
+                        value={employeeId}
+                        onValueChange={(v) => {
+                          setEmployeeId(v);
+                          setBreakdown(null);
+                        }}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select employee" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {employees.map((emp: any) => (
+                            <SelectItem key={emp.id} value={emp.id}>
+                              {emp.fullName} · {emp.employeeId}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
+                  </div>
+                  <div>
+                    <Label className="text-xs font-medium text-muted-foreground mb-1.5 block">
+                      Pay Period (Month) *
+                    </Label>
+                    <Input
+                      type="month"
+                      value={month}
+                      onChange={(e) => {
+                        setMonth(e.target.value);
+                        setBreakdown(null);
+                      }}
+                    />
+                  </div>
+                </div>
+
+                {/* Calculate Payroll action */}
+                {selectedEmp && !breakdown && (
+                  <div className="rounded-md border border-emerald-500/30 bg-emerald-500/5 p-3 flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <Calculator className="size-4 text-emerald-700 flex-shrink-0" />
+                      <div className="text-xs text-muted-foreground min-w-0">
+                        <span className="font-medium text-foreground">Calculate Payroll</span>
+                        <span className="hidden sm:inline"> — preview HRA, PF, TDS, gratuity & net salary before generating the payslip.</span>
+                      </div>
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="border-emerald-500/30 text-emerald-700 hover:bg-emerald-500/10 hover:text-emerald-800 flex-shrink-0"
+                      onClick={handleCalculate}
+                      disabled={calculating}
+                    >
+                      {calculating ? (
+                        <Loader2 className="size-4 mr-1.5 animate-spin" />
+                      ) : (
+                        <Calculator className="size-4 mr-1.5" />
+                      )}
+                      Calculate
+                    </Button>
+                  </div>
+                )}
+
+                {/* Breakdown display */}
+                {breakdown && (
+                  <div className="rounded-lg border border-border bg-card overflow-hidden">
+                    {/* Header */}
+                    <div className="px-3 py-2 bg-muted/40 border-b border-border flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <Receipt className="size-4 text-primary flex-shrink-0" />
+                        <span className="text-sm font-medium truncate">
+                          Payroll Breakdown
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        {breakdown.taxSlab && (
+                          <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-700 border border-emerald-500/20">
+                            Slab: {breakdown.taxSlab.label} ({Math.round(breakdown.taxSlab.rate * 100)}%)
+                          </span>
+                        )}
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-7 px-2 text-xs"
+                          onClick={() => setBreakdown(null)}
+                        >
+                          Clear
+                        </Button>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-border">
+                      {/* Earnings */}
+                      <div className="p-3 space-y-1.5">
+                        <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-1">
+                          Earnings
+                        </div>
+                        <BreakdownRow
+                          icon={<Wallet className="size-3.5" />}
+                          label="Basic Salary"
+                          value={formatCurrency(breakdown.basicSalary)}
+                        />
+                        <BreakdownRow
+                          icon={<Building2 className="size-3.5" />}
+                          label="House Rent Allowance (50%)"
+                          value={formatCurrency(breakdown.hra)}
+                          muted
+                        />
+                        <BreakdownRow
+                          icon={<Wallet className="size-3.5" />}
+                          label="Special Allowance"
+                          value={formatCurrency(breakdown.specialAllowance)}
+                          muted
+                        />
+                        {breakdown.customDeductions < 0 && (
+                          <BreakdownRow
+                            icon={<Wallet className="size-3.5" />}
+                            label="Additional Allowances"
+                            value={formatCurrency(-breakdown.customDeductions)}
+                            muted
+                          />
+                        )}
+                        <div className="flex justify-between items-center pt-1.5 mt-1 border-t border-border">
+                          <span className="text-xs font-semibold">Gross Salary</span>
+                          <span className="text-sm font-bold tabular-nums text-emerald-700">
+                            {formatCurrency(breakdown.grossSalary)}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Deductions */}
+                      <div className="p-3 space-y-1.5">
+                        <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-1">
+                          Deductions
+                        </div>
+                        <BreakdownRow
+                          icon={<ShieldCheck className="size-3.5" />}
+                          label="Provident Fund (12%)"
+                          value={`- ${formatCurrency(breakdown.pf)}`}
+                          danger
+                        />
+                        <BreakdownRow
+                          icon={<Receipt className="size-3.5" />}
+                          label="Professional Tax"
+                          value={`- ${formatCurrency(breakdown.professionalTax)}`}
+                          danger
+                        />
+                        <BreakdownRow
+                          icon={<TrendingDown className="size-3.5" />}
+                          label="TDS (Income Tax)"
+                          value={`- ${formatCurrency(breakdown.tds)}`}
+                          danger
+                        />
+                        {breakdown.customDeductions > 0 && (
+                          <BreakdownRow
+                            icon={<TrendingDown className="size-3.5" />}
+                            label="Custom Deductions"
+                            value={`- ${formatCurrency(breakdown.customDeductions)}`}
+                            danger
+                          />
+                        )}
+                        <div className="flex justify-between items-center pt-1.5 mt-1 border-t border-border">
+                          <span className="text-xs font-semibold">Total Deductions</span>
+                          <span className="text-sm font-bold tabular-nums text-rose-600">
+                            - {formatCurrency(breakdown.totalDeductions)}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Net Salary */}
+                    <div className="px-3 py-2.5 bg-emerald-500/10 border-t border-emerald-500/20 flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <Wallet className="size-4 text-emerald-700 flex-shrink-0" />
+                        <span className="text-sm font-semibold text-emerald-800">
+                          Net Salary (Take-home)
+                        </span>
+                      </div>
+                      <span className="text-lg font-bold tabular-nums text-emerald-700">
+                        {formatCurrency(breakdown.netSalary)}
                       </span>
                     </div>
-                  ) : (
-                    <Select
-                      value={employeeId}
-                      onValueChange={(v) => setEmployeeId(v)}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select employee" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {employees.map((emp: any) => (
-                          <SelectItem key={emp.id} value={emp.id}>
-                            {emp.fullName} · {emp.employeeId}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  )}
-                </div>
 
-                <div>
-                  <Label className="text-xs font-medium text-muted-foreground mb-1.5 block">
-                    Pay Period (Month) *
-                  </Label>
-                  <Input
-                    type="month"
-                    value={month}
-                    onChange={(e) => setMonth(e.target.value)}
-                  />
-                </div>
+                    {/* TDS Breakdown */}
+                    {breakdown.tdsBreakdown.length > 0 && (
+                      <details className="border-t border-border">
+                        <summary className="px-3 py-2 text-xs font-medium cursor-pointer hover:bg-muted/30 select-none flex items-center gap-1.5">
+                          <Calculator className="size-3.5" />
+                          TDS Slab Breakdown
+                          <span className="ml-auto text-muted-foreground font-mono">
+                            Annual: {formatCurrency(breakdown.annualIncome)} · Tax: {formatCurrency(breakdown.annualTax)}
+                          </span>
+                        </summary>
+                        <div className="px-3 pb-3 space-y-1">
+                          {breakdown.tdsBreakdown.map((row) => (
+                            <div
+                              key={row.slabId}
+                              className="flex items-center justify-between text-xs py-1 border-b border-border/50 last:border-0"
+                            >
+                              <div className="min-w-0">
+                                <div className="font-medium truncate">
+                                  {row.slabLabel}
+                                </div>
+                                <div className="text-[10px] text-muted-foreground">
+                                  Taxable: {formatCurrency(row.taxableAmountInSlab)}
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-3 flex-shrink-0">
+                                <span className="text-muted-foreground font-mono">
+                                  {Math.round(row.rate * 100)}%
+                                </span>
+                                <span className="font-semibold tabular-nums text-rose-600">
+                                  {formatCurrency(row.taxForSlab)}
+                                </span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </details>
+                    )}
 
-                {selectedEmp && (
+                    {/* Employer Contribution (informational) */}
+                    <div className="px-3 py-2 bg-muted/20 border-t border-border flex items-center justify-between text-xs">
+                      <div className="flex items-center gap-1.5">
+                        <Building2 className="size-3.5 text-muted-foreground" />
+                        <span className="text-muted-foreground">
+                          Employer Contribution — Gratuity (4.81% of basic)
+                        </span>
+                      </div>
+                      <span className="font-mono tabular-nums text-muted-foreground">
+                        {formatCurrency(breakdown.gratuity)} (informational)
+                      </span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Fallback basic info if no breakdown yet */}
+                {!breakdown && selectedEmp && (
                   <div className="rounded-md bg-muted/40 p-3 text-xs space-y-1">
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Basic Salary</span>
@@ -258,13 +533,13 @@ export function PayslipDialog({
                       </span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-muted-foreground">Tax</span>
+                      <span className="text-muted-foreground">Tax (employee record)</span>
                       <span className="font-medium tabular-nums">
                         ৳{selectedEmp.tax.toLocaleString()}
                       </span>
                     </div>
                     <div className="flex justify-between border-t border-border pt-1 mt-1">
-                      <span className="font-medium">Net Salary</span>
+                      <span className="font-medium">Net (simple)</span>
                       <span className="font-bold tabular-nums">
                         ৳
                         {(
@@ -499,5 +774,41 @@ export function PayslipDialog({
         </DialogContent>
       </Dialog>
     </>
+  );
+}
+
+// =========================================================
+// Small sub-component: breakdown row
+// =========================================================
+
+function BreakdownRow({
+  icon,
+  label,
+  value,
+  muted,
+  danger,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value: string;
+  muted?: boolean;
+  danger?: boolean;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-2 text-xs">
+      <div className="flex items-center gap-1.5 min-w-0">
+        <span className={`flex-shrink-0 ${danger ? "text-rose-600" : muted ? "text-muted-foreground" : "text-foreground"}`}>
+          {icon}
+        </span>
+        <span className={`${muted ? "text-muted-foreground" : "text-foreground"} truncate`}>
+          {label}
+        </span>
+      </div>
+      <span
+        className={`font-mono tabular-nums flex-shrink-0 ${danger ? "text-rose-600" : muted ? "text-muted-foreground" : "text-foreground font-medium"}`}
+      >
+        {value}
+      </span>
+    </div>
   );
 }

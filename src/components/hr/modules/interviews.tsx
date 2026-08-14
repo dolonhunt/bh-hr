@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
@@ -27,6 +27,9 @@ import {
   Briefcase,
   Loader2,
   UserCircle2,
+  ClipboardList,
+  TrendingUp,
+  AlertCircle,
 } from "lucide-react";
 import { PageHeader } from "../shared/page-header";
 import { KpiCard } from "../shared/kpi-card";
@@ -41,6 +44,13 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
+import {
+  Cell,
+  Pie,
+  PieChart,
+  ResponsiveContainer,
+  Tooltip as RechartsTooltip,
+} from "recharts";
 import {
   Tabs,
   TabsContent,
@@ -158,9 +168,9 @@ const RECOMMENDATION_TONE: Record<Recommendation, string> = {
 // =========================================================
 
 export function InterviewsModule() {
-  const [tab, setTab] = useState<"upcoming" | "past" | "all" | "calendar">(
-    "upcoming"
-  );
+  const [tab, setTab] = useState<
+    "upcoming" | "past" | "all" | "calendar" | "summary"
+  >("upcoming");
 
   return (
     <div className="space-y-6">
@@ -174,7 +184,7 @@ export function InterviewsModule() {
       <Tabs
         value={tab}
         onValueChange={(v) =>
-          setTab(v as "upcoming" | "past" | "all" | "calendar")
+          setTab(v as "upcoming" | "past" | "all" | "calendar" | "summary")
         }
         className="space-y-6"
       >
@@ -195,6 +205,10 @@ export function InterviewsModule() {
             <CalendarDays className="size-4" />
             Week View
           </TabsTrigger>
+          <TabsTrigger value="summary" className="gap-1.5">
+            <ClipboardList className="size-4" />
+            Candidate Summary
+          </TabsTrigger>
         </TabsList>
         <TabsContent value="upcoming">
           <UpcomingTab />
@@ -207,6 +221,9 @@ export function InterviewsModule() {
         </TabsContent>
         <TabsContent value="calendar">
           <WeekView />
+        </TabsContent>
+        <TabsContent value="summary">
+          <CandidateSummaryTab />
         </TabsContent>
       </Tabs>
     </div>
@@ -1558,5 +1575,494 @@ function CompleteDialog({
         </form>
       </DialogContent>
     </Dialog>
+  );
+}
+
+// =========================================================
+// Candidate Summary tab — aggregated feedback across interviewers
+// =========================================================
+
+interface AggSummary {
+  avgRating: number;
+  recommendationCounts: { HIRE: number; REJECT: number; HOLD: number };
+  totalInterviews: number;
+  completedInterviews: number;
+  ratedInterviews: number;
+  interviewers: { id: string | null; name: string; interviewCount: number }[];
+  overallRecommendation: Recommendation | null;
+  tie: boolean;
+}
+
+interface AggResponse {
+  candidate: {
+    id: string;
+    name: string;
+    jobId?: string | null;
+    status?: string;
+    email?: string | null;
+  } | null;
+  summary: AggSummary;
+  timeline: Interview[];
+}
+
+const REC_COLORS: Record<Recommendation, string> = {
+  HIRE: "#10b981",
+  REJECT: "#f43f5e",
+  HOLD: "#f59e0b",
+};
+
+const REC_TONE: Record<Recommendation, string> = {
+  HIRE: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/20",
+  REJECT: "bg-rose-500/15 text-rose-700 dark:text-rose-300 border-rose-500/20",
+  HOLD: "bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/20",
+};
+
+function CandidateSummaryTab() {
+  const [candidateId, setCandidateId] = useState<string>("");
+
+  const { data: candidatesData, isLoading: candidatesLoading } = useQuery({
+    queryKey: ["candidates", "summary-list"],
+    queryFn: async () => {
+      const r = await fetch("/api/candidates?pageSize=200");
+      if (!r.ok) throw new Error("Failed to load candidates");
+      return r.json();
+    },
+  });
+
+  const candidates: any[] = candidatesData?.items ?? [];
+
+  // Presence list used to pick a sensible default candidate (one that
+  // actually has interviews).
+  const { data: allInterviewsData } = useQuery({
+    queryKey: ["interviews", "summary-presence"],
+    queryFn: async () => {
+      const r = await fetch("/api/interviews");
+      if (!r.ok) throw new Error("Failed to load interviews");
+      return r.json();
+    },
+  });
+  const interviewsPresent: Interview[] = allInterviewsData?.items ?? [];
+
+  const defaultCandidateId = useMemo(() => {
+    if (candidates.length === 0) return "";
+    const withInterview = candidates.find((c) =>
+      interviewsPresent.some((i) => i.candidateId === c.id)
+    );
+    return (withInterview ?? candidates[0]).id;
+  }, [candidates, interviewsPresent]);
+
+  const effectiveId = candidateId || defaultCandidateId;
+
+  const { data, isLoading, isError } = useQuery({
+    queryKey: ["interviews", "aggregate", effectiveId],
+    queryFn: async () => {
+      if (!effectiveId) return null;
+      const r = await fetch(
+        `/api/interviews/aggregate?candidateId=${encodeURIComponent(effectiveId)}`
+      );
+      if (!r.ok) throw new Error("Failed to load aggregate");
+      return r.json();
+    },
+    enabled: !!effectiveId,
+  });
+
+  const agg: AggResponse | null = data ?? null;
+
+  return (
+    <div className="space-y-5">
+      <div className="flex flex-col md:flex-row gap-3 items-stretch md:items-center">
+        <Label className="text-sm text-muted-foreground whitespace-nowrap">
+          Select candidate:
+        </Label>
+        <Select
+          value={effectiveId || "NONE"}
+          onValueChange={(v) => setCandidateId(v === "NONE" ? "" : v)}
+        >
+          <SelectTrigger className="md:max-w-md">
+            <SelectValue placeholder="Choose a candidate" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="NONE">— Select —</SelectItem>
+            {candidates.map((c) => (
+              <SelectItem key={c.id} value={c.id}>
+                {c.name}
+                {c.job ? ` · ${c.job.title}` : ""}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      {!effectiveId && (
+        <EmptyState
+          icon={ClipboardList}
+          title="No candidate selected"
+          description="Pick a candidate above to see aggregated interview feedback, ratings and recommendations."
+        />
+      )}
+
+      {effectiveId && candidatesLoading && (
+        <Skeleton className="h-64 w-full rounded-xl" />
+      )}
+
+      {effectiveId && !candidatesLoading && isLoading && (
+        <div className="space-y-3">
+          <Skeleton className="h-28 w-full rounded-xl" />
+          <Skeleton className="h-64 w-full rounded-xl" />
+        </div>
+      )}
+
+      {effectiveId && !candidatesLoading && !isLoading && isError && (
+        <EmptyState
+          icon={AlertCircle}
+          title="Failed to load summary"
+          description="Please try again later."
+        />
+      )}
+
+      {effectiveId && !candidatesLoading && !isLoading && agg && (
+        <CandidateSummaryContent agg={agg} />
+      )}
+    </div>
+  );
+}
+
+function CandidateSummaryContent({ agg }: { agg: AggResponse }) {
+  const { candidate, summary, timeline } = agg;
+
+  const pieData = (
+    ["HIRE", "REJECT", "HOLD"] as Recommendation[]
+  )
+    .map((k) => ({
+      name: k,
+      value: summary.recommendationCounts[k] ?? 0,
+      color: REC_COLORS[k],
+    }))
+    .filter((d) => d.value > 0);
+
+  const totalRecs = pieData.reduce((s, d) => s + d.value, 0);
+
+  const overallTone = summary.overallRecommendation
+    ? REC_TONE[summary.overallRecommendation]
+    : "bg-muted text-muted-foreground border-border";
+
+  return (
+    <div className="space-y-5">
+      {/* Candidate header + overall recommendation badge */}
+      <Card className="p-5 gap-0">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+          <div className="flex items-center gap-3 min-w-0">
+            <AvatarBadge name={candidate?.name ?? "?"} size="md" />
+            <div className="min-w-0">
+              <div className="font-semibold truncate">
+                {candidate?.name ?? "Unknown candidate"}
+              </div>
+              <div className="text-xs text-muted-foreground flex items-center gap-1.5 mt-0.5">
+                <Briefcase className="size-3" />
+                {candidate?.status ?? "—"}
+                {candidate?.email ? (
+                  <>
+                    <span className="mx-1">·</span>
+                    {candidate.email}
+                  </>
+                ) : null}
+              </div>
+            </div>
+          </div>
+          <div className="flex items-center gap-3 flex-wrap">
+            <div className="text-xs text-muted-foreground">
+              Overall recommendation
+            </div>
+            {summary.overallRecommendation ? (
+              <Badge
+                className={cn(
+                  "text-sm px-3 py-1 border font-semibold",
+                  overallTone
+                )}
+              >
+                {summary.overallRecommendation}
+              </Badge>
+            ) : summary.tie && totalRecs > 0 ? (
+              <Badge className="text-sm px-3 py-1 border font-semibold bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/20">
+                Tied — Hold
+              </Badge>
+            ) : (
+              <Badge variant="outline" className="text-sm px-3 py-1">
+                No recommendation yet
+              </Badge>
+            )}
+          </div>
+        </div>
+      </Card>
+
+      {/* Summary KPI cards */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
+        <KpiCard
+          label="Avg Rating"
+          value={
+            summary.avgRating > 0 ? (
+              <span className="inline-flex items-center gap-1.5">
+                {summary.avgRating.toFixed(1)}
+                <Star className="size-4 fill-amber-400 text-amber-400" />
+              </span>
+            ) : (
+              "—"
+            )
+          }
+          icon={Star}
+          iconClass="bg-amber-500/15 text-amber-600"
+          footer={
+            <span className="text-muted-foreground">
+              {summary.ratedInterviews} rated
+            </span>
+          }
+        />
+        <KpiCard
+          label="Total Interviews"
+          value={summary.totalInterviews}
+          icon={CalendarClock}
+          iconClass="bg-primary/10 text-primary"
+          footer={
+            <span className="text-muted-foreground">
+              {summary.completedInterviews} completed
+            </span>
+          }
+        />
+        <KpiCard
+          label="Interviewers"
+          value={summary.interviewers.length}
+          icon={UsersIcon}
+          iconClass="bg-violet-500/15 text-violet-600"
+          footer={
+            <span className="text-muted-foreground">
+              Unique panel members
+            </span>
+          }
+        />
+        <KpiCard
+          label="Recommendations"
+          value={totalRecs}
+          icon={TrendingUp}
+          iconClass="bg-emerald-500/15 text-emerald-600"
+          footer={
+            <span className="text-muted-foreground">
+              H{summary.recommendationCounts.HIRE} · R
+              {summary.recommendationCounts.REJECT} · H
+              {summary.recommendationCounts.HOLD}
+            </span>
+          }
+        />
+      </div>
+
+      {/* Recommendation pie + interviewers */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <Card className="p-5 gap-0 lg:col-span-1">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="font-semibold text-sm">Recommendation Split</h3>
+            {totalRecs > 0 ? (
+              <span className="text-xs text-muted-foreground">
+                {totalRecs} total
+              </span>
+            ) : null}
+          </div>
+          {pieData.length === 0 ? (
+            <div className="h-48 flex items-center justify-center text-sm text-muted-foreground italic">
+              No recommendations yet
+            </div>
+          ) : (
+            <>
+              <div className="h-48">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={pieData}
+                      dataKey="value"
+                      nameKey="name"
+                      innerRadius={45}
+                      outerRadius={75}
+                      paddingAngle={2}
+                    >
+                      {pieData.map((d, i) => (
+                        <Cell key={i} fill={d.color} />
+                      ))}
+                    </Pie>
+                    <RechartsTooltip
+                      contentStyle={{
+                        borderRadius: 8,
+                        fontSize: 12,
+                        border: "1px solid hsl(var(--border))",
+                      }}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+              <div className="space-y-1.5">
+                {(["HIRE", "REJECT", "HOLD"] as Recommendation[]).map((k) => {
+                  const v = summary.recommendationCounts[k] ?? 0;
+                  const pct =
+                    totalRecs > 0 ? Math.round((v / totalRecs) * 100) : 0;
+                  return (
+                    <div
+                      key={k}
+                      className="flex items-center justify-between text-xs"
+                    >
+                      <div className="flex items-center gap-2">
+                        <span
+                          className="size-2.5 rounded-sm"
+                          style={{ backgroundColor: REC_COLORS[k] }}
+                        />
+                        <span className="font-medium">{k}</span>
+                      </div>
+                      <div className="flex items-center gap-2 tabular-nums">
+                        <span>{v}</span>
+                        <span className="text-muted-foreground">({pct}%)</span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </>
+          )}
+        </Card>
+
+        <Card className="p-5 gap-0 lg:col-span-2">
+          <h3 className="font-semibold text-sm mb-3">Interviewers</h3>
+          {summary.interviewers.length === 0 ? (
+            <div className="text-sm text-muted-foreground italic">
+              No interviewers assigned yet.
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              {summary.interviewers.map((iv, idx) => (
+                <div
+                  key={`${iv.id ?? "null"}-${idx}`}
+                  className="flex items-center gap-2.5 rounded-md border border-border/40 bg-muted/20 p-2.5"
+                >
+                  <AvatarBadge name={iv.name} size="sm" />
+                  <div className="min-w-0 flex-1">
+                    <div className="text-sm font-medium truncate">
+                      {iv.name}
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      {iv.interviewCount} interview
+                      {iv.interviewCount === 1 ? "" : "s"}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </Card>
+      </div>
+
+      {/* Timeline */}
+      <Card className="p-5 gap-0">
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="font-semibold text-sm">Interview Timeline</h3>
+          <span className="text-xs text-muted-foreground">
+            {timeline.length} interview{timeline.length === 1 ? "" : "s"} · chronological
+          </span>
+        </div>
+        {timeline.length === 0 ? (
+          <EmptyState
+            icon={CalendarClock}
+            title="No interviews yet"
+            description="Schedule interviews for this candidate to see a timeline."
+          />
+        ) : (
+          <ol className="relative border-l border-border/60 ml-3 space-y-4">
+            {timeline.map((i) => {
+              const t = TYPE_META[i.type];
+              const TypeIcon = t.icon;
+              return (
+                <li key={i.id} className="ml-5 pl-2">
+                  <span
+                    className={cn(
+                      "absolute -left-2 size-4 rounded-full border-2 border-background",
+                      "ring-2 ring-border/40",
+                      i.status === "COMPLETED"
+                        ? "bg-emerald-500"
+                        : i.status === "CANCELLED" || i.status === "NO_SHOW"
+                          ? "bg-rose-500"
+                          : "bg-amber-500"
+                    )}
+                  />
+                  <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-2">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <Badge
+                          variant="outline"
+                          className={cn(
+                            "text-[10px] px-1.5 py-0 rounded-full",
+                            t.color
+                          )}
+                        >
+                          <TypeIcon className="size-3 mr-0.5" />
+                          {t.label}
+                        </Badge>
+                        <Badge
+                          variant="outline"
+                          className={cn(
+                            "text-[10px] px-1.5 py-0 rounded-full capitalize",
+                            STATUS_TONE[i.status]
+                          )}
+                        >
+                          {i.status.replace(/_/g, " ").toLowerCase()}
+                        </Badge>
+                        {i.recommendation && (
+                          <Badge
+                            variant="outline"
+                            className={cn(
+                              "text-[10px] px-1.5 py-0 rounded-full",
+                              REC_TONE[i.recommendation]
+                            )}
+                          >
+                            {i.recommendation}
+                          </Badge>
+                        )}
+                      </div>
+                      <div className="text-sm font-medium mt-1.5 flex items-center gap-1.5">
+                        <User className="size-3.5 text-muted-foreground" />
+                        {i.interviewerName ?? "Unassigned"}
+                      </div>
+                      <div className="text-xs text-muted-foreground mt-1 flex items-center gap-3 flex-wrap">
+                        <span className="flex items-center gap-1">
+                          <CalendarDays className="size-3" />
+                          {formatDate(i.scheduledAt, "datetime")}
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <Clock className="size-3" />
+                          {i.duration} min
+                        </span>
+                        {i.jobTitle && (
+                          <span className="flex items-center gap-1">
+                            <Briefcase className="size-3" />
+                            {i.jobTitle}
+                          </span>
+                        )}
+                      </div>
+                      {i.notes && (
+                        <div className="mt-2 text-sm text-muted-foreground rounded-md bg-muted/30 p-2 border border-border/40">
+                          {i.notes}
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2 md:flex-col md:items-end">
+                      {typeof i.rating === "number" && i.rating > 0 ? (
+                        <RatingStars value={i.rating} />
+                      ) : (
+                        <span className="text-xs text-muted-foreground italic">
+                          Not rated
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </li>
+              );
+            })}
+          </ol>
+        )}
+      </Card>
+    </div>
   );
 }
