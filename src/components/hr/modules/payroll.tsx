@@ -58,10 +58,12 @@ import {
   RotateCcw,
   Landmark,
   FileSpreadsheet,
+  Send,
 } from "lucide-react";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { toast } from "sonner";
 import { PayslipDialog } from "./payslip-dialog";
+import { EmailPayslipDialog } from "./email-payslip-dialog";
 import { PayrollBatchDialog } from "./payroll-batch-dialog";
 import { ExportButton } from "../shared/export-button";
 
@@ -101,6 +103,12 @@ export function PayrollModule() {
   const [batchOpen, setBatchOpen] = useState(false);
   const [taxConfigOpen, setTaxConfigOpen] = useState(false);
   const [bankFileLoading, setBankFileLoading] = useState<"" | "csv" | "nacha">("");
+
+  // Email Payslip dialog state — pre-fills with the row's employee+month
+  // and only opens for PAID payroll records.
+  const [emailPayslipOpen, setEmailPayslipOpen] = useState(false);
+  const [emailPayslipEmployeeId, setEmailPayslipEmployeeId] = useState<string>("");
+  const [emailPayslipMonth, setEmailPayslipMonth] = useState<string>("");
 
   const { data: departments } = useQuery({
     queryKey: ["departments"],
@@ -177,6 +185,12 @@ export function PayrollModule() {
   function generatePayslip(employeeId?: string) {
     setPresetEmployee(employeeId ?? null);
     setPayslipOpen(true);
+  }
+
+  function emailPayslip(employeeId: string, month: string) {
+    setEmailPayslipEmployeeId(employeeId);
+    setEmailPayslipMonth(month);
+    setEmailPayslipOpen(true);
   }
 
   async function downloadBankFile(format: "csv" | "nacha") {
@@ -587,6 +601,14 @@ export function PayrollModule() {
                             >
                               <FileText className="size-4 mr-2" /> Generate Payslip
                             </DropdownMenuItem>
+                            {p.status === "PAID" && (
+                              <DropdownMenuItem
+                                onClick={() => emailPayslip(p.employeeId, p.payrollMonth)}
+                                className="text-emerald-700 focus:text-emerald-700"
+                              >
+                                <Send className="size-4 mr-2" /> Email Payslip
+                              </DropdownMenuItem>
+                            )}
                             {p.status === "DRAFT" && (
                               <DropdownMenuItem onClick={() => approve(p)}>
                                 <Check className="size-4 mr-2" /> Approve
@@ -643,6 +665,18 @@ export function PayrollModule() {
         onSaved={() => {
           qc.invalidateQueries({ queryKey: ["payroll"] });
           qc.invalidateQueries({ queryKey: ["documents"] });
+        }}
+      />
+
+      <EmailPayslipDialog
+        open={emailPayslipOpen}
+        onOpenChange={setEmailPayslipOpen}
+        employeeId={emailPayslipEmployeeId}
+        month={emailPayslipMonth}
+        onSent={() => {
+          qc.invalidateQueries({ queryKey: ["payroll"] });
+          qc.invalidateQueries({ queryKey: ["email-logs"] });
+          qc.invalidateQueries({ queryKey: ["dashboard"] });
         }}
       />
 

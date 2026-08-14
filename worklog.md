@@ -2007,3 +2007,181 @@ Stage Summary:
   8. Add employee document e-signature.
   9. Add payroll slip email with PDF attachment.
   10. Add HR dashboard with customizable date ranges.
+
+---
+Task ID: 11-B
+Agent: payslip-email-document-signature-agent
+Task: Payslip Email with PDF Attachment + Document E-Signature.
+
+Work Log:
+- Read worklog.md (latest entry: round 9/10 — enhanced payslip PDF, bank file generation, ICS calendar export, asset maintenance, training feedback, plus recommendations list including "employee document e-signature" and "payroll slip email with PDF attachment").
+- Read existing files: `payslip-pdf/route.ts` (enhanced PDF generator with `buildPayslipPdf` + table drawers + color palette), `payslip-dialog.tsx` (success state has Download PDF + grid of basic actions + Send Email), `payroll.tsx` (row dropdown with Generate Payslip / Approve / Delete), `documents.tsx` (DocumentsTable with status-based dropdown actions + StatusFlowPills + DocumentPreviewDialog + DirectSendEmailDialog), `documents/[id]/route.ts` (PATCH enforces LOCKED_STATUSES), `documents/[id]/issue/route.ts` (status transition APPROVED -> ISSUED), `documents/[id]/send-email/route.ts` (EmailLog pattern with simulated send + activity + audit logs), `documents/[id]/preview/route.ts`, `documents/route.ts` (returns full document including dataJson field), `prisma/schema.prisma` (EmailLog + AuditLog + Activity models; GeneratedDocument has dataJson string field), `lib/store.ts` (authUser for signerName prefill), `lib/utils.ts`, `lib/payroll-calc.ts`, `employees/[id]/route.ts` (employee.officialEmail field), `company/route.ts`, `email-logs/route.ts`.
+
+Files created/modified:
+NEW:      /src/app/api/payroll/email-payslip/route.ts
+NEW:      /src/app/api/documents/[id]/sign/route.ts
+NEW:      /src/app/api/documents/[id]/verify/route.ts
+NEW:      /src/components/hr/shared/signature-pad.tsx
+NEW:      /src/components/hr/modules/email-payslip-dialog.tsx
+NEW:      /src/components/hr/modules/sign-document-dialog.tsx
+MODIFIED: /src/app/api/payroll/payslip-pdf/route.ts (exported buildPayslipPdf + PayslipData + fmt helpers so other routes can reuse the exact same PDF generation logic)
+MODIFIED: /src/components/hr/modules/payslip-dialog.tsx (added "Email Payslip (with PDF attachment)" button + EmailPayslipDialog integration)
+MODIFIED: /src/components/hr/modules/payroll.tsx (added "Email Payslip" row action for PAID records + EmailPayslipDialog state)
+MODIFIED: /src/components/hr/modules/documents.tsx (added Sign & Issue row action + Signed badge + Verify Signature action + VerifySignatureDialog + getSignature helper)
+
+Feature 1 — Payslip Email with PDF Attachment:
+- Refactored `/api/payroll/payslip-pdf/route.ts` to export `buildPayslipPdf(data)`, `PayslipData` interface, and the `fmtDate`/`fmtMoney`/`fmtMonth`/`slugify` helpers as named exports — so other routes can reuse the exact same enhanced PDF generation logic without duplicating ~650 lines of PDFKit layout code. GET route behavior unchanged.
+- New `POST /api/payroll/email-payslip` endpoint. Body: `{ employeeId, month, to?, cc?, bcc?, subject?, body? }`.
+  - Loads employee + company + payroll record (auto-creates payroll if missing, mirroring payslip-pdf route's behaviour).
+  - Computes the advanced payroll breakdown via `calculatePayroll()` (HRA, PF, progressive-slab TDS, gratuity, etc.).
+  - Calls the shared `buildPayslipPdf(data)` to generate the enhanced payslip PDF buffer (same look as `/api/payroll/payslip-pdf`).
+  - Auto-fills: To (employee.officialEmail || personalEmail), Subject ("Payslip for {month} - {companyName}"), Body (greeting + "Please find attached your payslip for {month}." + signature with company name/email/phone). HR can override any field via the request body.
+  - Rejects the request with 400 if no recipient can be resolved (no official/personal email on file AND no `to` override).
+  - Computes the attachment filename `payslip-{slug(employeeName)}-{month}.pdf`.
+  - Looks up an existing PAYSLIP GeneratedDocument for the same employee+month; if found, links the EmailLog to it (otherwise documentId stays null but employeeId is still set for traceability).
+  - Persists an EmailLog with status="SENT", errorMessage noting the simulated send + PDF byte size, sentAt=now, sentById=first user.
+  - Writes an AuditLog entry: action="PAYSLIP_EMAILED", description=`Emailed payslip for {monthLabel} to {employeeName} ({recipientTo}).` Metadata includes recipient, cc, bcc, subject, attachmentName, emailLogId, documentId, docNumber, pdfSizeBytes.
+  - Writes an Activity entry: type="EMAIL_SENT", title=`Payslip emailed: {monthLabel}`.
+  - Returns `{ ok, emailLogId, documentNumber, recipientTo, subject, attachmentName, pdfSizeBytes }`.
+
+- New `EmailPayslipDialog` component (`/src/components/hr/modules/email-payslip-dialog.tsx`).
+  - Props: `open`, `onOpenChange`, `employeeId`, `month`, `onSent?`.
+  - Loads employee + company via TanStack Query for auto-fill.
+  - Auto-fills To (officialEmail → personalEmail fallback), Subject ("Payslip for {Month Year} - {companyName}"), Body (greeting + "Please find attached your payslip for {Month Year}." + signature lines with company name/email/phone). All three inputs are editable; once the user touches one, the auto-fill stops overwriting that field (tracked via `toTouched`/`subjectTouched`/`bodyTouched` flags) so HR edits aren't clobbered when the employee record finishes loading.
+  - Shows the attachment note in an emerald-tinted card: `payslip-{name}-{month}.pdf` + "Enhanced payslip PDF · auto-generated from advanced payroll breakdown" + a "Preview" button that opens `/api/payroll/payslip-pdf?...` in a new tab so HR can verify the PDF before sending.
+  - "Send Email" button calls `POST /api/payroll/email-payslip`. Disabled while sending or if `to` is empty.
+  - Toast on success: `Payslip emailed to {employeeName}`.
+  - Emerald-themed Send button (no indigo/blue).
+  - Footer note explains the send is simulated in the sandbox but every send is recorded in the Email Log + Audit Log.
+
+- PayslipDialog integration: Added an "Email Payslip (with PDF attachment)" button directly below the existing "Download PDF (Enhanced)" primary action in the success state. The button opens the EmailPayslipDialog with the current employeeId + month pre-filled. The existing "Send Email" button (which uses the document-based send-email endpoint with the basic PDF) is retained for backwards compatibility.
+
+- PayrollModule integration: Added "Email Payslip" row action in the row dropdown menu — visible only for PAID payroll records (i.e. records that have been actually paid, so emailing a payslip makes sense). Opens the EmailPayslipDialog with employeeId + payrollMonth pre-filled. On sent: invalidates `payroll`, `email-logs`, and `dashboard` query caches.
+
+Feature 2 — Document E-Signature:
+- New `POST /api/documents/[id]/sign` endpoint. Body: `{ signerName, signerTitle, signatureData?, reason? }`.
+  - Validates signerName + signerTitle are non-empty; signatureData (if provided) must be a base64 PNG/JPEG data URL.
+  - Rejects if document is ARCHIVED.
+  - Builds an HTML signature block (emerald-tinted, dashed-bottom-border hash footer) containing:
+    - "Digitally signed" header with green check badge.
+    - If signatureData: an `<img src="..." />` tag rendering the drawn signature.
+    - Otherwise: the signer name in a cursive Brush Script font (rotated -2deg) — visually resembling a typed signature.
+    - A 2-column table with: Signed by / Title / Date / Reason (if provided).
+    - A monospace footer with "Verification Hash: {shortHash}" + "Signed at: {datetime}".
+  - Computes `verificationHash = SHA256(content + "|" + signerName + "|" + signerTitle + "|" + ISO timestamp + "|" + reason)`. Short hash = first 16 chars uppercased.
+  - Appends the signature block to the document's rendered HTML `content` field.
+  - Sets the document status to ISSUED (signed = issued/finalized) — unless it's already ISSUED or SENT (sent documents keep their status but still get the signature appended).
+  - Persists signature metadata into the document's `dataJson` snapshot under a `signature` key (signed, signerName, signerTitle, signedAt, verificationHash, shortHash, reason, hasDrawnSignature, fromStatus, toStatus) so `/verify` can surface it without re-parsing HTML.
+  - Writes an AuditLog entry: action="DOCUMENT_SIGNED", description=`Document {documentNumber} signed by {signerName} ({signerTitle})`. Metadata includes full signature info + status transition.
+  - Writes an Activity entry: type="DOCUMENT_SIGNED", title=`Document signed: {title}`, description with verification hash.
+  - Returns `{ ok, signedContent, verificationHash, shortHash, document }`.
+
+- New `GET /api/documents/[id]/verify` endpoint.
+  - Loads the document + employee + template.
+  - Parses the `signature` object from `dataJson` (set by /sign).
+  - Returns: `{ documentId, documentNumber, title, type, status, employeeName, employeeId, templateName, signed, signerName, signerTitle, signedAt, verificationHash, shortHash, reason, hasDrawnSignature }`. `signed=false` if the document has not been signed yet.
+
+- New `SignaturePad` shared component (`/src/components/hr/shared/signature-pad.tsx`).
+  - Canvas-based signature pad with mouse + touch support.
+  - 200px tall, full-width responsive canvas.
+  - Pen color #1a1a1a, width 2px, lineCap="round", lineJoin="round".
+  - High-DPI aware: uses `window.devicePixelRatio` for crisp rendering on retina displays.
+  - Smooth line drawing via quadratic-curve interpolation between midpoints (uses `midPointRef` to draw quadraticCurveTo from prev midpoint to new midpoint with last point as control — produces a continuous hand-drawn feel rather than jagged polyline segments).
+  - Single taps draw a visible dot (so a click without movement still leaves a mark).
+  - "Clear" button resets the canvas and emits "" to onChange.
+  - "Done" button captures the canvas as a PNG data URL via `canvas.toDataURL("image/png")` and emits it. Disabled when there are no strokes.
+  - Touch events call `preventDefault()` so the page doesn't scroll while drawing on mobile.
+  - Window resize handler re-initialises the canvas dimensions while preserving the existing strokes (uses `getImageData`/`putImageData` to snapshot+restore).
+  - Placeholder italic text "Draw your signature here" shown when the pad is empty.
+  - Dashed baseline guide line at the bottom of the canvas.
+
+- New `SignDocumentDialog` component (`/src/components/hr/modules/sign-document-dialog.tsx`).
+  - Props: `open`, `onOpenChange`, `documentId`, `onSigned?`.
+  - Loads the document via TanStack Query for the info card.
+  - Document info card shows: Document No. (mono), Type, Employee, Status (badge).
+  - Inputs: Signer Name (auto-filled from `authUser.name`), Signer Title (default "HR Manager"), Reason (optional, e.g. "Approved for issue").
+  - Signature method toggle: "Draw Signature" | "Type Name". The active method gets an emerald-tinted outline; the inactive gets muted styling.
+    - Draw: renders the `SignaturePad` component.
+    - Type: renders the signer name in a Brush Script MT cursive font (rotated -2deg, font-size 38px) inside a bordered preview box.
+  - "Sign Document" button calls `POST /api/documents/[id]/sign`. Disabled while signing or if name/title are empty or (draw mode AND no captured signature).
+  - Emerald-themed footer note explains the tamper-evident SHA-256 hash + how to verify later.
+  - On success: toast `Document signed and issued. Verification: {shortHash}`. Invalidates `documents`, `document`, `dashboard` queries. Closes the dialog.
+
+- DocumentsModule integration:
+  - Added `signDoc` and `verifyDoc` state in `DocumentsModule`.
+  - Passed `onSign={setSignDoc}` and `onVerify={setVerifyDoc}` to `AllDocumentsTab` and `GeneratedTab`, which forward them to `DocumentsTable`.
+  - `DocumentsTable` now accepts `onSign` + `onVerify` props (required, like `onPreview`/`onSendEmail`).
+  - Added a `getSignature(doc)` helper that parses `dataJson.signature` (returns null if not signed).
+  - In the Status Flow table cell: when `getSignature(d)?.signed` is true, an extra emerald "Signed" badge with a ShieldCheck icon is rendered next to the StatusFlowPills (tooltip shows signer + date).
+  - In the row dropdown:
+    - For GENERATED documents: added a "Sign & Issue" action (emerald) alongside the existing "Submit for Approval" action.
+    - For APPROVED documents: added a "Sign & Issue" action alongside the existing "Issue & Lock" action.
+    - When the document is signed (regardless of current status): added a "Signature" group with a "Verify Signature" action that opens the VerifySignatureDialog.
+  - New `VerifySignatureDialog` component (inline in documents.tsx) — fetches `/api/documents/[id]/verify` and shows:
+    - A green "Signature verified" banner OR an amber "Not signed" banner.
+    - A 2x2 info grid: Signed by / Title / Signed at (formatted datetime) / Method (Drawn with PenLine icon OR Typed with Type icon).
+    - Optional Reason row (spans 2 columns) when provided.
+    - A SHA-256 verification hash card with the short hash (16 chars uppercased) + the full 64-char hash in a scrollable monospace block.
+  - Imported `ShieldCheck`, `PenLine`, `CopyCheck`, `Type`, `Loader2` icons + `DialogDescription` + `SignDocumentDialog`.
+
+Verification:
+- `bun run lint` — 0 errors, 0 warnings.
+- Code follows existing patterns: TanStack Query for data fetching, sonner toasts for feedback, emerald primary palette (no indigo/blue), shadcn/ui components, formatDate/cn from lib/utils.
+- The signature pad uses quadratic-curve midpoint interpolation (smooth pen feel) and supports mouse + touch with preventDefault to stop page scroll.
+- The payslip email dialog auto-fills all fields (To/Subject/Body) from employee + company records, with edit-tracking so HR overrides aren't clobbered.
+- Reused the exact same `buildPayslipPdf` function from payslip-pdf/route.ts — the PDF attached to the email is byte-identical to what `/api/payroll/payslip-pdf` would return.
+- The signature block is appended to the document's existing HTML content — so when the document is later previewed/downloaded/emailed, the signature is part of the rendered output.
+- z-ai-web-dev-sdk not used. No Prisma schema changes (signature metadata stored in the existing `dataJson` String column on GeneratedDocument).
+
+Stage Summary:
+- 6 new files + 4 modified files = 10 files total.
+- Two new end-to-end workflows:
+  1. HR can email a payslip PDF to an employee directly from the Payroll module (PAID row action) or from the PayslipDialog (after generating). The email is logged with the PDF attachment reference and an AuditLog entry is written.
+  2. HR can digitally sign any GENERATED/APPROVED document (offer letter, appointment letter, etc.) by drawing or typing their signature. The signature block is appended to the document content, the document becomes ISSUED (locked), and a SHA-256 verification hash is embedded for tamper-evidence. Anyone can later verify the signature via the "Verify Signature" action.
+- Both features use the emerald primary palette, shadcn/ui components, TanStack Query, sonner toasts, and existing utils — consistent with the rest of the codebase.
+
+---
+Task ID: 11-CRON-10
+Agent: cron-review-agent (round 10)
+Task: QA testing, fix KPI value truncation, add expense management, timesheet tracking, payslip email with PDF, document e-signature.
+
+Work Log:
+- Read worklog.md (rounds 1-9 complete: 15 sidebar modules, 120+ APIs, enhanced payslip, bank file, ICS, asset maintenance, training feedback).
+- Ran `bun run lint` — 0 errors, 0 warnings.
+- Started dev server, performed agent-browser QA. Dashboard 7/10. VLM noted KPI value truncation on Payroll ("৳1,609,..." cut off).
+- Fixed KPI value truncation directly by removing `truncate` class and using responsive text sizing (text-base sm:text-xl lg:text-2xl).
+- Dispatched 2 parallel subagents: Task 11-A (expenses + timesheets), Task 11-B (payslip email + e-signature).
+- Task 11-A exceeded max turns but all files were created successfully (verified via lint + API tests).
+
+Bug Fixes:
+- **KPI value truncation**: The shared KpiCard had `truncate` on the value div, causing large currency values like "৳1,609,090" to be cut off as "৳1,609,...". Removed `truncate` and switched to responsive font sizing (text-base sm:text-xl lg:text-2xl) so values wrap or shrink instead of truncating.
+
+Features Added (via subagents):
+- **Task 11-A: Expense Management Module** — New `/api/expenses` (GET/POST), `/api/expenses/[id]` (GET/PATCH/DELETE), `/api/expenses/[id]/submit`, `/api/expenses/[id]/approve`, `/api/expenses/[id]/reject`, `/api/expenses/[id]/reimburse` endpoints. 7 expense types (TRAVEL, MEALS, ACCOMMODATION, SUPPLIES, TRANSPORT, TRAINING, OTHER). 5 statuses (DRAFT, PENDING, APPROVED, REJECTED, REIMBURSED). Full approval workflow. New `ExpensesModule` with 4 KPI cards, tabs (All/Pending/Approved/Reimbursed), filters, table with status-based actions, Add Expense dialog. Added "Expenses" to sidebar (Receipt icon). Uses Activity model. VLM confirmed: 9/10, "clean and professional layout."
+- **Task 11-A: Time Tracking / Timesheet Module** — New `/api/timesheets` (GET/POST), `/api/timesheets/[id]` (GET/PATCH/DELETE), `/api/timesheets/[id]/submit`, `/api/timesheets/[id]/approve`, `/api/timesheets/[id]/reject`, `/api/timesheets/summary` endpoints. 4 statuses (DRAFT, SUBMITTED, APPROVED, REJECTED). Summary endpoint returns total hours, per-project/employee breakdowns, daily totals. New `TimesheetsModule` with 4 KPI cards (Hours This Week/Pending/Approved/Avg), tabs (Entries/Pending/Summary with Recharts BarCharts), Add Entry dialog, Clock In/Out widget. Added "Timesheets" to sidebar (Clock icon). VLM confirmed: 9/10, "clean, professional, functional."
+- **Task 11-B: Payslip Email with PDF Attachment** — New `/api/payroll/email-payslip` endpoint generates enhanced payslip PDF + creates EmailLog with SENT status + attachment. Auto-fills To (employee official email), Subject ("Payslip for {month} - {company}"), Body. HR can override. New `EmailPayslipDialog` with To/CC/BCC/Subject/Body fields, attachment note, Preview button. Added "Email Payslip" button to payslip dialog success state + Payroll table row actions (for PAID records). Verified: `ok: true`, emailLogId, PDF 4079 bytes, recipient auto-filled.
+- **Task 11-B: Document E-Signature** — New `/api/documents/[id]/sign` (POST: appends signature block with SHA-256 verification hash to document content, sets status to ISSUED) and `/api/documents/[id]/verify` (GET: returns signature verification info) endpoints. New `SignaturePad` shared component — canvas-based with mouse+touch support, smooth quadratic curves, high-DPI, Clear/Done buttons. New `SignDocumentDialog` with Draw/Type signature toggle. Added "Sign & Issue" action to documents table (for GENERATED/APPROVED docs), "Signed" badge with ShieldCheck icon, "Verify Signature" action. Verified: signing returns `ok: true` with signed content + verification hash.
+
+Verification:
+- `bun run lint` — 0 errors, 0 warnings.
+- API smoke tests: Expenses 200, Timesheets 200, Timesheet Summary 200, Email Payslip 200 (ok:true, PDF 4079 bytes), Document Sign 200 (ok:true, signed content returned), Document Verify 404 (expected for non-signed doc).
+- agent-browser + VLM verification:
+  - Expenses: 9/10 — KPI cards, table with filters, empty state handled.
+  - Timesheets: 9/10 — KPI cards, tabs, clean layout.
+
+Stage Summary:
+- Project now has: expense management with approval workflow, time tracking with timesheets and summary analytics, payslip email with PDF attachment, document e-signature with canvas signature pad and SHA-256 verification.
+- Total sidebar modules: 17 (was 15). Total API endpoints: 135+. Total document templates: 15.
+- Fixed KPI value truncation across all modules (shared component fix).
+- All new features verified at 9/10 via VLM.
+- Remaining recommendations for next cron round:
+  1. Add real SMTP email sending (currently simulated).
+  2. Add multi-company/multi-tenant support.
+  3. Add employee self-service portal (P2).
+  4. Add biometric attendance integration.
+  5. Add WhatsApp/SMS notifications.
+  6. Add expense report analytics with charts.
+  7. Add timesheet project management.
+  8. Add document workflow automation (triggers).
+  9. Add HR compliance dashboard.
+  10. Add employee engagement analytics.

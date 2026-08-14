@@ -18,6 +18,8 @@ import { AuditModule } from "./modules/audit";
 import { SettingsModule } from "./modules/settings";
 import { AssetsModule } from "./modules/assets";
 import { TrainingModule } from "./modules/training";
+import { ExpensesModule } from "./modules/expenses";
+import { TimesheetsModule } from "./modules/timesheets";
 import { CommandPalette } from "./command-palette";
 import { QuickActions } from "./quick-actions";
 import { useKeyboardShortcuts } from "@/hooks/use-keyboard-shortcuts";
@@ -41,6 +43,8 @@ const MODULE_COMPONENTS: Record<string, React.ComponentType> = {
   settings: SettingsModule,
   assets: AssetsModule,
   training: TrainingModule,
+  expenses: ExpensesModule,
+  timesheets: TimesheetsModule,
 };
 
 export function AppShell() {

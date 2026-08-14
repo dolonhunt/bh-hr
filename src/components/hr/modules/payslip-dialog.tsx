@@ -37,10 +37,12 @@ import {
   ShieldCheck,
   FileDown,
   Sparkles,
+  Send,
 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { printDocument } from "@/lib/print";
 import { formatCurrency } from "@/lib/utils";
+import { EmailPayslipDialog } from "./email-payslip-dialog";
 
 // =========================================================
 // Types
@@ -110,6 +112,9 @@ export function PayslipDialog({
 
   // Enhanced PDF download state
   const [downloadingPdf, setDownloadingPdf] = useState(false);
+
+  // Email payslip (enhanced PDF attachment) sub-dialog state
+  const [emailPayslipOpen, setEmailPayslipOpen] = useState(false);
 
   const { data: employeesData } = useQuery({
     queryKey: ["employees-for-payslip"],
@@ -709,6 +714,19 @@ export function PayslipDialog({
                   Download PDF (Enhanced)
                 </Button>
 
+                {/* Email enhanced payslip PDF to employee (full-width action) */}
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="w-full border-emerald-500/40 text-emerald-700 hover:bg-emerald-500/10 hover:text-emerald-800"
+                  onClick={() => setEmailPayslipOpen(true)}
+                  disabled={!employeeId || !month}
+                  title="Email the enhanced payslip PDF to the employee"
+                >
+                  <Send className="size-4 mr-2" />
+                  Email Payslip (with PDF attachment)
+                </Button>
+
                 <div className="grid grid-cols-2 gap-2">
                   <Button
                     variant="outline"
@@ -901,6 +919,15 @@ export function PayslipDialog({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Email Payslip sub-dialog (enhanced PDF attachment) */}
+      <EmailPayslipDialog
+        open={emailPayslipOpen}
+        onOpenChange={setEmailPayslipOpen}
+        employeeId={employeeId}
+        month={month}
+        onSent={() => onSaved?.()}
+      />
     </>
   );
 }

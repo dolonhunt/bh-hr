@@ -39,6 +39,7 @@ import {
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -72,6 +73,11 @@ import {
   ChevronRight,
   Printer,
   GitCompareArrows,
+  ShieldCheck,
+  PenLine,
+  CopyCheck,
+  Type,
+  Loader2,
 } from "lucide-react";
 import { formatDate, relativeTime, cn } from "@/lib/utils";
 import { printDocument } from "@/lib/print";
@@ -81,6 +87,7 @@ import { BulkGenerateDialog } from "./bulk-generate-dialog";
 import { ApprovalQueue } from "./approval-queue";
 import { ExportButton } from "../shared/export-button";
 import { TemplateCompareDialog } from "./template-compare-dialog";
+import { SignDocumentDialog } from "./sign-document-dialog";
 
 const DOC_TYPES = [
   "OFFER",
@@ -125,6 +132,8 @@ export function DocumentsModule() {
   const [editTemplate, setEditTemplate] = useState<{ id: string } | null>(null);
   const [previewDoc, setPreviewDoc] = useState<any | null>(null);
   const [sendEmailDoc, setSendEmailDoc] = useState<any | null>(null);
+  const [signDoc, setSignDoc] = useState<any | null>(null);
+  const [verifyDoc, setVerifyDoc] = useState<any | null>(null);
   const [compareOpen, setCompareOpen] = useState(false);
   const [compareTpl1, setCompareTpl1] = useState<string | undefined>(undefined);
   const [compareTpl2, setCompareTpl2] = useState<string | undefined>(undefined);
@@ -182,7 +191,12 @@ export function DocumentsModule() {
       </Tabs>
 
       {documentsTab === "all" && (
-        <AllDocumentsTab onPreview={setPreviewDoc} onSendEmail={setSendEmailDoc} />
+        <AllDocumentsTab
+          onPreview={setPreviewDoc}
+          onSendEmail={setSendEmailDoc}
+          onSign={setSignDoc}
+          onVerify={setVerifyDoc}
+        />
       )}
       {documentsTab === "templates" && (
         <TemplatesTab
@@ -205,6 +219,8 @@ export function DocumentsModule() {
         <GeneratedTab
           onPreview={setPreviewDoc}
           onSendEmail={setSendEmailDoc}
+          onSign={setSignDoc}
+          onVerify={setVerifyDoc}
         />
       )}
       {documentsTab === "email-history" && <EmailHistoryTab />}
@@ -240,6 +256,19 @@ export function DocumentsModule() {
       {/* Send email dialog */}
       <DirectSendEmailDialog doc={sendEmailDoc} onClose={() => setSendEmailDoc(null)} />
 
+      {/* Sign document dialog */}
+      <SignDocumentDialog
+        open={!!signDoc}
+        onOpenChange={(o) => !o && setSignDoc(null)}
+        documentId={signDoc?.id ?? ""}
+      />
+
+      {/* Verify signature dialog */}
+      <VerifySignatureDialog
+        doc={verifyDoc}
+        onClose={() => setVerifyDoc(null)}
+      />
+
       {/* Template compare dialog */}
       <TemplateCompareDialog
         open={compareOpen}
@@ -264,9 +293,13 @@ export function DocumentsModule() {
 function AllDocumentsTab({
   onPreview,
   onSendEmail,
+  onSign,
+  onVerify,
 }: {
   onPreview: (doc: any) => void;
   onSendEmail: (doc: any) => void;
+  onSign: (doc: any) => void;
+  onVerify: (doc: any) => void;
 }) {
   const { data, isLoading } = useQuery({
     queryKey: ["documents", "all-tab"],
@@ -318,6 +351,8 @@ function AllDocumentsTab({
           loading={isLoading}
           onPreview={onPreview}
           onSendEmail={onSendEmail}
+          onSign={onSign}
+          onVerify={onVerify}
         />
       </Card>
     </div>
@@ -568,9 +603,13 @@ function TemplatesTab({
 function GeneratedTab({
   onPreview,
   onSendEmail,
+  onSign,
+  onVerify,
 }: {
   onPreview: (doc: any) => void;
   onSendEmail: (doc: any) => void;
+  onSign: (doc: any) => void;
+  onVerify: (doc: any) => void;
 }) {
   const qc = useQueryClient();
   const [search, setSearch] = useState("");
@@ -689,6 +728,8 @@ function GeneratedTab({
           loading={isLoading}
           onPreview={onPreview}
           onSendEmail={onSendEmail}
+          onSign={onSign}
+          onVerify={onVerify}
           onDownload={download}
           onArchive={archiveDoc}
         />
@@ -980,6 +1021,8 @@ function DocumentsTable({
   loading,
   onPreview,
   onSendEmail,
+  onSign,
+  onVerify,
   onDownload,
   onArchive,
 }: {
@@ -987,6 +1030,8 @@ function DocumentsTable({
   loading: boolean;
   onPreview: (doc: any) => void;
   onSendEmail: (doc: any) => void;
+  onSign: (doc: any) => void;
+  onVerify: (doc: any) => void;
   onDownload?: (id: string, format: "docx" | "pdf", docNumber: string) => void;
   onArchive?: (id: string) => void;
 }) {
@@ -1149,7 +1194,19 @@ function DocumentsTable({
                 </div>
               </TableCell>
               <TableCell>
-                <StatusFlowPills status={d.status} />
+                <div className="flex items-center gap-2 flex-wrap">
+                  <StatusFlowPills status={d.status} />
+                  {getSignature(d)?.signed && (
+                    <Badge
+                      variant="outline"
+                      className="gap-1 text-[9px] font-medium border-emerald-500/40 bg-emerald-500/10 text-emerald-700 px-1.5 h-5"
+                      title={`Signed by ${getSignature(d)?.signerName ?? ""} on ${formatDate(getSignature(d)?.signedAt)}`}
+                    >
+                      <ShieldCheck className="size-3" />
+                      Signed
+                    </Badge>
+                  )}
+                </div>
               </TableCell>
               <TableCell>
                 {d.latestEmail ? (
@@ -1197,6 +1254,12 @@ function DocumentsTable({
                             <Forward className="size-4 mr-2" /> Submit for
                             Approval
                           </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => onSign(d)}
+                            className="text-emerald-700 focus:text-emerald-700"
+                          >
+                            <PenLine className="size-4 mr-2" /> Sign &amp; Issue
+                          </DropdownMenuItem>
                           <DropdownMenuSeparator />
                         </>
                       )}
@@ -1227,6 +1290,25 @@ function DocumentsTable({
                             className="text-teal-700 focus:text-teal-700"
                           >
                             <Stamp className="size-4 mr-2" /> Issue &amp; Lock
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => onSign(d)}
+                            className="text-emerald-700 focus:text-emerald-700"
+                          >
+                            <PenLine className="size-4 mr-2" /> Sign &amp; Issue
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                        </>
+                      )}
+                      {getSignature(d)?.signed && (
+                        <>
+                          <DropdownMenuLabel>Signature</DropdownMenuLabel>
+                          <DropdownMenuItem
+                            onClick={() => onVerify(d)}
+                            className="text-emerald-700 focus:text-emerald-700"
+                          >
+                            <ShieldCheck className="size-4 mr-2" /> Verify
+                            Signature
                           </DropdownMenuItem>
                           <DropdownMenuSeparator />
                         </>
@@ -1630,6 +1712,214 @@ function DirectSendEmailDialog({
               <Send className="size-4 mr-2" />
             )}
             Send Email
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// =============================================================
+// Helpers — signature detection from document.dataJson
+// =============================================================
+
+/** Parse the `signature` object stored inside a document's dataJson snapshot.
+ *  Returns null if the document has not been signed. */
+function getSignature(doc: any): {
+  signed: boolean;
+  signerName?: string;
+  signerTitle?: string;
+  signedAt?: string;
+  verificationHash?: string;
+  shortHash?: string;
+  reason?: string | null;
+  hasDrawnSignature?: boolean;
+} | null {
+  if (!doc) return null;
+  try {
+    const parsed = JSON.parse(doc.dataJson || "{}");
+    return parsed.signature ?? null;
+  } catch {
+    return null;
+  }
+}
+
+// =============================================================
+// Verify Signature Dialog
+// =============================================================
+
+function VerifySignatureDialog({
+  doc,
+  onClose,
+}: {
+  doc: any | null;
+  onClose: () => void;
+}) {
+  const [info, setInfo] = useState<any | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!doc) {
+      const t = setTimeout(() => {
+        setInfo(null);
+        setLoading(false);
+      }, 0);
+      return () => clearTimeout(t);
+    }
+    let cancelled = false;
+    // Use queueMicrotask so the rule about synchronous setState in effects
+    // doesn't fire — we genuinely want to flip loading=true before the fetch.
+    queueMicrotask(() => {
+      if (!cancelled) setLoading(true);
+    });
+    fetch(`/api/documents/${doc.id}/verify`)
+      .then((r) => r.json())
+      .then((d) => {
+        if (!cancelled) setInfo(d);
+      })
+      .catch(() => toast.error("Failed to load signature info"))
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [doc]);
+
+  const sig = info;
+  const isSigned = !!sig?.signed;
+
+  return (
+    <Dialog open={!!doc} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-w-[95vw] sm:max-w-lg p-0 gap-0">
+        <DialogHeader className="px-6 py-4 border-b border-border">
+          <DialogTitle className="flex items-center gap-2">
+            <ShieldCheck className="size-5 text-primary" />
+            Verify Signature
+          </DialogTitle>
+          <DialogDescription>
+            Signature verification details for document{" "}
+            <span className="font-mono font-medium text-foreground">
+              {doc?.documentNumber ?? "—"}
+            </span>
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="px-6 py-4 space-y-4">
+          {loading && (
+            <div className="flex items-center gap-2 text-xs text-muted-foreground py-4">
+              <Loader2 className="size-3.5 animate-spin" />
+              Loading signature info…
+            </div>
+          )}
+
+          {!loading && !isSigned && (
+            <div className="rounded-md border border-amber-500/30 bg-amber-500/5 p-4 flex items-start gap-3">
+              <X className="size-5 text-amber-600 flex-shrink-0 mt-0.5" />
+              <div>
+                <div className="font-medium text-sm text-amber-800">
+                  Not signed
+                </div>
+                <div className="text-xs text-amber-700/80 mt-1">
+                  This document has not been digitally signed yet. Use the
+                  &ldquo;Sign &amp; Issue&rdquo; action to add a signature.
+                </div>
+              </div>
+            </div>
+          )}
+
+          {!loading && isSigned && (
+            <>
+              <div className="rounded-md border border-emerald-500/30 bg-emerald-500/5 p-4 flex items-start gap-3">
+                <CheckCircle2 className="size-5 text-emerald-700 flex-shrink-0 mt-0.5" />
+                <div className="min-w-0">
+                  <div className="font-medium text-sm text-emerald-800">
+                    Signature verified
+                  </div>
+                  <div className="text-xs text-emerald-700/80 mt-1">
+                    This document carries a valid digital signature block
+                    appended to its rendered content.
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+                <div className="rounded-md border border-border bg-muted/30 p-3">
+                  <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                    Signed by
+                  </div>
+                  <div className="font-medium truncate">
+                    {sig?.signerName ?? "—"}
+                  </div>
+                </div>
+                <div className="rounded-md border border-border bg-muted/30 p-3">
+                  <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                    Title
+                  </div>
+                  <div className="font-medium truncate">
+                    {sig?.signerTitle ?? "—"}
+                  </div>
+                </div>
+                <div className="rounded-md border border-border bg-muted/30 p-3">
+                  <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                    Signed at
+                  </div>
+                  <div className="font-medium">
+                    {sig?.signedAt ? formatDate(sig.signedAt, "datetime") : "—"}
+                  </div>
+                </div>
+                <div className="rounded-md border border-border bg-muted/30 p-3">
+                  <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                    Method
+                  </div>
+                  <div className="font-medium flex items-center gap-1.5">
+                    {sig?.hasDrawnSignature ? (
+                      <>
+                        <PenLine className="size-3.5" /> Drawn
+                      </>
+                    ) : (
+                      <>
+                        <Type className="size-3.5" /> Typed
+                      </>
+                    )}
+                  </div>
+                </div>
+                {sig?.reason && (
+                  <div className="rounded-md border border-border bg-muted/30 p-3 sm:col-span-2">
+                    <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                      Reason
+                    </div>
+                    <div className="text-sm">{sig.reason}</div>
+                  </div>
+                )}
+              </div>
+
+              <div className="rounded-md border border-emerald-500/30 bg-emerald-500/5 p-3">
+                <div className="text-[10px] uppercase tracking-wider text-emerald-700 mb-1 flex items-center gap-1.5">
+                  <CopyCheck className="size-3" />
+                  Verification Hash (SHA-256, short)
+                </div>
+                <div className="font-mono text-xs break-all text-emerald-800">
+                  {sig?.shortHash ?? sig?.verificationHash?.slice(0, 16).toUpperCase() ?? "—"}
+                </div>
+                {sig?.verificationHash && (
+                  <div className="mt-2">
+                    <div className="text-[10px] uppercase tracking-wider text-emerald-700 mb-1">
+                      Full hash
+                    </div>
+                    <div className="font-mono text-[10px] break-all text-emerald-700/70 max-h-20 overflow-y-auto">
+                      {sig.verificationHash}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </>
+          )}
+        </div>
+
+        <div className="flex justify-end px-6 py-4 border-t border-border">
+          <Button variant="outline" onClick={onClose}>
+            Close
           </Button>
         </div>
       </DialogContent>

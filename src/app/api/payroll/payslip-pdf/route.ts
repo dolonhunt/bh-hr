@@ -45,7 +45,7 @@ const C = {
   amber: "92400e", // amber-800
 };
 
-function fmtDate(d: Date | string | null | undefined): string {
+export function fmtDate(d: Date | string | null | undefined): string {
   if (!d) return "—";
   const date = typeof d === "string" ? new Date(d) : d;
   if (isNaN(date.getTime())) return "—";
@@ -56,7 +56,7 @@ function fmtDate(d: Date | string | null | undefined): string {
   });
 }
 
-function fmtMoney(n: number | null | undefined): string {
+export function fmtMoney(n: number | null | undefined): string {
   if (n === null || n === undefined || isNaN(n)) return "৳0";
   return `৳${new Intl.NumberFormat("en-US", {
     minimumFractionDigits: 0,
@@ -64,7 +64,7 @@ function fmtMoney(n: number | null | undefined): string {
   }).format(n)}`;
 }
 
-function fmtMonth(m: string): string {
+export function fmtMonth(m: string): string {
   if (!m) return "—";
   const [y, mm] = m.split("-");
   if (!y || !mm) return m;
@@ -73,7 +73,7 @@ function fmtMonth(m: string): string {
   return d.toLocaleDateString("en-US", { month: "long", year: "numeric" });
 }
 
-function slugify(s: string): string {
+export function slugify(s: string): string {
   return (s || "")
     .toLowerCase()
     .normalize("NFKD")
@@ -87,7 +87,7 @@ function slugify(s: string): string {
 // PDF builder
 // =============================================================
 
-interface PayslipData {
+export interface PayslipData {
   companyName: string;
   companyAddress: string | null;
   companyEmail: string | null;
@@ -103,7 +103,10 @@ interface PayslipData {
   generatedAt: Date;
 }
 
-async function buildPayslipPdf(data: PayslipData): Promise<Buffer> {
+/** Build the enhanced payslip PDF buffer from a PayslipData object. Exported
+ * so other routes (e.g. /api/payroll/email-payslip) can reuse the exact same
+ * PDF generation logic instead of duplicating it. */
+export async function buildPayslipPdf(data: PayslipData): Promise<Buffer> {
   return new Promise<Buffer>((resolve, reject) => {
     try {
       // A4 portrait

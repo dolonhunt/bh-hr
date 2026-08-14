@@ -1,0 +1,950 @@
+     1→"use client";
+     2→
+     3→import { useEffect, useState } from "react";
+     4→import { useQuery, useQueryClient, useQueries } from "@tanstack/react-query";
+     5→import { PageHeader } from "../shared/page-header";
+     6→import { KpiCard } from "../shared/kpi-card";
+     7→import { AvatarBadge } from "../shared/avatar-badge";
+     8→import { StatusBadge } from "../shared/status-badge";
+     9→import { EmptyState } from "../shared/empty-state";
+    10→import { Button } from "@/components/ui/button";
+    11→import { Input } from "@/components/ui/input";
+    12→import { Label } from "@/components/ui/label";
+    13→import { Card } from "@/components/ui/card";
+    14→import {
+    15→  Select,
+    16→  SelectContent,
+    17→  SelectItem,
+    18→  SelectTrigger,
+    19→  SelectValue,
+    20→} from "@/components/ui/select";
+    21→import {
+    22→  Table,
+    23→  TableBody,
+    24→  TableCell,
+    25→  TableHead,
+    26→  TableHeader,
+    27→  TableRow,
+    28→} from "@/components/ui/table";
+    29→import {
+    30→  DropdownMenu,
+    31→  DropdownMenuContent,
+    32→  DropdownMenuItem,
+    33→  DropdownMenuSeparator,
+    34→  DropdownMenuTrigger,
+    35→} from "@/components/ui/dropdown-menu";
+    36→import {
+    37→  Dialog,
+    38→  DialogContent,
+    39→  DialogDescription,
+    40→  DialogFooter,
+    41→  DialogHeader,
+    42→  DialogTitle,
+    43→} from "@/components/ui/dialog";
+    44→import {
+    45→  Wallet,
+    46→  Plus,
+    47→  Search,
+    48→  MoreVertical,
+    49→  FileText,
+    50→  Check,
+    51→  Pencil,
+    52→  Trash2,
+    53→  Layers,
+    54→  Calculator,
+    55→  TrendingDown,
+    56→  Save,
+    57→  Loader2,
+    58→  RotateCcw,
+    59→  Landmark,
+    60→  FileSpreadsheet,
+    61→} from "lucide-react";
+    62→import { formatCurrency, formatDate } from "@/lib/utils";
+    63→import { toast } from "sonner";
+    64→import { PayslipDialog } from "./payslip-dialog";
+    65→import { PayrollBatchDialog } from "./payroll-batch-dialog";
+    66→import { ExportButton } from "../shared/export-button";
+    67→
+    68→// =========================================================
+    69→// Tax Slab types
+    70→// =========================================================
+    71→
+    72→interface TaxSlab {
+    73→  id: string;
+    74→  min: number;
+    75→  max: number | null;
+    76→  rate: number;
+    77→  label: string;
+    78→}
+    79→
+    80→interface PayrollBreakdown {
+    81→  tds: number;
+    82→  taxSlab: { id: string; label: string; rate: number } | null;
+    83→}
+    84→
+    85→// =========================================================
+    86→// Main module
+    87→// =========================================================
+    88→
+    89→export function PayrollModule() {
+    90→  const qc = useQueryClient();
+    91→  const now = new Date();
+    92→  const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+    93→  const [month, setMonth] = useState(currentMonth);
+    94→  const [status, setStatus] = useState("");
+    95→  const [departmentId, setDepartmentId] = useState("");
+    96→  const [search, setSearch] = useState("");
+    97→  const [page, setPage] = useState(1);
+    98→
+    99→  const [payslipOpen, setPayslipOpen] = useState(false);
+   100→  const [presetEmployee, setPresetEmployee] = useState<string | null>(null);
+   101→  const [batchOpen, setBatchOpen] = useState(false);
+   102→  const [taxConfigOpen, setTaxConfigOpen] = useState(false);
+   103→  const [bankFileLoading, setBankFileLoading] = useState<"" | "csv" | "nacha">("");
+   104→
+   105→  const { data: departments } = useQuery({
+   106→    queryKey: ["departments"],
+   107→    queryFn: () => fetch("/api/departments").then((r) => r.json()),
+   108→  });
+   109→
+   110→  const { data, isLoading } = useQuery({
+   111→    queryKey: ["payroll", month, status, departmentId, search, page],
+   112→    queryFn: async () => {
+   113→      const params = new URLSearchParams();
+   114→      if (month) params.set("payrollMonth", month);
+   115→      if (status) params.set("status", status);
+   116→      if (departmentId) params.set("departmentId", departmentId);
+   117→      if (search) params.set("search", search);
+   118→      params.set("page", String(page));
+   119→      params.set("pageSize", "20");
+   120→      const r = await fetch(`/api/payroll?${params.toString()}`);
+   121→      return r.json();
+   122→    },
+   123→    placeholderData: (prev) => prev,
+   124→  });
+   125→
+   126→  const items = data?.items ?? [];
+   127→  const total = data?.total ?? 0;
+   128→  const totalPages = data?.totalPages ?? 1;
+   129→
+   130→  // Parallel-fetch calculated payroll breakdown for each visible payroll row
+   131→  // (so we can show the actual progressive-tax TDS, not just the stored `tax` field).
+   132→  const tdsQueries = useQueries({
+   133→    queries: items.map((p: any) => ({
+   134→      queryKey: ["payroll-calc", p.employeeId, p.payrollMonth],
+   135→      queryFn: async () => {
+   136→        const r = await fetch("/api/payroll/calculate", {
+   137→          method: "POST",
+   138→          headers: { "Content-Type": "application/json" },
+   139→          body: JSON.stringify({ employeeId: p.employeeId, month: p.payrollMonth }),
+   140→        });
+   141→        if (!r.ok) return null;
+   142→        const json = await r.json();
+   143→        return json as PayrollBreakdown;
+   144→      },
+   145→      staleTime: 60 * 1000, // 1 min
+   146→    })),
+   147→  });
+   148→
+   149→  // Map employeeId+month -> calculated breakdown
+   150→  const tdsByEmp: Record<string, PayrollBreakdown | null> = {};
+   151→  items.forEach((p: any, i: number) => {
+   152→    const q = tdsQueries[i];
+   153→    tdsByEmp[`${p.employeeId}:${p.payrollMonth}`] = q?.isSuccess
+   154→      ? (q.data as PayrollBreakdown | null)
+   155→      : null;
+   156→  });
+   157→
+   158→  // KPIs from current page (use calculated TDS when available)
+   159→  const totalNet = items.reduce(
+   160→    (sum: number, p: any) => sum + (p.netSalary || 0),
+   161→    0
+   162→  );
+   163→  const totalBasic = items.reduce(
+   164→    (sum: number, p: any) => sum + (p.basicSalary || 0),
+   165→    0
+   166→  );
+   167→  const totalAllowances = items.reduce(
+   168→    (sum: number, p: any) => sum + (p.allowances || 0),
+   169→    0
+   170→  );
+   171→  const totalDeductions = items.reduce((sum: number, p: any) => {
+   172→    const calc = tdsByEmp[`${p.employeeId}:${p.payrollMonth}`];
+   173→    const tds = calc?.tds ?? p.tax ?? 0;
+   174→    return sum + (p.deductions || 0) + tds;
+   175→  }, 0);
+   176→
+   177→  function generatePayslip(employeeId?: string) {
+   178→    setPresetEmployee(employeeId ?? null);
+   179→    setPayslipOpen(true);
+   180→  }
+   181→
+   182→  async function downloadBankFile(format: "csv" | "nacha") {
+   183→    if (!month) {
+   184→      toast.error("Select a payroll month first.");
+   185→      return;
+   186→    }
+   187→    setBankFileLoading(format);
+   188→    try {
+   189→      const r = await fetch(
+   190→        `/api/payroll/bank-file?month=${encodeURIComponent(month)}&format=${format}`
+   191→      );
+   192→      if (!r.ok) {
+   193→        const err = await r.json().catch(() => ({}));
+   194→        throw new Error(err.error || "Failed to generate bank file");
+   195→      }
+   196→      const blob = await r.blob();
+   197→      const url = URL.createObjectURL(blob);
+   198→      const a = document.createElement("a");
+   199→      a.href = url;
+   200→      const cd = r.headers.get("Content-Disposition") || "";
+   201→      const match = cd.match(/filename="?([^";\n]+)"?/i);
+   202→      a.download = match
+   203→        ? match[1]
+   204→        : `bank-transfer-${month}.${format === "csv" ? "csv" : "nacha"}`;
+   205→      document.body.appendChild(a);
+   206→      a.click();
+   207→      document.body.removeChild(a);
+   208→      URL.revokeObjectURL(url);
+   209→      const count = r.headers.get("X-Employee-Count");
+   210→      const n = count ? parseInt(count, 10) : 0;
+   211→      toast.success(
+   212→        n > 0
+   213→          ? `Bank file generated for ${n} employee${n === 1 ? "" : "s"}.`
+   214→          : "Bank file generated."
+   215→      );
+   216→    } catch (err: any) {
+   217→      toast.error(err?.message || "Bank file generation failed");
+   218→    } finally {
+   219→      setBankFileLoading("");
+   220→    }
+   221→  }
+   222→
+   223→  async function approve(p: any) {
+   224→    try {
+   225→      const r = await fetch(`/api/payroll/${p.id}`, {
+   226→        method: "PATCH",
+   227→        headers: { "Content-Type": "application/json" },
+   228→        body: JSON.stringify({
+   229→          status: "APPROVED",
+   230→          paymentDate: new Date().toISOString(),
+   231→        }),
+   232→      });
+   233→      if (!r.ok) throw new Error("Failed to approve");
+   234→      toast.success(`Payroll approved for ${p.employee?.fullName}.`);
+   235→      qc.invalidateQueries({ queryKey: ["payroll"] });
+   236→    } catch (err: any) {
+   237→      toast.error(err.message || "Action failed");
+   238→    }
+   239→  }
+   240→
+   241→  async function deleteFn(id: string) {
+   242→    if (!confirm("Delete this payroll record?")) return;
+   243→    try {
+   244→      const r = await fetch(`/api/payroll/${id}`, { method: "DELETE" });
+   245→      if (!r.ok) throw new Error("Failed to delete");
+   246→      toast.success("Payroll record deleted.");
+   247→      qc.invalidateQueries({ queryKey: ["payroll"] });
+   248→    } catch (err: any) {
+   249→      toast.error(err.message || "Delete failed");
+   250→    }
+   251→  }
+   252→
+   253→  return (
+   254→    <div className="space-y-6">
+   255→      <PageHeader
+   256→        title="Payroll"
+   257→        description="Manage monthly salary disbursements and payslips"
+   258→        icon={<Wallet className="size-5" />}
+   259→        actions={
+   260→          <>
+   261→            <ExportButton
+   262→              module="payroll"
+   263→              filters={{
+   264→                payrollMonth: month,
+   265→                status,
+   266→                departmentId,
+   267→                search,
+   268→              }}
+   269→            />
+   270→            <DropdownMenu>
+   271→              <DropdownMenuTrigger asChild>
+   272→                <Button
+   273→                  size="sm"
+   274→                  variant="outline"
+   275→                  disabled={bankFileLoading !== ""}
+   276→                  title="Download bank transfer file for direct deposit"
+   277→                >
+   278→                  {bankFileLoading !== "" ? (
+   279→                    <Loader2 className="size-4 mr-1.5 animate-spin" />
+   280→                  ) : (
+   281→                    <Landmark className="size-4 mr-1.5" />
+   282→                  )}
+   283→                  <span className="hidden sm:inline">
+   284→                    {bankFileLoading !== ""
+   285→                      ? bankFileLoading === "csv"
+   286→                        ? "Generating CSV…"
+   287→                        : "Generating NACHA…"
+   288→                      : "Bank File"}
+   289→                  </span>
+   290→                  <span className="sm:hidden">
+   291→                    {bankFileLoading !== "" ? "…" : "Bank"}
+   292→                  </span>
+   293→                </Button>
+   294→              </DropdownMenuTrigger>
+   295→              <DropdownMenuContent align="end" className="w-48">
+   296→                <DropdownMenuItem
+   297→                  className="gap-2 cursor-pointer"
+   298→                  onClick={() => downloadBankFile("csv")}
+   299→                  disabled={bankFileLoading !== ""}
+   300→                >
+   301→                  <FileSpreadsheet className="size-4 text-emerald-600" />
+   302→                  <div className="min-w-0">
+   303→                    <div className="text-xs font-medium">CSV Format</div>
+   304→                    <div className="text-[10px] text-muted-foreground">
+   305→                      Standard bank transfer CSV
+   306→                    </div>
+   307→                  </div>
+   308→                </DropdownMenuItem>
+   309→                <DropdownMenuItem
+   310→                  className="gap-2 cursor-pointer"
+   311→                  onClick={() => downloadBankFile("nacha")}
+   312→                  disabled={bankFileLoading !== ""}
+   313→                >
+   314→                  <Landmark className="size-4 text-teal-600" />
+   315→                  <div className="min-w-0">
+   316→                    <div className="text-xs font-medium">NACHA Format</div>
+   317→                    <div className="text-[10px] text-muted-foreground">
+   318→                      US fixed-width (94-char)
+   319→                    </div>
+   320→                  </div>
+   321→                </DropdownMenuItem>
+   322→              </DropdownMenuContent>
+   323→            </DropdownMenu>
+   324→            <Button
+   325→              size="sm"
+   326→              variant="outline"
+   327→              onClick={() => setTaxConfigOpen(true)}
+   328→              title="View & edit progressive tax slab configuration"
+   329→            >
+   330→              <Calculator className="size-4 mr-1.5" />
+   331→              <span className="hidden sm:inline">Tax Configuration</span>
+   332→              <span className="sm:hidden">Tax</span>
+   333→            </Button>
+   334→            <Button
+   335→              size="sm"
+   336→              variant="outline"
+   337→              onClick={() => setBatchOpen(true)}
+   338→            >
+   339→              <Layers className="size-4 mr-1.5" />{" "}
+   340→              <span className="hidden sm:inline">Batch Create</span>
+   341→              <span className="sm:hidden">Batch</span>
+   342→            </Button>
+   343→            <Button size="sm" onClick={() => generatePayslip()}>
+   344→              <Plus className="size-4 mr-1.5" /> <span className="hidden sm:inline">Create Payroll</span>
+   345→              <span className="sm:hidden">Create</span>
+   346→            </Button>
+   347→          </>
+   348→        }
+   349→      />
+   350→
+   351→      {/* KPIs */}
+   352→      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
+   353→        <KpiCard
+   354→          label="Total Net Payroll"
+   355→          value={formatCurrency(totalNet)}
+   356→          icon={Wallet}
+   357→          iconClass="bg-primary/10 text-primary"
+   358→        />
+   359→        <KpiCard
+   360→          label="Basic Salary"
+   361→          value={formatCurrency(totalBasic)}
+   362→          icon={Wallet}
+   363→          iconClass="bg-emerald-500/10 text-emerald-600"
+   364→        />
+   365→        <KpiCard
+   366→          label="Allowances"
+   367→          value={formatCurrency(totalAllowances)}
+   368→          icon={Wallet}
+   369→          iconClass="bg-teal-500/10 text-teal-600"
+   370→        />
+   371→        <KpiCard
+   372→          label="Deductions + TDS"
+   373→          value={formatCurrency(totalDeductions)}
+   374→          icon={TrendingDown}
+   375→          iconClass="bg-rose-500/10 text-rose-600"
+   376→        />
+   377→      </div>
+   378→
+   379→      {/* Filters */}
+   380→      <div className="flex flex-col md:flex-row gap-3">
+   381→        <Input
+   382→          type="month"
+   383→          value={month}
+   384→          onChange={(e) => {
+   385→            setMonth(e.target.value);
+   386→            setPage(1);
+   387→          }}
+   388→          className="md:w-44"
+   389→        />
+   390→        <Select
+   391→          value={status || "ALL"}
+   392→          onValueChange={(v) => {
+   393→            setStatus(v === "ALL" ? "" : v);
+   394→            setPage(1);
+   395→          }}
+   396→        >
+   397→          <SelectTrigger className="md:w-40">
+   398→            <SelectValue placeholder="All statuses" />
+   399→          </SelectTrigger>
+   400→          <SelectContent>
+   401→            <SelectItem value="ALL">All statuses</SelectItem>
+   402→            <SelectItem value="DRAFT">Draft</SelectItem>
+   403→            <SelectItem value="APPROVED">Approved</SelectItem>
+   404→            <SelectItem value="PAID">Paid</SelectItem>
+   405→            <SelectItem value="CANCELLED">Cancelled</SelectItem>
+   406→          </SelectContent>
+   407→        </Select>
+   408→        <Select
+   409→          value={departmentId || "ALL"}
+   410→          onValueChange={(v) => {
+   411→            setDepartmentId(v === "ALL" ? "" : v);
+   412→            setPage(1);
+   413→          }}
+   414→        >
+   415→          <SelectTrigger className="md:w-48">
+   416→            <SelectValue placeholder="All departments" />
+   417→          </SelectTrigger>
+   418→          <SelectContent>
+   419→            <SelectItem value="ALL">All departments</SelectItem>
+   420→            {(departments?.items ?? departments ?? []).map((d: any) => (
+   421→              <SelectItem key={d.id} value={d.id}>
+   422→                {d.name}
+   423→              </SelectItem>
+   424→            ))}
+   425→          </SelectContent>
+   426→        </Select>
+   427→        <div className="relative flex-1">
+   428→          <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+   429→          <Input
+   430→            placeholder="Search employee name or ID…"
+   431→            value={search}
+   432→            onChange={(e) => {
+   433→              setSearch(e.target.value);
+   434→              setPage(1);
+   435→            }}
+   436→            className="pl-9"
+   437→          />
+   438→        </div>
+   439→      </div>
+   440→
+   441→      <div className="text-sm text-muted-foreground">
+   442→        Showing <span className="font-medium text-foreground">{items.length}</span> of{" "}
+   443→        <span className="font-medium text-foreground">{total}</span> records
+   444→      </div>
+   445→
+   446→      {/* Loading */}
+   447→      {isLoading && (
+   448→        <Card className="border-border/60 shadow-soft p-4">
+   449→          <div className="space-y-3">
+   450→            {Array.from({ length: 6 }).map((_, i) => (
+   451→              <div key={i} className="h-12 rounded-md bg-muted/40 animate-pulse" />
+   452→            ))}
+   453→          </div>
+   454→        </Card>
+   455→      )}
+   456→
+   457→      {/* Empty */}
+   458→      {!isLoading && items.length === 0 && (
+   459→        <EmptyState
+   460→          icon={Wallet}
+   461→          title="No payroll records"
+   462→          description={
+   463→            month || status || departmentId || search
+   464→              ? "No records match the current filters."
+   465→              : "Generate the first payslip to get started."
+   466→          }
+   467→          actionLabel="Create Payroll"
+   468→          onAction={() => generatePayslip()}
+   469→        />
+   470→      )}
+   471→
+   472→      {/* Table */}
+   473→      {!isLoading && items.length > 0 && (
+   474→        <Card className="border-border/60 shadow-soft overflow-hidden">
+   475→          <div className="overflow-x-auto">
+   476→            <Table>
+   477→              <TableHeader>
+   478→                <TableRow className="bg-muted/40 hover:bg-muted/40">
+   479→                  <TableHead className="min-w-[200px]">Employee</TableHead>
+   480→                  <TableHead>Month</TableHead>
+   481→                  <TableHead>Basic</TableHead>
+   482→                  <TableHead>Allowances</TableHead>
+   483→                  <TableHead>Deductions</TableHead>
+   484→                  <TableHead>TDS (calculated)</TableHead>
+   485→                  <TableHead>Net Salary</TableHead>
+   486→                  <TableHead>Payment Date</TableHead>
+   487→                  <TableHead>Status</TableHead>
+   488→                  <TableHead className="text-right">Actions</TableHead>
+   489→                </TableRow>
+   490→              </TableHeader>
+   491→              <TableBody>
+   492→                {items.map((p: any, idx: number) => {
+   493→                  const calc = tdsByEmp[`${p.employeeId}:${p.payrollMonth}`];
+   494→                  const tdsQuery = tdsQueries[idx];
+   495→                  const tdsLoading = tdsQuery?.isLoading;
+   496→                  const tdsValue = calc?.tds ?? null;
+   497→                  const tdsSlab = calc?.taxSlab;
+   498→                  return (
+   499→                    <TableRow key={p.id} className="hover:bg-muted/30">
+   500→                      <TableCell>
+   501→                        <div className="flex items-center gap-3">
+   502→                          <AvatarBadge
+   503→                            name={p.employee?.fullName}
+   504→                            photo={p.employee?.photo}
+   505→                            size="md"
+   506→                          />
+   507→                          <div className="min-w-0">
+   508→                            <div className="font-medium truncate">
+   509→                              {p.employee?.fullName}
+   510→                            </div>
+   511→                            <div className="text-xs text-muted-foreground font-mono">
+   512→                              {p.employee?.employeeId}
+   513→                            </div>
+   514→                          </div>
+   515→                        </div>
+   516→                      </TableCell>
+   517→                      <TableCell className="text-xs">
+   518→                        {(() => {
+   519→                          const [y, m] = (p.payrollMonth || "").split("-");
+   520→                          if (!y || !m) return p.payrollMonth;
+   521→                          const d = new Date(Number(y), Number(m) - 1, 1);
+   522→                          return d.toLocaleDateString("en-US", {
+   523→                            month: "short",
+   524→                            year: "numeric",
+   525→                          });
+   526→                        })()}
+   527→                      </TableCell>
+   528→                      <TableCell className="text-xs tabular-nums">
+   529→                        {formatCurrency(p.basicSalary)}
+   530→                      </TableCell>
+   531→                      <TableCell className="text-xs tabular-nums">
+   532→                        {formatCurrency(p.allowances)}
+   533→                      </TableCell>
+   534→                      <TableCell className="text-xs tabular-nums">
+   535→                        {formatCurrency(p.deductions)}
+   536→                      </TableCell>
+   537→                      <TableCell>
+   538→                        <div className="flex flex-col">
+   539→                          {tdsLoading ? (
+   540→                            <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
+   541→                              <Loader2 className="size-3 animate-spin" />
+   542→                              <span>calculating…</span>
+   543→                            </div>
+   544→                          ) : tdsValue !== null ? (
+   545→                            <>
+   546→                              <span className="text-xs tabular-nums font-medium text-rose-600">
+   547→                                {formatCurrency(tdsValue)}
+   548→                              </span>
+   549→                              {tdsSlab && (
+   550→                                <span
+   551→                                  className="text-[10px] text-muted-foreground font-mono"
+   552→                                  title={`Tax slab: ${tdsSlab.label}`}
+   553→                                >
+   554→                                  @ {Math.round(tdsSlab.rate * 100)}%
+   555→                                </span>
+   556→                              )}
+   557→                            </>
+   558→                          ) : (
+   559→                            <span className="text-xs text-muted-foreground tabular-nums">
+   560→                              {formatCurrency(p.tax)}
+   561→                              <span className="text-[10px] ml-1 text-muted-foreground/70">
+   562→                                (stored)
+   563→                              </span>
+   564→                            </span>
+   565→                          )}
+   566→                        </div>
+   567→                      </TableCell>
+   568→                      <TableCell className="text-xs tabular-nums font-semibold">
+   569→                        {formatCurrency(p.netSalary)}
+   570→                      </TableCell>
+   571→                      <TableCell className="text-xs">
+   572→                        {formatDate(p.paymentDate)}
+   573→                      </TableCell>
+   574→                      <TableCell>
+   575→                        <StatusBadge status={p.status} />
+   576→                      </TableCell>
+   577→                      <TableCell className="text-right">
+   578→                        <DropdownMenu>
+   579→                          <DropdownMenuTrigger asChild>
+   580→                            <Button variant="ghost" size="icon" className="size-8">
+   581→                              <MoreVertical className="size-4" />
+   582→                            </Button>
+   583→                          </DropdownMenuTrigger>
+   584→                          <DropdownMenuContent align="end">
+   585→                            <DropdownMenuItem
+   586→                              onClick={() => generatePayslip(p.employeeId)}
+   587→                            >
+   588→                              <FileText className="size-4 mr-2" /> Generate Payslip
+   589→                            </DropdownMenuItem>
+   590→                            {p.status === "DRAFT" && (
+   591→                              <DropdownMenuItem onClick={() => approve(p)}>
+   592→                                <Check className="size-4 mr-2" /> Approve
+   593→                              </DropdownMenuItem>
+   594→                            )}
+   595→                            <DropdownMenuSeparator />
+   596→                            <DropdownMenuItem
+   597→                              className="text-rose-600"
+   598→                              onClick={() => deleteFn(p.id)}
+   599→                            >
+   600→                              <Trash2 className="size-4 mr-2" /> Delete
+   601→                            </DropdownMenuItem>
+   602→                          </DropdownMenuContent>
+   603→                        </DropdownMenu>
+   604→                      </TableCell>
+   605→                    </TableRow>
+   606→                  );
+   607→                })}
+   608→              </TableBody>
+   609→            </Table>
+   610→          </div>
+   611→        </Card>
+   612→      )}
+   613→
+   614→      {/* Pagination */}
+   615→      {!isLoading && totalPages > 1 && (
+   616→        <div className="flex items-center justify-between">
+   617→          <Button
+   618→            variant="outline"
+   619→            size="sm"
+   620→            disabled={page === 1}
+   621→            onClick={() => setPage((p) => Math.max(1, p - 1))}
+   622→          >
+   623→            Previous
+   624→          </Button>
+   625→          <div className="text-sm text-muted-foreground">
+   626→            Page {page} of {totalPages}
+   627→          </div>
+   628→          <Button
+   629→            variant="outline"
+   630→            size="sm"
+   631→            disabled={page >= totalPages}
+   632→            onClick={() => setPage((p) => p + 1)}
+   633→          >
+   634→            Next
+   635→          </Button>
+   636→        </div>
+   637→      )}
+   638→
+   639→      <PayslipDialog
+   640→        open={payslipOpen}
+   641→        onOpenChange={setPayslipOpen}
+   642→        presetEmployeeId={presetEmployee}
+   643→        onSaved={() => {
+   644→          qc.invalidateQueries({ queryKey: ["payroll"] });
+   645→          qc.invalidateQueries({ queryKey: ["documents"] });
+   646→        }}
+   647→      />
+   648→
+   649→      <PayrollBatchDialog
+   650→        open={batchOpen}
+   651→        onOpenChange={(o) => {
+   652→          setBatchOpen(o);
+   653→          if (!o) qc.invalidateQueries({ queryKey: ["payroll"] });
+   654→        }}
+   655→      />
+   656→
+   657→      <TaxConfigDialog
+   658→        open={taxConfigOpen}
+   659→        onOpenChange={setTaxConfigOpen}
+   660→        onSaved={() => {
+   661→          // Invalidate payroll-calc queries so the TDS column refreshes
+   662→          qc.invalidateQueries({ queryKey: ["payroll-calc"] });
+   663→          qc.invalidateQueries({ queryKey: ["tax-slabs"] });
+   664→        }}
+   665→      />
+   666→    </div>
+   667→  );
+   668→}
+   669→
+   670→// =========================================================
+   671→// Tax Configuration Dialog
+   672→// =========================================================
+   673→
+   674→function TaxConfigDialog({
+   675→  open,
+   676→  onOpenChange,
+   677→  onSaved,
+   678→}: {
+   679→  open: boolean;
+   680→  onOpenChange: (v: boolean) => void;
+   681→  onSaved?: () => void;
+   682→}) {
+   683→  const qc = useQueryClient();
+   684→  const [draft, setDraft] = useState<TaxSlab[]>([]);
+   685→  const [saving, setSaving] = useState(false);
+   686→  const [dirty, setDirty] = useState(false);
+   687→
+   688→  const { data, isLoading } = useQuery({
+   689→    queryKey: ["tax-slabs"],
+   690→    queryFn: () => fetch("/api/payroll/tax-slabs").then((r) => r.json()),
+   691→    enabled: open,
+   692→  });
+   693→
+   694→  // Sync draft with fetched data — only when fresh data arrives and the
+   695→  // draft is empty (i.e. dialog just opened or first load).
+   696→  useEffect(() => {
+   697→    if (open && data?.slabs && draft.length === 0 && !dirty) {
+   698→      setDraft(data.slabs);
+   699→    }
+   700→  }, [open, data, draft.length, dirty]);
+   701→
+   702→  function close() {
+   703→    onOpenChange(false);
+   704→    setDraft([]);
+   705→    setDirty(false);
+   706→  }
+   707→
+   708→  function updateSlab(idx: number, patch: Partial<TaxSlab>) {
+   709→    setDraft((prev) => {
+   710→      const next = prev.map((s, i) => (i === idx ? { ...s, ...patch } : s));
+   711→      return next;
+   712→    });
+   713→    setDirty(true);
+   714→  }
+   715→
+   716→  function addSlab() {
+   717→    const lastMax = draft.reduce((m, s) => Math.max(m, s.max ?? 0), 0);
+   718→    setDraft((prev) => [
+   719→      ...prev,
+   720→      {
+   721→        id: `slab-${Date.now()}`,
+   722→        min: lastMax,
+   723→        max: lastMax + 300000,
+   724→        rate: 0.1,
+   725→        label: `${lastMax.toLocaleString()} - ${(lastMax + 300000).toLocaleString()}`,
+   726→      },
+   727→    ]);
+   728→    setDirty(true);
+   729→  }
+   730→
+   731→  function removeSlab(idx: number) {
+   732→    setDraft((prev) => prev.filter((_, i) => i !== idx));
+   733→    setDirty(true);
+   734→  }
+   735→
+   736→  function resetDefaults() {
+   737→    if (!data?.defaults) return;
+   738→    setDraft(data.defaults);
+   739→    setDirty(true);
+   740→    toast.info("Reset to default tax slabs. Save to persist.");
+   741→  }
+   742→
+   743→  async function save() {
+   744→    setSaving(true);
+   745→    try {
+   746→      // Validate locally: each slab must have min, max (or null), rate
+   747→      const slabs = draft.map((s, idx) => {
+   748→        const min = Number(s.min);
+   749→        const max =
+   750→          s.max === null || s.max === undefined
+   751→            ? null
+   752→            : Number(s.max);
+   753→        const rate = Number(s.rate);
+   754→        if (!Number.isFinite(min) || min < 0) {
+   755→          throw new Error(`Slab #${idx + 1}: min must be a non-negative number`);
+   756→        }
+   757→        if (max !== null && (!Number.isFinite(max) || max <= min)) {
+   758→          throw new Error(`Slab #${idx + 1}: max must be null or > min`);
+   759→        }
+   760→        if (!Number.isFinite(rate) || rate < 0 || rate > 1) {
+   761→          throw new Error(`Slab #${idx + 1}: rate must be between 0 and 1`);
+   762→        }
+   763→        return {
+   764→          id: String(s.id || `slab-${idx + 1}`),
+   765→          min,
+   766→          max,
+   767→          rate,
+   768→          label: String(s.label || "").trim() ||
+   769→            (max === null ? `Above ${min.toLocaleString()}` : `${min.toLocaleString()} - ${max.toLocaleString()}`),
+   770→        };
+   771→      });
+   772→
+   773→      const r = await fetch("/api/payroll/tax-slabs", {
+   774→        method: "PATCH",
+   775→        headers: { "Content-Type": "application/json" },
+   776→        body: JSON.stringify({ slabs }),
+   777→      });
+   778→      if (!r.ok) {
+   779→        const err = await r.json().catch(() => ({}));
+   780→        throw new Error(err.error || "Failed to save tax slabs");
+   781→      }
+   782→      toast.success("Tax slabs updated.");
+   783→      setDirty(false);
+   784→      qc.invalidateQueries({ queryKey: ["tax-slabs"] });
+   785→      onSaved?.();
+   786→      onOpenChange(false);
+   787→    } catch (err: any) {
+   788→      toast.error(err?.message || "Save failed");
+   789→    } finally {
+   790→      setSaving(false);
+   791→    }
+   792→  }
+   793→
+   794→  return (
+   795→    <Dialog open={open} onOpenChange={(o) => (o ? null : close())}>
+   796→      <DialogContent className="max-w-[95vw] sm:max-w-3xl max-h-[90vh] overflow-hidden p-0 gap-0">
+   797→        <DialogHeader className="px-6 py-4 border-b border-border">
+   798→          <DialogTitle className="flex items-center gap-2">
+   799→            <Calculator className="size-5 text-primary" />
+   800→            Tax Slab Configuration
+   801→          </DialogTitle>
+   802→          <DialogDescription>
+   803→            Progressive tax slabs used to compute TDS (Tax Deducted at Source)
+   804→            for payroll. Annual income is taxed slab-by-slab, then divided by 12
+   805→            for the monthly TDS deduction.
+   806→          </DialogDescription>
+   807→        </DialogHeader>
+   808→
+   809→        <div className="px-6 py-4 overflow-y-auto max-h-[60vh] space-y-4">
+   810→          {isLoading ? (
+   811→            <div className="flex items-center justify-center py-8">
+   812→              <Loader2 className="size-5 animate-spin text-muted-foreground" />
+   813→              <span className="ml-2 text-sm text-muted-foreground">Loading tax slabs…</span>
+   814→            </div>
+   815→          ) : (
+   816→            <>
+   817→              <div className="rounded-md border border-emerald-500/20 bg-emerald-500/5 p-3 text-xs text-emerald-800 flex items-start gap-2">
+   818→                <Calculator className="size-4 flex-shrink-0 mt-0.5" />
+   819→                <div>
+   820→                  <div className="font-medium">How TDS is calculated</div>
+   821→                  <div className="mt-0.5 text-emerald-700/80">
+   822→                    Monthly gross × 12 = annual income. Each slab applies its rate
+   823→                    to the portion of income within that slab's range. Total annual
+   824→                    tax ÷ 12 = monthly TDS deduction.
+   825→                  </div>
+   826→                </div>
+   827→              </div>
+   828→
+   829→              {/* Slab table */}
+   830→              <div className="rounded-md border border-border overflow-hidden">
+   831→                <div className="grid grid-cols-12 gap-2 px-3 py-2 bg-muted/40 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+   832→                  <div className="col-span-4">Label</div>
+   833→                  <div className="col-span-3">Min (annual)</div>
+   834→                  <div className="col-span-3">Max (annual, blank = ∞)</div>
+   835→                  <div className="col-span-1">Rate</div>
+   836→                  <div className="col-span-1 text-right">—</div>
+   837→                </div>
+   838→                <div className="divide-y divide-border">
+   839→                  {draft.map((s, idx) => (
+   840→                    <div
+   841→                      key={s.id}
+   842→                      className="grid grid-cols-12 gap-2 px-3 py-2 items-center hover:bg-muted/20"
+   843→                    >
+   844→                      <div className="col-span-4">
+   845→                        <Input
+   846→                          value={s.label}
+   847→                          onChange={(e) => updateSlab(idx, { label: e.target.value })}
+   848→                          className="h-8 text-xs"
+   849→                          placeholder="Slab label"
+   850→                        />
+   851→                      </div>
+   852→                      <div className="col-span-3">
+   853→                        <Input
+   854→                          type="number"
+   855→                          value={s.min}
+   856→                          onChange={(e) => updateSlab(idx, { min: Number(e.target.value) })}
+   857→                          className="h-8 text-xs tabular-nums"
+   858→                          placeholder="0"
+   859→                        />
+   860→                      </div>
+   861→                      <div className="col-span-3">
+   862→                        <Input
+   863→                          type="number"
+   864→                          value={s.max ?? ""}
+   865→                          onChange={(e) => {
+   866→                            const v = e.target.value;
+   867→                            updateSlab(idx, {
+   868→                              max: v === "" ? null : Number(v),
+   869→                            });
+   870→                          }}
+   871→                          className="h-8 text-xs tabular-nums"
+   872→                          placeholder="∞ (no upper bound)"
+   873→                        />
+   874→                      </div>
+   875→                      <div className="col-span-1">
+   876→                        <Input
+   877→                          type="number"
+   878→                          step="0.01"
+   879→                          min="0"
+   880→                          max="1"
+   881→                          value={s.rate}
+   882→                          onChange={(e) => updateSlab(idx, { rate: Number(e.target.value) })}
+   883→                          className="h-8 text-xs tabular-nums"
+   884→                          title="Tax rate as a decimal (0 = 0%, 0.05 = 5%, 0.25 = 25%)"
+   885→                        />
+   886→                      </div>
+   887→                      <div className="col-span-1 flex justify-end">
+   888→                        <Button
+   889→                          size="icon"
+   890→                          variant="ghost"
+   891→                          className="size-7 text-rose-600 hover:bg-rose-500/10"
+   892→                          onClick={() => removeSlab(idx)}
+   893→                          title="Remove slab"
+   894→                          disabled={draft.length <= 1}
+   895→                        >
+   896→                          <Trash2 className="size-3.5" />
+   897→                        </Button>
+   898→                      </div>
+   899→                    </div>
+   900→                  ))}
+   901→                </div>
+   902→              </div>
+   903→
+   904→              <div className="flex flex-wrap items-center justify-between gap-2">
+   905→                <div className="text-xs text-muted-foreground">
+   906→                  {draft.length} slab{draft.length === 1 ? "" : "s"} configured
+   907→                  {dirty && <span className="text-amber-600 ml-1">· unsaved changes</span>}
+   908→                </div>
+   909→                <div className="flex items-center gap-2">
+   910→                  <Button
+   911→                    size="sm"
+   912→                    variant="outline"
+   913→                    onClick={resetDefaults}
+   914→                    title="Reset to default slabs"
+   915→                  >
+   916→                    <RotateCcw className="size-3.5 mr-1.5" />
+   917→                    Reset Defaults
+   918→                  </Button>
+   919→                  <Button
+   920→                    size="sm"
+   921→                    variant="outline"
+   922→                    onClick={addSlab}
+   923→                  >
+   924→                    <Plus className="size-3.5 mr-1.5" />
+   925→                    Add Slab
+   926→                  </Button>
+   927→                </div>
+   928→              </div>
+   929→            </>
+   930→          )}
+   931→        </div>
+   932→
+   933→        <DialogFooter className="px-6 py-4 border-t border-border">
+   934→          <Button variant="outline" onClick={close}>
+   935→            Cancel
+   936→          </Button>
+   937→          <Button onClick={save} disabled={saving || !dirty || isLoading}>
+   938→            {saving ? (
+   939→              <Loader2 className="size-4 mr-2 animate-spin" />
+   940→            ) : (
+   941→              <Save className="size-4 mr-2" />
+   942→            )}
+   943→            Save Tax Slabs
+   944→          </Button>
+   945→        </DialogFooter>
+   946→      </DialogContent>
+   947→    </Dialog>
+   948→  );
+   949→}
+   950→

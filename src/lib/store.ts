@@ -19,6 +19,8 @@ export type ModuleKey =
   | "settings"
   | "assets"
   | "training"
+  | "expenses"
+  | "timesheets"
   | "search";
 
 export type EmployeeView = "list" | "grid" | "new" | "profile";

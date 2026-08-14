@@ -1,0 +1,2002 @@
+     1→"use client";
+     2→
+     3→import { useState, useMemo, useEffect } from "react";
+     4→import { useQuery, useQueryClient } from "@tanstack/react-query";
+     5→import { toast } from "sonner";
+     6→import {
+     7→  Area,
+     8→  AreaChart,
+     9→  CartesianGrid,
+    10→  ResponsiveContainer,
+    11→  Tooltip as RechartsTooltip,
+    12→  XAxis,
+    13→  YAxis,
+    14→} from "recharts";
+    15→import {
+    16→  Package,
+    17→  PackageCheck,
+    18→  PackageOpen,
+    19→  AlertTriangle,
+    20→  Plus,
+    21→  Search,
+    22→  Pencil,
+    23→  Trash2,
+    24→  MoreVertical,
+    25→  Laptop,
+    26→  Monitor,
+    27→  Smartphone,
+    28→  Tablet,
+    29→  Keyboard,
+    30→  Mouse,
+    31→  Headset,
+    32→  LampDesk,
+    33→  Armchair,
+    34→  Printer,
+    35→  Camera,
+    36→  Box,
+    37→  LayoutGrid,
+    38→  List,
+    39→  UserPlus,
+    40→  Undo2,
+    41→  Loader2,
+    42→  ChevronDown,
+    43→  ChevronsUpDown,
+    44→  Check,
+    45→  TrendingDown,
+    46→  Coins,
+    47→  LineChart as LineChartIcon,
+    48→  Info,
+    49→  Wrench,
+    50→  CalendarClock,
+    51→  Building2,
+    52→  ClipboardList,
+    53→  CircleDot,
+    54→} from "lucide-react";
+    55→import { PageHeader } from "../shared/page-header";
+    56→import { KpiCard } from "../shared/kpi-card";
+    57→import { AvatarBadge } from "../shared/avatar-badge";
+    58→import { StatusBadge } from "../shared/status-badge";
+    59→import { EmptyState } from "../shared/empty-state";
+    60→import { ExportButton } from "../shared/export-button";
+    61→import { Button } from "@/components/ui/button";
+    62→import { Input } from "@/components/ui/input";
+    63→import { Label } from "@/components/ui/label";
+    64→import { Textarea } from "@/components/ui/textarea";
+    65→import { Card } from "@/components/ui/card";
+    66→import { Skeleton } from "@/components/ui/skeleton";
+    67→import { Badge } from "@/components/ui/badge";
+    68→import {
+    69→  Table,
+    70→  TableBody,
+    71→  TableCell,
+    72→  TableHead,
+    73→  TableHeader,
+    74→  TableRow,
+    75→} from "@/components/ui/table";
+    76→import {
+    77→  Dialog,
+    78→  DialogContent,
+    79→  DialogDescription,
+    80→  DialogFooter,
+    81→  DialogHeader,
+    82→  DialogTitle,
+    83→} from "@/components/ui/dialog";
+    84→import {
+    85→  Select,
+    86→  SelectContent,
+    87→  SelectItem,
+    88→  SelectTrigger,
+    89→  SelectValue,
+    90→} from "@/components/ui/select";
+    91→import {
+    92→  DropdownMenu,
+    93→  DropdownMenuContent,
+    94→  DropdownMenuItem,
+    95→  DropdownMenuSeparator,
+    96→  DropdownMenuTrigger,
+    97→} from "@/components/ui/dropdown-menu";
+    98→import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+    99→import {
+   100→  Command,
+   101→  CommandEmpty,
+   102→  CommandGroup,
+   103→  CommandInput,
+   104→  CommandItem,
+   105→  CommandList,
+   106→} from "@/components/ui/command";
+   107→import { cn, formatDate, formatCurrency } from "@/lib/utils";
+   108→
+   109→// =========================================================
+   110→// Constants & types
+   111→// =========================================================
+   112→
+   113→const ASSET_TYPES = [
+   114→  { value: "LAPTOP", label: "Laptop", icon: Laptop, color: "text-sky-600 bg-sky-500/10" },
+   115→  { value: "MONITOR", label: "Monitor", icon: Monitor, color: "text-violet-600 bg-violet-500/10" },
+   116→  { value: "PHONE", label: "Phone", icon: Smartphone, color: "text-emerald-600 bg-emerald-500/10" },
+   117→  { value: "TABLET", label: "Tablet", icon: Tablet, color: "text-amber-600 bg-amber-500/10" },
+   118→  { value: "KEYBOARD", label: "Keyboard", icon: Keyboard, color: "text-teal-600 bg-teal-500/10" },
+   119→  { value: "MOUSE", label: "Mouse", icon: Mouse, color: "text-fuchsia-600 bg-fuchsia-500/10" },
+   120→  { value: "HEADSET", label: "Headset", icon: Headset, color: "text-rose-600 bg-rose-500/10" },
+   121→  { value: "DESK", label: "Desk", icon: LampDesk, color: "text-orange-600 bg-orange-500/10" },
+   122→  { value: "CHAIR", label: "Chair", icon: Armchair, color: "text-lime-600 bg-lime-500/10" },
+   123→  { value: "PRINTER", label: "Printer", icon: Printer, color: "text-cyan-600 bg-cyan-500/10" },
+   124→  { value: "CAMERA", label: "Camera", icon: Camera, color: "text-pink-600 bg-pink-500/10" },
+   125→  { value: "OTHER", label: "Other", icon: Box, color: "text-muted-foreground bg-muted" },
+   126→] as const;
+   127→
+   128→const CONDITIONS = ["NEW", "GOOD", "FAIR", "DAMAGED"] as const;
+   129→const STATUSES = ["AVAILABLE", "ASSIGNED", "RETURNED", "RETIRED"] as const;
+   130→
+   131→const MAINTENANCE_TYPES = [
+   132→  { value: "REPAIR", label: "Repair" },
+   133→  { value: "MAINTENANCE", label: "Maintenance" },
+   134→  { value: "UPGRADE", label: "Upgrade" },
+   135→  { value: "INSPECTION", label: "Inspection" },
+   136→  { value: "REPLACEMENT", label: "Replacement" },
+   137→] as const;
+   138→
+   139→const MAINTENANCE_STATUSES = [
+   140→  "SCHEDULED",
+   141→  "IN_PROGRESS",
+   142→  "COMPLETED",
+   143→  "CANCELLED",
+   144→] as const;
+   145→
+   146→type MaintenanceTypeValue = (typeof MAINTENANCE_TYPES)[number]["value"];
+   147→type MaintenanceStatusValue = (typeof MAINTENANCE_STATUSES)[number];
+   148→
+   149→const MAINTENANCE_TYPE_COLOR: Record<MaintenanceTypeValue, string> = {
+   150→  REPAIR: "bg-rose-500/15 text-rose-700 dark:text-rose-300 border-rose-500/20",
+   151→  MAINTENANCE:
+   152→    "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/20",
+   153→  UPGRADE: "bg-violet-500/15 text-violet-700 dark:text-violet-300 border-violet-500/20",
+   154→  INSPECTION:
+   155→    "bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/20",
+   156→  REPLACEMENT:
+   157→    "bg-teal-500/15 text-teal-700 dark:text-teal-300 border-teal-500/20",
+   158→};
+   159→
+   160→const MAINTENANCE_STATUS_COLOR: Record<MaintenanceStatusValue, string> = {
+   161→  SCHEDULED:
+   162→    "bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/20",
+   163→  IN_PROGRESS:
+   164→    "bg-sky-500/15 text-sky-700 dark:text-sky-300 border-sky-500/20",
+   165→  COMPLETED:
+   166→    "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/20",
+   167→  CANCELLED:
+   168→    "bg-rose-500/15 text-rose-700 dark:text-rose-300 border-rose-500/20",
+   169→};
+   170→
+   171→const MAINTENANCE_STATUS_NEXT: Record<MaintenanceStatusValue, MaintenanceStatusValue> = {
+   172→  SCHEDULED: "IN_PROGRESS",
+   173→  IN_PROGRESS: "COMPLETED",
+   174→  COMPLETED: "COMPLETED",
+   175→  CANCELLED: "CANCELLED",
+   176→};
+   177→
+   178→type AssetType = (typeof ASSET_TYPES)[number]["value"];
+   179→type AssetCondition = (typeof CONDITIONS)[number];
+   180→type AssetStatus = (typeof STATUSES)[number];
+   181→
+   182→const CONDITION_COLOR: Record<AssetCondition, string> = {
+   183→  NEW: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/20",
+   184→  GOOD: "bg-sky-500/15 text-sky-700 dark:text-sky-300 border-sky-500/20",
+   185→  FAIR: "bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/20",
+   186→  DAMAGED: "bg-rose-500/15 text-rose-700 dark:text-rose-300 border-rose-500/20",
+   187→};
+   188→
+   189→const STATUS_COLOR: Record<AssetStatus, string> = {
+   190→  AVAILABLE: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/20",
+   191→  ASSIGNED: "bg-sky-500/15 text-sky-700 dark:text-sky-300 border-sky-500/20",
+   192→  RETURNED: "bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/20",
+   193→  RETIRED: "bg-rose-500/15 text-rose-700 dark:text-rose-300 border-rose-500/20",
+   194→};
+   195→
+   196→function getTypeMeta(t: string) {
+   197→  return (
+   198→    ASSET_TYPES.find((x) => x.value === t) ?? ASSET_TYPES[ASSET_TYPES.length - 1]
+   199→  );
+   200→}
+   201→
+   202→interface Asset {
+   203→  id: string;
+   204→  name: string;
+   205→  type: AssetType;
+   206→  serialNumber: string;
+   207→  condition: AssetCondition;
+   208→  purchaseValue?: number;
+   209→  assignedToId: string | null;
+   210→  assignedToName: string | null;
+   211→  assignedDate: string | null;
+   212→  returnDate: string | null;
+   213→  expectedReturnDate: string | null;
+   214→  status: AssetStatus;
+   215→  notes: string | null;
+   216→  createdAt: string;
+   217→}
+   218→
+   219→interface DepreciationRow {
+   220→  id: string;
+   221→  name: string;
+   222→  type: AssetType;
+   223→  serialNumber: string;
+   224→  purchaseValue: number;
+   225→  depreciationRate: number;
+   226→  age: number;
+   227→  annualDepreciation: number;
+   228→  totalDepreciation: number;
+   229→  currentValue: number;
+   230→  purchaseDate: string;
+   231→  condition: AssetCondition;
+   232→  status: AssetStatus;
+   233→}
+   234→
+   235→interface DepreciationSummary {
+   236→  totalPurchaseValue: number;
+   237→  totalCurrentValue: number;
+   238→  totalDepreciation: number;
+   239→  avgDepreciationPct: number;
+   240→}
+   241→
+   242→interface DepreciationDetailYear {
+   243→  year: number;
+   244→  label: string;
+   245→  startValue: number;
+   246→  endValue: number;
+   247→  depreciationThisYear: number;
+   248→  cumulativeDepreciation: number;
+   249→  remainingValue: number;
+   250→  isPast: boolean;
+   251→  isCurrent: boolean;
+   252→  isProjection: boolean;
+   253→}
+   254→
+   255→interface DepreciationDetail {
+   256→  asset: {
+   257→    id: string;
+   258→    name: string;
+   259→    type: AssetType;
+   260→    serialNumber: string;
+   261→    purchaseValue: number;
+   262→    depreciationRate: number;
+   263→    age: number;
+   264→    annualDepreciation: number;
+   265→    totalDepreciation: number;
+   266→    currentValue: number;
+   267→    purchaseDate: string;
+   268→    condition: AssetCondition;
+   269→    status: AssetStatus;
+   270→  };
+   271→  history: DepreciationDetailYear[];
+   272→}
+   273→
+   274→interface EmployeeOption {
+   275→  id: string;
+   276→  employeeId: string;
+   277→  fullName: string;
+   278→  photo?: string | null;
+   279→  department?: { name: string; color?: string | null } | null;
+   280→  designation?: { name: string } | null;
+   281→}
+   282→
+   283→interface MaintenanceRecord {
+   284→  id: string;
+   285→  assetId: string;
+   286→  type: MaintenanceTypeValue;
+   287→  description: string;
+   288→  cost: number;
+   289→  vendor: string | null;
+   290→  startDate: string;
+   291→  endDate: string | null;
+   292→  status: MaintenanceStatusValue;
+   293→  notes: string | null;
+   294→  createdAt: string;
+   295→}
+   296→
+   297→interface MaintenanceSummary {
+   298→  totalCost: number;
+   299→  activeCount: number;
+   300→  completedCount: number;
+   301→  cancelledCount: number;
+   302→}
+   303→
+   304→interface AssetMaintenanceResponse {
+   305→  items: MaintenanceRecord[];
+   306→  total: number;
+   307→  summary: MaintenanceSummary;
+   308→}
+   309→
+   310→interface GlobalMaintenanceSummary extends MaintenanceSummary {
+   311→  assetsWithMaintenanceCount: number;
+   312→  damagedAssetCount: number;
+   313→  typeDistribution: Record<string, number>;
+   314→  topAssets: { assetId: string; cost: number }[];
+   315→}
+   316→
+   317→interface GlobalMaintenanceResponse {
+   318→  items: MaintenanceRecord[];
+   319→  total: number;
+   320→  summary: GlobalMaintenanceSummary;
+   321→}
+   322→
+   323→// =========================================================
+   324→// Main module
+   325→// =========================================================
+   326→
+   327→export function AssetsModule() {
+   328→  const [search, setSearch] = useState("");
+   329→  const [type, setType] = useState("");
+   330→  const [status, setStatus] = useState("");
+   331→  const [view, setView] = useState<"table" | "grid" | "depreciation">("table");
+   332→
+   333→  const [formOpen, setFormOpen] = useState(false);
+   334→  const [editAsset, setEditAsset] = useState<Asset | null>(null);
+   335→  const [assignAsset, setAssignAsset] = useState<Asset | null>(null);
+   336→  const [returnAsset, setReturnAsset] = useState<Asset | null>(null);
+   337→  const [depreciationAsset, setDepreciationAsset] = useState<DepreciationRow | null>(null);
+   338→  const [maintenanceAsset, setMaintenanceAsset] = useState<Asset | null>(null);
+   339→
+   340→  const qc = useQueryClient();
+   341→  const { data, isLoading, isError } = useQuery({
+   342→    queryKey: ["assets", search, type, status],
+   343→    queryFn: async () => {
+   344→      const params = new URLSearchParams();
+   345→      if (search) params.set("search", search);
+   346→      if (type) params.set("type", type);
+   347→      if (status) params.set("status", status);
+   348→      const r = await fetch(`/api/assets?${params.toString()}`);
+   349→      if (!r.ok) throw new Error("Failed to load assets");
+   350→      return r.json();
+   351→    },
+   352→  });
+   353→
+   354→  const assets: Asset[] = data?.items ?? [];
+   355→  const total = assets.length;
+   356→  const assigned = assets.filter((a) => a.status === "ASSIGNED").length;
+   357→  const available = assets.filter((a) => a.status === "AVAILABLE").length;
+   358→  const damaged = assets.filter((a) => a.condition === "DAMAGED").length;
+   359→
+   360→  // Global maintenance summary for the Maintenance KPI card (table + grid views only).
+   361→  const maintenanceSummaryQ = useQuery({
+   362→    queryKey: ["assets", "maintenance", "summary"],
+   363→    queryFn: async () => {
+   364→      const r = await fetch("/api/assets/maintenance");
+   365→      if (!r.ok) throw new Error("Failed to load maintenance summary");
+   366→      return r.json();
+   367→    },
+   368→    enabled: view !== "depreciation",
+   369→  });
+   370→  const maintenanceSummary: GlobalMaintenanceSummary | undefined =
+   371→    maintenanceSummaryQ.data?.summary;
+   372→
+   373→  function openCreate() {
+   374→    setEditAsset(null);
+   375→    setFormOpen(true);
+   376→  }
+   377→  function openEdit(a: Asset) {
+   378→    setEditAsset(a);
+   379→    setFormOpen(true);
+   380→  }
+   381→  async function deleteAsset(a: Asset) {
+   382→    if (!confirm(`Permanently delete asset "${a.name}"?`)) return;
+   383→    try {
+   384→      const r = await fetch(`/api/assets/${a.id}`, { method: "DELETE" });
+   385→      if (!r.ok) throw new Error("Failed to delete asset");
+   386→      toast.success(`Asset "${a.name}" deleted.`);
+   387→      qc.invalidateQueries({ queryKey: ["assets"] });
+   388→    } catch (err: any) {
+   389→      toast.error(err?.message || "Failed to delete asset.");
+   390→    }
+   391→  }
+   392→  async function retireAsset(a: Asset) {
+   393→    if (!confirm(`Retire asset "${a.name}"? It will be marked RETIRED.`))
+   394→      return;
+   395→    try {
+   396→      const r = await fetch(`/api/assets/${a.id}`, {
+   397→        method: "PATCH",
+   398→        headers: { "Content-Type": "application/json" },
+   399→        body: JSON.stringify({ status: "RETIRED" }),
+   400→      });
+   401→      if (!r.ok) throw new Error("Failed to retire asset");
+   402→      toast.success(`Asset "${a.name}" retired.`);
+   403→      qc.invalidateQueries({ queryKey: ["assets"] });
+   404→    } catch (err: any) {
+   405→      toast.error(err?.message || "Failed to retire asset.");
+   406→    }
+   407→  }
+   408→
+   409→  return (
+   410→    <div className="space-y-6">
+   411→      <PageHeader
+   412→        title="Asset Management"
+   413→        description="Track company assets and equipment assignments"
+   414→        icon={<Package className="size-5" />}
+   415→        actions={
+   416→          <>
+   417→            <ExportButton
+   418→              module="assets"
+   419→              filters={{ search, status, type }}
+   420→            />
+   421→            <div className="flex rounded-md border border-border overflow-hidden">
+   422→              <Button
+   423→                variant={view === "table" ? "default" : "ghost"}
+   424→                size="sm"
+   425→                className="rounded-none gap-1.5"
+   426→                onClick={() => setView("table")}
+   427→                aria-label="Table view"
+   428→              >
+   429→                <List className="size-4" />
+   430→                <span className="hidden sm:inline">Table</span>
+   431→              </Button>
+   432→              <Button
+   433→                variant={view === "grid" ? "default" : "ghost"}
+   434→                size="sm"
+   435→                className="rounded-none gap-1.5"
+   436→                onClick={() => setView("grid")}
+   437→                aria-label="Grid view"
+   438→              >
+   439→                <LayoutGrid className="size-4" />
+   440→                <span className="hidden sm:inline">Grid</span>
+   441→              </Button>
+   442→              <Button
+   443→                variant={view === "depreciation" ? "default" : "ghost"}
+   444→                size="sm"
+   445→                className="rounded-none gap-1.5"
+   446→                onClick={() => setView("depreciation")}
+   447→                aria-label="Depreciation view"
+   448→              >
+   449→                <TrendingDown className="size-4" />
+   450→                <span className="hidden sm:inline">Depreciation</span>
+   451→              </Button>
+   452→            </div>
+   453→            <Button size="sm" onClick={openCreate} className="gap-1.5">
+   454→              <Plus className="size-4" />
+   455→              <span className="hidden sm:inline">Add Asset</span>
+   456→              <span className="sm:hidden">New</span>
+   457→            </Button>
+   458→          </>
+   459→        }
+   460→      />
+   461→
+   462→      {/* KPI cards */}
+   463→      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
+   464→        <KpiCard
+   465→          label="Total Assets"
+   466→          value={total}
+   467→          icon={Package}
+   468→          iconClass="bg-primary/10 text-primary"
+   469→          footer={<span className="text-muted-foreground">All equipment</span>}
+   470→        />
+   471→        <KpiCard
+   472→          label="Assigned"
+   473→          value={assigned}
+   474→          icon={PackageCheck}
+   475→          iconClass="bg-sky-500/15 text-sky-600"
+   476→          footer={<span className="text-muted-foreground">In use</span>}
+   477→        />
+   478→        <KpiCard
+   479→          label="Available"
+   480→          value={available}
+   481→          icon={PackageOpen}
+   482→          iconClass="bg-emerald-500/15 text-emerald-600"
+   483→          footer={<span className="text-muted-foreground">Free to assign</span>}
+   484→        />
+   485→        <KpiCard
+   486→          label="Damaged"
+   487→          value={damaged}
+   488→          icon={AlertTriangle}
+   489→          iconClass="bg-rose-500/15 text-rose-600"
+   490→          footer={<span className="text-muted-foreground">Needs repair</span>}
+   491→        />
+   492→      </div>
+   493→
+   494→      {/* Maintenance summary card (hidden in depreciation view) */}
+   495→      {view !== "depreciation" && (
+   496→        <MaintenanceSummaryCard
+   497→          summary={maintenanceSummary}
+   498→          isLoading={maintenanceSummaryQ.isLoading}
+   499→          isError={maintenanceSummaryQ.isError}
+   500→          onRetry={() =>
+   501→            qc.invalidateQueries({ queryKey: ["assets", "maintenance", "summary"] })
+   502→          }
+   503→        />
+   504→      )}
+   505→
+   506→      {/* Filter bar */}
+   507→      <div className="flex flex-col md:flex-row gap-3">
+   508→        <div className="relative flex-1">
+   509→          <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+   510→          <Input
+   511→            placeholder="Search by name, serial, or assignee…"
+   512→            value={search}
+   513→            onChange={(e) => setSearch(e.target.value)}
+   514→            className="pl-9"
+   515→          />
+   516→        </div>
+   517→        <Select
+   518→          value={type || "ALL"}
+   519→          onValueChange={(v) => setType(v === "ALL" ? "" : v)}
+   520→        >
+   521→          <SelectTrigger className="md:w-44">
+   522→            <SelectValue placeholder="All types" />
+   523→          </SelectTrigger>
+   524→          <SelectContent>
+   525→            <SelectItem value="ALL">All types</SelectItem>
+   526→            {ASSET_TYPES.map((t) => (
+   527→              <SelectItem key={t.value} value={t.value}>
+   528→                {t.label}
+   529→              </SelectItem>
+   530→            ))}
+   531→          </SelectContent>
+   532→        </Select>
+   533→        <Select
+   534→          value={status || "ALL"}
+   535→          onValueChange={(v) => setStatus(v === "ALL" ? "" : v)}
+   536→        >
+   537→          <SelectTrigger className="md:w-44">
+   538→            <SelectValue placeholder="All statuses" />
+   539→          </SelectTrigger>
+   540→          <SelectContent>
+   541→            <SelectItem value="ALL">All statuses</SelectItem>
+   542→            {STATUSES.map((s) => (
+   543→              <SelectItem key={s} value={s}>
+   544→                {s.charAt(0) + s.slice(1).toLowerCase()}
+   545→              </SelectItem>
+   546→            ))}
+   547→          </SelectContent>
+   548→        </Select>
+   549→      </div>
+   550→
+   551→      {/* Result count */}
+   552→      <div className="flex items-center justify-between text-sm">
+   553→        <div className="text-muted-foreground">
+   554→          {isLoading ? (
+   555→            <Skeleton className="h-4 w-32" />
+   556→          ) : (
+   557→            <span>
+   558→              Showing <span className="font-semibold text-foreground">{assets.length}</span>{" "}
+   559→              asset{assets.length === 1 ? "" : "s"}
+   560→              {(type || status || search) && " (filtered)"}
+   561→            </span>
+   562→          )}
+   563→        </div>
+   564→      </div>
+   565→
+   566→      {/* Content */}
+   567→      {view === "depreciation" ? (
+   568→        <DepreciationView
+   569→          search={search}
+   570→          type={type}
+   571→          status={status}
+   572→          onInspect={(row) => setDepreciationAsset(row)}
+   573→        />
+   574→      ) : isLoading ? (
+   575→        <AssetsSkeleton view={view} />
+   576→      ) : isError ? (
+   577→        <EmptyState
+   578→          icon={AlertTriangle}
+   579→          title="Failed to load assets"
+   580→          description="Please try again. If the problem persists, check the dev server."
+   581→          actionLabel="Retry"
+   582→          onAction={() => qc.invalidateQueries({ queryKey: ["assets"] })}
+   583→        />
+   584→      ) : assets.length === 0 ? (
+   585→        <EmptyState
+   586→          icon={Package}
+   587→          title={search || type || status ? "No matching assets" : "No assets yet"}
+   588→          description={
+   589→            search || type || status
+   590→              ? "Try adjusting your filters."
+   591→              : "Start by adding your first company asset."
+   592→          }
+   593→          actionLabel="Add Asset"
+   594→          onAction={openCreate}
+   595→        />
+   596→      ) : view === "table" ? (
+   597→        <AssetsTable
+   598→          assets={assets}
+   599→          onEdit={openEdit}
+   600→          onDelete={deleteAsset}
+   601→          onAssign={(a) => setAssignAsset(a)}
+   602→          onReturn={(a) => setReturnAsset(a)}
+   603→          onRetire={retireAsset}
+   604→          onMaintenance={(a) => setMaintenanceAsset(a)}
+   605→        />
+   606→      ) : (
+   607→        <AssetsGrid
+   608→          assets={assets}
+   609→          onEdit={openEdit}
+   610→          onDelete={deleteAsset}
+   611→          onAssign={(a) => setAssignAsset(a)}
+   612→          onReturn={(a) => setReturnAsset(a)}
+   613→          onRetire={retireAsset}
+   614→          onMaintenance={(a) => setMaintenanceAsset(a)}
+   615→        />
+   616→      )}
+   617→
+   618→      {/* Create / Edit dialog */}
+   619→      <AssetFormDialog
+   620→        open={formOpen}
+   621→        onOpenChange={(o) => {
+   622→          setFormOpen(o);
+   623→          if (!o) setEditAsset(null);
+   624→        }}
+   625→        asset={editAsset}
+   626→        onSaved={() => qc.invalidateQueries({ queryKey: ["assets"] })}
+   627→      />
+   628→
+   629→      {/* Assign dialog */}
+   630→      <AssignDialog
+   631→        asset={assignAsset}
+   632→        onClose={() => setAssignAsset(null)}
+   633→        onSaved={() => {
+   634→          qc.invalidateQueries({ queryKey: ["assets"] });
+   635→          setAssignAsset(null);
+   636→        }}
+   637→      />
+   638→
+   639→      {/* Return dialog */}
+   640→      <ReturnDialog
+   641→        asset={returnAsset}
+   642→        onClose={() => setReturnAsset(null)}
+   643→        onSaved={() => {
+   644→          qc.invalidateQueries({ queryKey: ["assets"] });
+   645→          setReturnAsset(null);
+   646→        }}
+   647→      />
+   648→
+   649→      {/* Depreciation detail dialog */}
+   650→      <DepreciationDetailDialog
+   651→        asset={depreciationAsset}
+   652→        onClose={() => setDepreciationAsset(null)}
+   653→      />
+   654→
+   655→      {/* Maintenance history dialog */}
+   656→      <MaintenanceHistoryDialog
+   657→        asset={maintenanceAsset}
+   658→        onClose={() => setMaintenanceAsset(null)}
+   659→      />
+   660→    </div>
+   661→  );
+   662→}
+   663→
+   664→// =========================================================
+   665→// Table view
+   666→// =========================================================
+   667→
+   668→function AssetsTable({
+   669→  assets,
+   670→  onEdit,
+   671→  onDelete,
+   672→  onAssign,
+   673→  onReturn,
+   674→  onRetire,
+   675→  onMaintenance,
+   676→}: {
+   677→  assets: Asset[];
+   678→  onEdit: (a: Asset) => void;
+   679→  onDelete: (a: Asset) => void;
+   680→  onAssign: (a: Asset) => void;
+   681→  onReturn: (a: Asset) => void;
+   682→  onRetire: (a: Asset) => void;
+   683→  onMaintenance: (a: Asset) => void;
+   684→}) {
+   685→  return (
+   686→    <Card className="p-0 overflow-hidden border-border/60">
+   687→      <div className="overflow-x-auto max-h-[70vh] overflow-y-auto">
+   688→        <Table>
+   689→          <TableHeader className="sticky top-0 bg-card z-10">
+   690→            <TableRow>
+   691→              <TableHead>Asset</TableHead>
+   692→              <TableHead>Type</TableHead>
+   693→              <TableHead className="hidden md:table-cell">Serial</TableHead>
+   694→              <TableHead>Condition</TableHead>
+   695→              <TableHead>Assigned To</TableHead>
+   696→              <TableHead className="hidden lg:table-cell">Assigned Date</TableHead>
+   697→              <TableHead>Status</TableHead>
+   698→              <TableHead className="text-right">Actions</TableHead>
+   699→            </TableRow>
+   700→          </TableHeader>
+   701→          <TableBody>
+   702→            {assets.map((a) => {
+   703→              const tm = getTypeMeta(a.type);
+   704→              const TIcon = tm.icon;
+   705→              return (
+   706→                <TableRow key={a.id} className="hover:bg-muted/30">
+   707→                  <TableCell>
+   708→                    <div className="flex items-center gap-2.5 min-w-0">
+   709→                      <div
+   710→                        className={cn(
+   711→                          "size-9 rounded-lg flex items-center justify-center flex-shrink-0",
+   712→                          tm.color
+   713→                        )}
+   714→                      >
+   715→                        <TIcon className="size-4" />
+   716→                      </div>
+   717→                      <div className="min-w-0">
+   718→                        <div className="font-medium text-sm truncate">{a.name}</div>
+   719→                        {a.notes && (
+   720→                          <div className="text-xs text-muted-foreground truncate max-w-[200px]">
+   721→                            {a.notes.split("\n")[0]}
+   722→                          </div>
+   723→                        )}
+   724→                      </div>
+   725→                    </div>
+   726→                  </TableCell>
+   727→                  <TableCell>
+   728→                    <Badge variant="outline" className="gap-1 font-medium">
+   729→                      <TIcon className="size-3" />
+   730→                      {tm.label}
+   731→                    </Badge>
+   732→                  </TableCell>
+   733→                  <TableCell className="hidden md:table-cell font-mono text-xs">
+   734→                    {a.serialNumber || "—"}
+   735→                  </TableCell>
+   736→                  <TableCell>
+   737→                    <Badge
+   738→                      variant="outline"
+   739→                      className={cn(
+   740→                        "font-medium border text-[11px]",
+   741→                        CONDITION_COLOR[a.condition]
+   742→                      )}
+   743→                    >
+   744→                      {a.condition.charAt(0) + a.condition.slice(1).toLowerCase()}
+   745→                    </Badge>
+   746→                  </TableCell>
+   747→                  <TableCell>
+   748→                    {a.assignedToName ? (
+   749→                      <div className="flex items-center gap-2 min-w-0">
+   750→                        <AvatarBadge name={a.assignedToName} size="sm" />
+   751→                        <div className="min-w-0">
+   752→                          <div className="text-sm font-medium truncate max-w-[140px]">
+   753→                            {a.assignedToName}
+   754→                          </div>
+   755→                        </div>
+   756→                      </div>
+   757→                    ) : (
+   758→                      <span className="text-xs text-muted-foreground italic">
+   759→                        Available
+   760→                      </span>
+   761→                    )}
+   762→                  </TableCell>
+   763→                  <TableCell className="hidden lg:table-cell text-xs text-muted-foreground">
+   764→                    {a.assignedDate ? formatDate(a.assignedDate) : "—"}
+   765→                  </TableCell>
+   766→                  <TableCell>
+   767→                    <Badge
+   768→                      variant="outline"
+   769→                      className={cn(
+   770→                        "font-medium border text-[11px]",
+   771→                        STATUS_COLOR[a.status]
+   772→                      )}
+   773→                    >
+   774→                      {a.status.charAt(0) + a.status.slice(1).toLowerCase()}
+   775→                    </Badge>
+   776→                  </TableCell>
+   777→                  <TableCell className="text-right">
+   778→                    <div className="flex items-center justify-end gap-1">
+   779→                      <Button
+   780→                        size="sm"
+   781→                        variant="outline"
+   782→                        className="h-8 gap-1.5"
+   783→                        onClick={() => onMaintenance(a)}
+   784→                        title="View maintenance history"
+   785→                      >
+   786→                        <Wrench className="size-3.5" />
+   787→                        <span className="hidden xl:inline">Maintenance</span>
+   788→                      </Button>
+   789→                      {a.status === "AVAILABLE" && (
+   790→                        <Button
+   791→                          size="sm"
+   792→                          variant="outline"
+   793→                          className="h-8 gap-1.5"
+   794→                          onClick={() => onAssign(a)}
+   795→                        >
+   796→                          <UserPlus className="size-3.5" />
+   797→                          <span className="hidden xl:inline">Assign</span>
+   798→                        </Button>
+   799→                      )}
+   800→                      {a.status === "ASSIGNED" && (
+   801→                        <Button
+   802→                          size="sm"
+   803→                          variant="outline"
+   804→                          className="h-8 gap-1.5"
+   805→                          onClick={() => onReturn(a)}
+   806→                        >
+   807→                          <Undo2 className="size-3.5" />
+   808→                          <span className="hidden xl:inline">Return</span>
+   809→                        </Button>
+   810→                      )}
+   811→                      <DropdownMenu>
+   812→                        <DropdownMenuTrigger asChild>
+   813→                          <Button
+   814→                            size="icon"
+   815→                            variant="ghost"
+   816→                            className="size-8"
+   817→                            aria-label="Actions"
+   818→                          >
+   819→                            <MoreVertical className="size-4" />
+   820→                          </Button>
+   821→                        </DropdownMenuTrigger>
+   822→                        <DropdownMenuContent align="end" className="w-44">
+   823→                          <DropdownMenuItem onClick={() => onEdit(a)}>
+   824→                            <Pencil className="size-4 mr-2" /> Edit
+   825→                          </DropdownMenuItem>
+   826→                          <DropdownMenuItem onClick={() => onMaintenance(a)}>
+   827→                            <Wrench className="size-4 mr-2" /> Maintenance History
+   828→                          </DropdownMenuItem>
+   829→                          {a.status !== "RETIRED" && (
+   830→                            <DropdownMenuItem onClick={() => onRetire(a)}>
+   831→                              <Box className="size-4 mr-2" /> Retire
+   832→                            </DropdownMenuItem>
+   833→                          )}
+   834→                          <DropdownMenuSeparator />
+   835→                          <DropdownMenuItem
+   836→                            className="text-rose-600 focus:text-rose-700"
+   837→                            onClick={() => onDelete(a)}
+   838→                          >
+   839→                            <Trash2 className="size-4 mr-2" /> Delete
+   840→                          </DropdownMenuItem>
+   841→                        </DropdownMenuContent>
+   842→                      </DropdownMenu>
+   843→                    </div>
+   844→                  </TableCell>
+   845→                </TableRow>
+   846→              );
+   847→            })}
+   848→          </TableBody>
+   849→        </Table>
+   850→      </div>
+   851→    </Card>
+   852→  );
+   853→}
+   854→
+   855→// =========================================================
+   856→// Grid view
+   857→// =========================================================
+   858→
+   859→function AssetsGrid({
+   860→  assets,
+   861→  onEdit,
+   862→  onDelete,
+   863→  onAssign,
+   864→  onReturn,
+   865→  onRetire,
+   866→  onMaintenance,
+   867→}: {
+   868→  assets: Asset[];
+   869→  onEdit: (a: Asset) => void;
+   870→  onDelete: (a: Asset) => void;
+   871→  onAssign: (a: Asset) => void;
+   872→  onReturn: (a: Asset) => void;
+   873→  onRetire: (a: Asset) => void;
+   874→  onMaintenance: (a: Asset) => void;
+   875→}) {
+   876→  return (
+   877→    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+   878→      {assets.map((a) => {
+   879→        const tm = getTypeMeta(a.type);
+   880→        const TIcon = tm.icon;
+   881→        return (
+   882→          <Card
+   883→            key={a.id}
+   884→            className="p-4 border-border/60 hover:border-border hover:shadow-card-hover transition-all flex flex-col gap-3"
+   885→          >
+   886→            <div className="flex items-start justify-between gap-2">
+   887→              <div
+   888→                className={cn(
+   889→                  "size-12 rounded-xl flex items-center justify-center",
+   890→                  tm.color
+   891→                )}
+   892→              >
+   893→                <TIcon className="size-6" />
+   894→              </div>
+   895→              <Badge
+   896→                variant="outline"
+   897→                className={cn(
+   898→                  "font-medium border text-[10px]",
+   899→                  STATUS_COLOR[a.status]
+   900→                )}
+   901→              >
+   902→                {a.status.charAt(0) + a.status.slice(1).toLowerCase()}
+   903→              </Badge>
+   904→            </div>
+   905→
+   906→            <div>
+   907→              <div className="font-semibold leading-tight truncate" title={a.name}>
+   908→                {a.name}
+   909→              </div>
+   910→              <div className="text-xs text-muted-foreground mt-0.5">
+   911→                {tm.label}
+   912→                {a.serialNumber && (
+   913→                  <span className="font-mono"> · {a.serialNumber}</span>
+   914→                )}
+   915→              </div>
+   916→            </div>
+   917→
+   918→            <div className="flex items-center gap-2">
+   919→              <Badge
+   920→                variant="outline"
+   921→                className={cn(
+   922→                  "font-medium border text-[10px]",
+   923→                  CONDITION_COLOR[a.condition]
+   924→                )}
+   925→              >
+   926→                {a.condition.charAt(0) + a.condition.slice(1).toLowerCase()}
+   927→              </Badge>
+   928→            </div>
+   929→
+   930→            {a.assignedToName ? (
+   931→              <div className="flex items-center gap-2 pt-1 border-t border-border/60">
+   932→                <AvatarBadge name={a.assignedToName} size="sm" />
+   933→                <div className="min-w-0 flex-1">
+   934→                  <div className="text-xs font-medium truncate">
+   935→                    {a.assignedToName}
+   936→                  </div>
+   937→                  <div className="text-[10px] text-muted-foreground">
+   938→                    {a.assignedDate ? formatDate(a.assignedDate) : "—"}
+   939→                  </div>
+   940→                </div>
+   941→              </div>
+   942→            ) : (
+   943→              <div className="text-xs text-emerald-600 dark:text-emerald-400 italic pt-1 border-t border-border/60">
+   944→                Available for assignment
+   945→              </div>
+   946→            )}
+   947→
+   948→            <div className="flex items-center gap-1.5 mt-auto pt-2">
+   949→              <Button
+   950→                size="sm"
+   951→                variant="outline"
+   952→                className="h-8 gap-1.5"
+   953→                onClick={() => onMaintenance(a)}
+   954→                title="Maintenance history"
+   955→              >
+   956→                <Wrench className="size-3.5" />
+   957→                <span className="hidden sm:inline">Maint.</span>
+   958→              </Button>
+   959→              {a.status === "AVAILABLE" && (
+   960→                <Button
+   961→                  size="sm"
+   962→                  variant="default"
+   963→                  className="h-8 flex-1 gap-1.5"
+   964→                  onClick={() => onAssign(a)}
+   965→                >
+   966→                  <UserPlus className="size-3.5" /> Assign
+   967→                </Button>
+   968→              )}
+   969→              {a.status === "ASSIGNED" && (
+   970→                <Button
+   971→                  size="sm"
+   972→                  variant="outline"
+   973→                  className="h-8 flex-1 gap-1.5"
+   974→                  onClick={() => onReturn(a)}
+   975→                >
+   976→                  <Undo2 className="size-3.5" /> Return
+   977→                </Button>
+   978→              )}
+   979→              <DropdownMenu>
+   980→                <DropdownMenuTrigger asChild>
+   981→                  <Button
+   982→                    size="icon"
+   983→                    variant="ghost"
+   984→                    className="size-8"
+   985→                    aria-label="More actions"
+   986→                  >
+   987→                    <MoreVertical className="size-4" />
+   988→                  </Button>
+   989→                </DropdownMenuTrigger>
+   990→                <DropdownMenuContent align="end" className="w-44">
+   991→                  <DropdownMenuItem onClick={() => onEdit(a)}>
+   992→                    <Pencil className="size-4 mr-2" /> Edit
+   993→                  </DropdownMenuItem>
+   994→                  <DropdownMenuItem onClick={() => onMaintenance(a)}>
+   995→                    <Wrench className="size-4 mr-2" /> Maintenance History
+   996→                  </DropdownMenuItem>
+   997→                  {a.status !== "RETIRED" && (
+   998→                    <DropdownMenuItem onClick={() => onRetire(a)}>
+   999→                      <Box className="size-4 mr-2" /> Retire
+  1000→                    </DropdownMenuItem>
+  1001→                  )}
+  1002→                  <DropdownMenuSeparator />
+  1003→                  <DropdownMenuItem
+  1004→                    className="text-rose-600 focus:text-rose-700"
+  1005→                    onClick={() => onDelete(a)}
+  1006→                  >
+  1007→                    <Trash2 className="size-4 mr-2" /> Delete
+  1008→                  </DropdownMenuItem>
+  1009→                </DropdownMenuContent>
+  1010→              </DropdownMenu>
+  1011→            </div>
+  1012→          </Card>
+  1013→        );
+  1014→      })}
+  1015→    </div>
+  1016→  );
+  1017→}
+  1018→
+  1019→// =========================================================
+  1020→// Skeleton + dialog components
+  1021→// =========================================================
+  1022→
+  1023→function AssetsSkeleton({ view }: { view: "table" | "grid" }) {
+  1024→  if (view === "grid") {
+  1025→    return (
+  1026→      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+  1027→        {Array.from({ length: 8 }).map((_, i) => (
+  1028→          <Card key={i} className="p-4 h-48">
+  1029→            <Skeleton className="h-12 w-12 rounded-xl" />
+  1030→            <Skeleton className="h-4 w-2/3 mt-3" />
+  1031→            <Skeleton className="h-3 w-1/2 mt-2" />
+  1032→            <Skeleton className="h-8 w-full mt-4" />
+  1033→          </Card>
+  1034→        ))}
+  1035→      </div>
+  1036→    );
+  1037→  }
+  1038→  return (
+  1039→    <Card className="p-0 overflow-hidden">
+  1040→      {Array.from({ length: 6 }).map((_, i) => (
+  1041→        <div key={i} className="flex items-center gap-3 p-3 border-b border-border/40">
+  1042→          <Skeleton className="size-9 rounded-lg" />
+  1043→          <div className="flex-1 space-y-1.5">
+  1044→            <Skeleton className="h-3.5 w-1/3" />
+  1045→            <Skeleton className="h-2.5 w-1/4" />
+  1046→          </div>
+  1047→          <Skeleton className="h-6 w-20 rounded-full" />
+  1048→          <Skeleton className="h-8 w-16" />
+  1049→        </div>
+  1050→      ))}
+  1051→    </Card>
+  1052→  );
+  1053→}
+  1054→
+  1055→// =========================================================
+  1056→// Create / Edit form dialog
+  1057→// =========================================================
+  1058→
+  1059→function AssetFormDialog({
+  1060→  open,
+  1061→  onOpenChange,
+  1062→  asset,
+  1063→  onSaved,
+  1064→}: {
+  1065→  open: boolean;
+  1066→  onOpenChange: (o: boolean) => void;
+  1067→  asset: Asset | null;
+  1068→  onSaved: () => void;
+  1069→}) {
+  1070→  const formKey = `${open ? "open" : "closed"}-${asset?.id ?? "new"}`;
+  1071→  const [saving, setSaving] = useState(false);
+  1072→
+  1073→  return (
+  1074→    <Dialog
+  1075→      open={open}
+  1076→      onOpenChange={(o) => {
+  1077→        if (!saving) onOpenChange(o);
+  1078→      }}
+  1079→    >
+  1080→      <DialogContent className="sm:max-w-lg">
+  1081→        <DialogHeader>
+  1082→          <DialogTitle>
+  1083→            {asset ? "Edit Asset" : "Add New Asset"}
+  1084→          </DialogTitle>
+  1085→          <DialogDescription>
+  1086→            {asset
+  1087→              ? "Update asset details. Status changes are handled via Assign/Return actions."
+  1088→              : "Register a new company asset for tracking and assignment."}
+  1089→          </DialogDescription>
+  1090→        </DialogHeader>
+  1091→        <AssetFormBody
+  1092→          key={formKey}
+  1093→          asset={asset}
+  1094→          savingState={[saving, setSaving]}
+  1095→          onSaved={() => {
+  1096→            onSaved();
+  1097→            onOpenChange(false);
+  1098→            toast.success(asset ? "Asset updated." : "Asset created.");
+  1099→          }}
+  1100→          onCancel={() => onOpenChange(false)}
+  1101→        />
+  1102→      </DialogContent>
+  1103→    </Dialog>
+  1104→  );
+  1105→}
+  1106→
+  1107→function AssetFormBody({
+  1108→  asset,
+  1109→  savingState,
+  1110→  onSaved,
+  1111→  onCancel,
+  1112→}: {
+  1113→  asset: Asset | null;
+  1114→  savingState: [boolean, (b: boolean) => void];
+  1115→  onSaved: () => void;
+  1116→  onCancel: () => void;
+  1117→}) {
+  1118→  const [name, setName] = useState(asset?.name ?? "");
+  1119→  const [type, setType] = useState<AssetType>(asset?.type ?? "LAPTOP");
+  1120→  const [serialNumber, setSerialNumber] = useState(asset?.serialNumber ?? "");
+  1121→  const [condition, setCondition] = useState<AssetCondition>(
+  1122→    asset?.condition ?? "GOOD"
+  1123→  );
+  1124→  const [purchaseValue, setPurchaseValue] = useState<string>(
+  1125→    asset?.purchaseValue !== undefined && asset.purchaseValue !== null
+  1126→      ? String(asset.purchaseValue)
+  1127→      : "1000"
+  1128→  );
+  1129→  const [notes, setNotes] = useState(asset?.notes ?? "");
+  1130→  const [saving, setSaving] = savingState;
+  1131→
+  1132→  async function submit() {
+  1133→    if (!name.trim()) {
+  1134→      toast.error("Asset name is required.");
+  1135→      return;
+  1136→    }
+  1137→    const pvNum = Number(purchaseValue);
+  1138→    const pv =
+  1139→      purchaseValue.trim() !== "" && !isNaN(pvNum) && pvNum >= 0
+  1140→        ? pvNum
+  1141→        : 1000;
+  1142→    setSaving(true);
+  1143→    try {
+  1144→      const body = { name, type, serialNumber, condition, purchaseValue: pv, notes };
+  1145→      const r = asset
+  1146→        ? await fetch(`/api/assets/${asset.id}`, {
+  1147→            method: "PATCH",
+  1148→            headers: { "Content-Type": "application/json" },
+  1149→            body: JSON.stringify(body),
+  1150→          })
+  1151→        : await fetch("/api/assets", {
+  1152→            method: "POST",
+  1153→            headers: { "Content-Type": "application/json" },
+  1154→            body: JSON.stringify(body),
+  1155→          });
+  1156→      if (!r.ok) {
+  1157→        const e = await r.json().catch(() => ({}));
+  1158→        throw new Error(e?.error || "Failed to save asset");
+  1159→      }
+  1160→      onSaved();
+  1161→    } catch (err: any) {
+  1162→      toast.error(err?.message || "Failed to save asset.");
+  1163→    } finally {
+  1164→      setSaving(false);
+  1165→    }
+  1166→  }
+  1167→
+  1168→  return (
+  1169→    <div className="space-y-4">
+  1170→      <div className="space-y-1.5">
+  1171→        <Label htmlFor="asset-name">Asset name *</Label>
+  1172→        <Input
+  1173→          id="asset-name"
+  1174→          placeholder="e.g. MacBook Pro 16&quot; M3"
+  1175→          value={name}
+  1176→          onChange={(e) => setName(e.target.value)}
+  1177→        />
+  1178→      </div>
+  1179→      <div className="grid grid-cols-2 gap-3">
+  1180→        <div className="space-y-1.5">
+  1181→          <Label htmlFor="asset-type">Type</Label>
+  1182→          <Select value={type} onValueChange={(v) => setType(v as AssetType)}>
+  1183→            <SelectTrigger id="asset-type">
+  1184→              <SelectValue />
+  1185→            </SelectTrigger>
+  1186→            <SelectContent>
+  1187→              {ASSET_TYPES.map((t) => (
+  1188→                <SelectItem key={t.value} value={t.value}>
+  1189→                  <span className="flex items-center gap-2">
+  1190→                    <t.icon className="size-3.5" />
+  1191→                    {t.label}
+  1192→                  </span>
+  1193→                </SelectItem>
+  1194→              ))}
+  1195→            </SelectContent>
+  1196→          </Select>
+  1197→        </div>
+  1198→        <div className="space-y-1.5">
+  1199→          <Label htmlFor="asset-condition">Condition</Label>
+  1200→          <Select
+  1201→            value={condition}
+  1202→            onValueChange={(v) => setCondition(v as AssetCondition)}
+  1203→          >
+  1204→            <SelectTrigger id="asset-condition">
+  1205→              <SelectValue />
+  1206→            </SelectTrigger>
+  1207→            <SelectContent>
+  1208→              {CONDITIONS.map((c) => (
+  1209→                <SelectItem key={c} value={c}>
+  1210→                  {c.charAt(0) + c.slice(1).toLowerCase()}
+  1211→                </SelectItem>
+  1212→              ))}
+  1213→            </SelectContent>
+  1214→          </Select>
+  1215→        </div>
+  1216→      </div>
+  1217→      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+  1218→        <div className="space-y-1.5">
+  1219→          <Label htmlFor="asset-serial">Serial number</Label>
+  1220→          <Input
+  1221→            id="asset-serial"
+  1222→            placeholder="e.g. SN-2024-001234"
+  1223→            value={serialNumber}
+  1224→            onChange={(e) => setSerialNumber(e.target.value)}
+  1225→          />
+  1226→        </div>
+  1227→        <div className="space-y-1.5">
+  1228→          <Label htmlFor="asset-purchase-value">
+  1229→            Purchase value (৳)
+  1230→          </Label>
+  1231→          <Input
+  1232→            id="asset-purchase-value"
+  1233→            type="number"
+  1234→            min="0"
+  1235→            step="100"
+  1236→            placeholder="1000"
+  1237→            value={purchaseValue}
+  1238→            onChange={(e) => setPurchaseValue(e.target.value)}
+  1239→          />
+  1240→          <p className="text-[11px] text-muted-foreground">
+  1241→            Used to compute depreciation. Defaults to ৳1,000 if left blank.
+  1242→          </p>
+  1243→        </div>
+  1244→      </div>
+  1245→      <div className="space-y-1.5">
+  1246→        <Label htmlFor="asset-notes">Notes</Label>
+  1247→        <Textarea
+  1248→          id="asset-notes"
+  1249→          placeholder="Optional notes (specs, warranty, purchase date, etc.)"
+  1250→          value={notes}
+  1251→          onChange={(e) => setNotes(e.target.value)}
+  1252→          rows={3}
+  1253→        />
+  1254→      </div>
+  1255→      <DialogFooter>
+  1256→        <Button variant="outline" onClick={onCancel} disabled={saving}>
+  1257→          Cancel
+  1258→        </Button>
+  1259→        <Button onClick={submit} disabled={saving} className="gap-1.5">
+  1260→          {saving && <Loader2 className="size-4 animate-spin" />}
+  1261→          {asset ? "Save Changes" : "Create Asset"}
+  1262→        </Button>
+  1263→      </DialogFooter>
+  1264→    </div>
+  1265→  );
+  1266→}
+  1267→
+  1268→// =========================================================
+  1269→// Employee searchable multi-select (used by Assign dialog)
+  1270→// =========================================================
+  1271→
+  1272→function useEmployees(enabled: boolean) {
+  1273→  return useQuery({
+  1274→    queryKey: ["employees-select"],
+  1275→    queryFn: async () => {
+  1276→      const r = await fetch(`/api/employees?pageSize=500`);
+  1277→      return r.json();
+  1278→    },
+  1279→    enabled,
+  1280→  });
+  1281→}
+  1282→
+  1283→function EmployeeSearchSelect({
+  1284→  value,
+  1285→  onChange,
+  1286→  employees,
+  1287→}: {
+  1288→  value: string;
+  1289→  onChange: (id: string) => void;
+  1290→  employees: EmployeeOption[];
+  1291→}) {
+  1292→  const [open, setOpen] = useState(false);
+  1293→  const selected = employees.find((e) => e.id === value);
+  1294→  return (
+  1295→    <Popover open={open} onOpenChange={setOpen}>
+  1296→      <PopoverTrigger asChild>
+  1297→        <Button
+  1298→          type="button"
+  1299→          variant="outline"
+  1300→          role="combobox"
+  1301→          aria-expanded={open}
+  1302→          className="w-full justify-between font-normal"
+  1303→        >
+  1304→          {selected ? (
+  1305→            <span className="flex items-center gap-2 min-w-0">
+  1306→              <AvatarBadge
+  1307→                name={selected.fullName}
+  1308→                photo={selected.photo}
+  1309→                size="sm"
+  1310→              />
+  1311→              <span className="truncate">{selected.fullName}</span>
+  1312→              <span className="text-xs text-muted-foreground font-mono">
+  1313→                {selected.employeeId}
+  1314→              </span>
+  1315→            </span>
+  1316→          ) : (
+  1317→            <span className="text-muted-foreground">Select employee…</span>
+  1318→          )}
+  1319→          <ChevronsUpDown className="size-4 opacity-50 shrink-0" />
+  1320→        </Button>
+  1321→      </PopoverTrigger>
+  1322→      <PopoverContent
+  1323→        className="w-[var(--radix-popover-trigger-width)] p-0"
+  1324→        align="start"
+  1325→      >
+  1326→        <Command>
+  1327→          <CommandInput placeholder="Search employee name or ID…" />
+  1328→          <CommandList className="max-h-64">
+  1329→            <CommandEmpty>No employee found.</CommandEmpty>
+  1330→            <CommandGroup>
+  1331→              {employees.map((e) => (
+  1332→                <CommandItem
+  1333→                  key={e.id}
+  1334→                  value={`${e.fullName} ${e.employeeId} ${e.department?.name ?? ""}`}
+  1335→                  onSelect={() => {
+  1336→                    onChange(e.id);
+  1337→                    setOpen(false);
+  1338→                  }}
+  1339→                >
+  1340→                  <AvatarBadge
+  1341→                    name={e.fullName}
+  1342→                    photo={e.photo}
+  1343→                    size="sm"
+  1344→                  />
+  1345→                  <div className="min-w-0 flex-1">
+  1346→                    <div className="truncate text-sm font-medium">
+  1347→                      {e.fullName}
+  1348→                    </div>
+  1349→                    <div className="text-xs text-muted-foreground font-mono">
+  1350→                      {e.employeeId} · {e.department?.name ?? "—"}
+  1351→                    </div>
+  1352→                  </div>
+  1353→                  {value === e.id && (
+  1354→                    <Check className="size-4 text-primary shrink-0" />
+  1355→                  )}
+  1356→                </CommandItem>
+  1357→              ))}
+  1358→            </CommandGroup>
+  1359→          </CommandList>
+  1360→        </Command>
+  1361→      </PopoverContent>
+  1362→    </Popover>
+  1363→  );
+  1364→}
+  1365→
+  1366→// =========================================================
+  1367→// Assign dialog
+  1368→// =========================================================
+  1369→
+  1370→function AssignDialog({
+  1371→  asset,
+  1372→  onClose,
+  1373→  onSaved,
+  1374→}: {
+  1375→  asset: Asset | null;
+  1376→  onClose: () => void;
+  1377→  onSaved: () => void;
+  1378→}) {
+  1379→  const { data: employeesData } = useEmployees(!!asset);
+  1380→  const employees: EmployeeOption[] = useMemo(
+  1381→    () =>
+  1382→      (employeesData?.items ?? []).map((e: any) => ({
+  1383→        id: e.id,
+  1384→        employeeId: e.employeeId,
+  1385→        fullName: e.fullName,
+  1386→        photo: e.photo,
+  1387→        department: e.department,
+  1388→        designation: e.designation,
+  1389→      })) ?? [],
+  1390→    [employeesData]
+  1391→  );
+  1392→
+  1393→  const [employeeId, setEmployeeId] = useState("");
+  1394→  const [assignedDate, setAssignedDate] = useState(
+  1395→    new Date().toISOString().slice(0, 10)
+  1396→  );
+  1397→  const [expectedReturnDate, setExpectedReturnDate] = useState("");
+  1398→  const [saving, setSaving] = useState(false);
+  1399→
+  1400→  // Reset form when a new asset opens
+  1401→  const resetKey = asset?.id ?? "none";
+  1402→  const [lastKey, setLastKey] = useState(resetKey);
+  1403→  if (resetKey !== lastKey) {
+  1404→    setLastKey(resetKey);
+  1405→    setEmployeeId("");
+  1406→    setAssignedDate(new Date().toISOString().slice(0, 10));
+  1407→    setExpectedReturnDate("");
+  1408→  }
+  1409→
+  1410→  async function submit() {
+  1411→    if (!asset) return;
+  1412→    if (!employeeId) {
+  1413→      toast.error("Please select an employee.");
+  1414→      return;
+  1415→    }
+  1416→    setSaving(true);
+  1417→    try {
+  1418→      const body: any = { employeeId, assignedDate };
+  1419→      if (expectedReturnDate) body.expectedReturnDate = expectedReturnDate;
+  1420→      const r = await fetch(`/api/assets/${asset.id}/assign`, {
+  1421→        method: "POST",
+  1422→        headers: { "Content-Type": "application/json" },
+  1423→        body: JSON.stringify(body),
+  1424→      });
+  1425→      if (!r.ok) {
+  1426→        const e = await r.json().catch(() => ({}));
+  1427→        throw new Error(e?.error || "Failed to assign asset");
+  1428→      }
+  1429→      toast.success(`Asset "${asset.name}" assigned.`);
+  1430→      onSaved();
+  1431→    } catch (err: any) {
+  1432→      toast.error(err?.message || "Failed to assign asset.");
+  1433→    } finally {
+  1434→      setSaving(false);
+  1435→    }
+  1436→  }
+  1437→
+  1438→  return (
+  1439→    <Dialog
+  1440→      open={!!asset}
+  1441→      onOpenChange={(o) => {
+  1442→        if (!saving && !o) onClose();
+  1443→      }}
+  1444→    >
+  1445→      <DialogContent className="sm:max-w-md">
+  1446→        <DialogHeader>
+  1447→          <DialogTitle className="flex items-center gap-2">
+  1448→            <UserPlus className="size-5 text-primary" />
+  1449→            Assign Asset
+  1450→          </DialogTitle>
+  1451→          <DialogDescription>
+  1452→            {asset
+  1453→              ? `Assign "${asset.name}" to an employee. The asset status will change to ASSIGNED.`
+  1454→              : ""}
+  1455→          </DialogDescription>
+  1456→        </DialogHeader>
+  1457→        <div className="space-y-4">
+  1458→          <div className="space-y-1.5">
+  1459→            <Label>Employee *</Label>
+  1460→            {employeesData ? (
+  1461→              <EmployeeSearchSelect
+  1462→                value={employeeId}
+  1463→                onChange={setEmployeeId}
+  1464→                employees={employees}
+  1465→              />
+  1466→            ) : (
+  1467→              <Skeleton className="h-9 w-full" />
+  1468→            )}
+  1469→          </div>
+  1470→          <div className="space-y-1.5">
+  1471→            <Label htmlFor="assign-date">Assigned date</Label>
+  1472→            <Input
+  1473→              id="assign-date"
+  1474→              type="date"
+  1475→              value={assignedDate}
+  1476→              onChange={(e) => setAssignedDate(e.target.value)}
+  1477→            />
+  1478→          </div>
+  1479→          <div className="space-y-1.5">
+  1480→            <Label htmlFor="expected-return">Expected return date (optional)</Label>
+  1481→            <Input
+  1482→              id="expected-return"
+  1483→              type="date"
+  1484→              value={expectedReturnDate}
+  1485→              onChange={(e) => setExpectedReturnDate(e.target.value)}
+  1486→            />
+  1487→          </div>
+  1488→        </div>
+  1489→        <DialogFooter>
+  1490→          <Button variant="outline" onClick={onClose} disabled={saving}>
+  1491→            Cancel
+  1492→          </Button>
+  1493→          <Button onClick={submit} disabled={saving} className="gap-1.5">
+  1494→            {saving && <Loader2 className="size-4 animate-spin" />}
+  1495→            Assign Asset
+  1496→          </Button>
+  1497→        </DialogFooter>
+  1498→      </DialogContent>
+  1499→    </Dialog>
+  1500→  );
+  1501→}
+  1502→
+  1503→// =========================================================
+  1504→// Return dialog
+  1505→// =========================================================
+  1506→
+  1507→function ReturnDialog({
+  1508→  asset,
+  1509→  onClose,
+  1510→  onSaved,
+  1511→}: {
+  1512→  asset: Asset | null;
+  1513→  onClose: () => void;
+  1514→  onSaved: () => void;
+  1515→}) {
+  1516→  const [condition, setCondition] = useState<AssetCondition>("GOOD");
+  1517→  const [notes, setNotes] = useState("");
+  1518→  const [saving, setSaving] = useState(false);
+  1519→
+  1520→  const resetKey = asset?.id ?? "none";
+  1521→  const [lastKey, setLastKey] = useState(resetKey);
+  1522→  if (resetKey !== lastKey) {
+  1523→    setLastKey(resetKey);
+  1524→    setCondition(asset?.condition ?? "GOOD");
+  1525→    setNotes("");
+  1526→  }
+  1527→
+  1528→  async function submit() {
+  1529→    if (!asset) return;
+  1530→    setSaving(true);
+  1531→    try {
+  1532→      const body: any = { condition };
+  1533→      if (notes.trim()) body.notes = notes.trim();
+  1534→      const r = await fetch(`/api/assets/${asset.id}/return`, {
+  1535→        method: "POST",
+  1536→        headers: { "Content-Type": "application/json" },
+  1537→        body: JSON.stringify(body),
+  1538→      });
+  1539→      if (!r.ok) {
+  1540→        const e = await r.json().catch(() => ({}));
+  1541→        throw new Error(e?.error || "Failed to return asset");
+  1542→      }
+  1543→      toast.success(`Asset "${asset.name}" returned.`);
+  1544→      onSaved();
+  1545→    } catch (err: any) {
+  1546→      toast.error(err?.message || "Failed to return asset.");
+  1547→    } finally {
+  1548→      setSaving(false);
+  1549→    }
+  1550→  }
+  1551→
+  1552→  return (
+  1553→    <Dialog
+  1554→      open={!!asset}
+  1555→      onOpenChange={(o) => {
+  1556→        if (!saving && !o) onClose();
+  1557→      }}
+  1558→    >
+  1559→      <DialogContent className="sm:max-w-md">
+  1560→        <DialogHeader>
+  1561→          <DialogTitle className="flex items-center gap-2">
+  1562→            <Undo2 className="size-5 text-primary" />
+  1563→            Return Asset
+  1564→          </DialogTitle>
+  1565→          <DialogDescription>
+  1566→            {asset
+  1567→              ? `Mark "${asset.name}" as returned by ${asset.assignedToName ?? "the assigned employee"}. The asset will become available again.`
+  1568→              : ""}
+  1569→          </DialogDescription>
+  1570→        </DialogHeader>
+  1571→        <div className="space-y-4">
+  1572→          <div className="space-y-1.5">
+  1573→            <Label htmlFor="return-condition">Condition on return</Label>
+  1574→            <Select
+  1575→              value={condition}
+  1576→              onValueChange={(v) => setCondition(v as AssetCondition)}
+  1577→            >
+  1578→              <SelectTrigger id="return-condition">
+  1579→                <SelectValue />
+  1580→              </SelectTrigger>
+  1581→              <SelectContent>
+  1582→                {CONDITIONS.map((c) => (
+  1583→                  <SelectItem key={c} value={c}>
+  1584→                    {c.charAt(0) + c.slice(1).toLowerCase()}
+  1585→                  </SelectItem>
+  1586→                ))}
+  1587→              </SelectContent>
+  1588→            </Select>
+  1589→          </div>
+  1590→          <div className="space-y-1.5">
+  1591→            <Label htmlFor="return-notes">Return notes (optional)</Label>
+  1592→            <Textarea
+  1593→              id="return-notes"
+  1594→              placeholder="Note any damage, missing accessories, or remarks…"
+  1595→              value={notes}
+  1596→              onChange={(e) => setNotes(e.target.value)}
+  1597→              rows={3}
+  1598→            />
+  1599→          </div>
+  1600→        </div>
+  1601→        <DialogFooter>
+  1602→          <Button variant="outline" onClick={onClose} disabled={saving}>
+  1603→            Cancel
+  1604→          </Button>
+  1605→          <Button onClick={submit} disabled={saving} className="gap-1.5">
+  1606→            {saving && <Loader2 className="size-4 animate-spin" />}
+  1607→            Confirm Return
+  1608→          </Button>
+  1609→        </DialogFooter>
+  1610→      </DialogContent>
+  1611→    </Dialog>
+  1612→  );
+  1613→}
+  1614→
+  1615→// =========================================================
+  1616→// Depreciation View — KPIs + table + color-coded bars
+  1617→// =========================================================
+  1618→
+  1619→function depreciationColor(pct: number) {
+  1620→  if (pct < 30) return "bg-emerald-500";
+  1621→  if (pct <= 70) return "bg-amber-500";
+  1622→  return "bg-rose-500";
+  1623→}
+  1624→
+  1625→function depreciationTone(pct: number) {
+  1626→  if (pct < 30)
+  1627→    return "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/20";
+  1628→  if (pct <= 70)
+  1629→    return "bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/20";
+  1630→  return "bg-rose-500/15 text-rose-700 dark:text-rose-300 border-rose-500/20";
+  1631→}
+  1632→
+  1633→function DepreciationView({
+  1634→  search,
+  1635→  type,
+  1636→  status,
+  1637→  onInspect,
+  1638→}: {
+  1639→  search: string;
+  1640→  type: string;
+  1641→  status: string;
+  1642→  onInspect: (row: DepreciationRow) => void;
+  1643→}) {
+  1644→  const qc = useQueryClient();
+  1645→  const { data, isLoading, isError } = useQuery({
+  1646→    queryKey: ["assets", "depreciation"],
+  1647→    queryFn: async () => {
+  1648→      const r = await fetch("/api/assets/depreciation");
+  1649→      if (!r.ok) throw new Error("Failed to load depreciation");
+  1650→      return r.json();
+  1651→    },
+  1652→  });
+  1653→
+  1654→  const summary: DepreciationSummary | undefined = data?.summary;
+  1655→  const items: DepreciationRow[] = data?.items ?? [];
+  1656→
+  1657→  const filtered = useMemo(() => {
+  1658→    let list = items;
+  1659→    if (type) list = list.filter((a) => a.type === type);
+  1660→    if (status) list = list.filter((a) => a.status === status);
+  1661→    if (search) {
+  1662→      const q = search.toLowerCase();
+  1663→      list = list.filter(
+  1664→        (a) =>
+  1665→          a.name.toLowerCase().includes(q) ||
+  1666→          a.serialNumber.toLowerCase().includes(q)
+  1667→      );
+  1668→    }
+  1669→    return list;
+  1670→  }, [items, type, status, search]);
+  1671→
+  1672→  if (isLoading) {
+  1673→    return (
+  1674→      <div className="space-y-4">
+  1675→        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
+  1676→          {Array.from({ length: 4 }).map((_, i) => (
+  1677→            <Skeleton key={i} className="h-28 w-full rounded-xl" />
+  1678→          ))}
+  1679→        </div>
+  1680→        <Skeleton className="h-96 w-full rounded-xl" />
+  1681→      </div>
+  1682→    );
+  1683→  }
+  1684→
+  1685→  if (isError) {
+  1686→    return (
+  1687→      <EmptyState
+  1688→        icon={AlertTriangle}
+  1689→        title="Failed to load depreciation data"
+  1690→        description="Please try again. If the problem persists, check the dev server."
+  1691→        actionLabel="Retry"
+  1692→        onAction={() => qc.invalidateQueries({ queryKey: ["assets", "depreciation"] })}
+  1693→      />
+  1694→    );
+  1695→  }
+  1696→
+  1697→  if (items.length === 0) {
+  1698→    return (
+  1699→      <EmptyState
+  1700→        icon={TrendingDown}
+  1701→        title="No assets to depreciate"
+  1702→        description="Once you add assets, depreciation will be tracked here automatically."
+  1703→      />
+  1704→    );
+  1705→  }
+  1706→
+  1707→  return (
+  1708→    <div className="space-y-5">
+  1709→      {/* KPI cards */}
+  1710→      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
+  1711→        <KpiCard
+  1712→          label="Total Purchase Value"
+  1713→          value={summary ? formatCurrency(summary.totalPurchaseValue) : "—"}
+  1714→          icon={Coins}
+  1715→          iconClass="bg-primary/10 text-primary"
+  1716→          footer={<span className="text-muted-foreground">{items.length} asset{items.length === 1 ? "" : "s"}</span>}
+  1717→        />
+  1718→        <KpiCard
+  1719→          label="Total Current Value"
+  1720→          value={summary ? formatCurrency(summary.totalCurrentValue) : "—"}
+  1721→          icon={Package}
+  1722→          iconClass="bg-emerald-500/15 text-emerald-600"
+  1723→          footer={<span className="text-muted-foreground">After depreciation</span>}
+  1724→        />
+  1725→        <KpiCard
+  1726→          label="Total Depreciated"
+  1727→          value={summary ? formatCurrency(summary.totalDepreciation) : "—"}
+  1728→          icon={TrendingDown}
+  1729→          iconClass="bg-rose-500/15 text-rose-600"
+  1730→          footer={<span className="text-muted-foreground">All-time loss</span>}
+  1731→        />
+  1732→        <KpiCard
+  1733→          label="Avg Depreciation"
+  1734→          value={summary ? `${summary.avgDepreciationPct}%` : "—"}
+  1735→          icon={LineChartIcon}
+  1736→          iconClass="bg-amber-500/15 text-amber-600"
+  1737→          footer={<span className="text-muted-foreground">Across portfolio</span>}
+  1738→        />
+  1739→      </div>
+  1740→
+  1741→      {/* Table */}
+  1742→      <Card className="p-0 overflow-hidden border-border/60">
+  1743→        <div className="overflow-x-auto max-h-[70vh] overflow-y-auto">
+  1744→          <Table>
+  1745→            <TableHeader className="sticky top-0 bg-card z-10">
+  1746→              <TableRow>
+  1747→                <TableHead>Asset</TableHead>
+  1748→                <TableHead className="hidden md:table-cell">Type</TableHead>
+  1749→                <TableHead className="text-right">Purchase</TableHead>
+  1750→                <TableHead className="hidden lg:table-cell">Purchased</TableHead>
+  1751→                <TableHead className="text-right">Age (yrs)</TableHead>
+  1752→                <TableHead className="text-right hidden sm:table-cell">Rate</TableHead>
+  1753→                <TableHead className="text-right">Current</TableHead>
+  1754→                <TableHead className="min-w-[160px]">Depreciation</TableHead>
+  1755→                <TableHead className="text-right">Inspect</TableHead>
+  1756→              </TableRow>
+  1757→            </TableHeader>
+  1758→            <TableBody>
+  1759→              {filtered.length === 0 ? (
+  1760→                <TableRow>
+  1761→                  <TableCell colSpan={9} className="text-center text-muted-foreground py-8">
+  1762→                    No assets match the current filters.
+  1763→                  </TableCell>
+  1764→                </TableRow>
+  1765→              ) : (
+  1766→                filtered.map((a) => {
+  1767→                  const pct =
+  1768→                    a.purchaseValue > 0
+  1769→                      ? Math.min(100, Math.round((a.totalDepreciation / a.purchaseValue) * 100))
+  1770→                      : 0;
+  1771→                  const tm = getTypeMeta(a.type);
+  1772→                  const TIcon = tm.icon;
+  1773→                  return (
+  1774→                    <TableRow key={a.id} className="hover:bg-muted/30">
+  1775→                      <TableCell>
+  1776→                        <div className="flex items-center gap-2.5 min-w-0">
+  1777→                          <div
+  1778→                            className={cn(
+  1779→                              "size-9 rounded-lg flex items-center justify-center flex-shrink-0",
+  1780→                              tm.color
+  1781→                            )}
+  1782→                          >
+  1783→                            <TIcon className="size-4" />
+  1784→                          </div>
+  1785→                          <div className="min-w-0">
+  1786→                            <div className="font-medium text-sm truncate">{a.name}</div>
+  1787→                            <div className="text-xs text-muted-foreground font-mono truncate">
+  1788→                              {a.serialNumber || "—"}
+  1789→                            </div>
+  1790→                          </div>
+  1791→                        </div>
+  1792→                      </TableCell>
+  1793→                      <TableCell className="hidden md:table-cell">
+  1794→                        <Badge variant="outline" className="gap-1 font-medium">
+  1795→                          <TIcon className="size-3" />
+  1796→                          {tm.label}
+  1797→                        </Badge>
+  1798→                      </TableCell>
+  1799→                      <TableCell className="text-right text-sm font-medium tabular-nums">
+  1800→                        {formatCurrency(a.purchaseValue)}
+  1801→                      </TableCell>
+  1802→                      <TableCell className="hidden lg:table-cell text-xs text-muted-foreground">
+  1803→                        {formatDate(a.purchaseDate)}
+  1804→                      </TableCell>
+  1805→                      <TableCell className="text-right text-sm tabular-nums">
+  1806→                        {a.age.toFixed(1)}
+  1807→                      </TableCell>
+  1808→                      <TableCell className="text-right text-sm hidden sm:table-cell tabular-nums">
+  1809→                        {Math.round(a.depreciationRate * 100)}%
+  1810→                      </TableCell>
+  1811→                      <TableCell className="text-right text-sm font-semibold tabular-nums">
+  1812→                        {formatCurrency(a.currentValue)}
+  1813→                      </TableCell>
+  1814→                      <TableCell>
+  1815→                        <div className="flex items-center gap-2 min-w-[140px]">
+  1816→                          <div className="flex-1 h-2 rounded-full bg-muted overflow-hidden">
+  1817→                            <div
+  1818→                              className={cn("h-full transition-all", depreciationColor(pct))}
+  1819→                              style={{ width: `${pct}%` }}
+  1820→                            />
+  1821→                          </div>
+  1822→                          <Badge
+  1823→                            variant="outline"
+  1824→                            className={cn(
+  1825→                              "text-[10px] px-1.5 py-0 tabular-nums w-12 justify-center",
+  1826→                              depreciationTone(pct)
+  1827→                            )}
+  1828→                          >
+  1829→                            {pct}%
+  1830→                          </Badge>
+  1831→                        </div>
+  1832→                      </TableCell>
+  1833→                      <TableCell className="text-right">
+  1834→                        <Button
+  1835→                          size="sm"
+  1836→                          variant="outline"
+  1837→                          className="h-8 gap-1.5"
+  1838→                          onClick={() => onInspect(a)}
+  1839→                        >
+  1840→                          <LineChartIcon className="size-3.5" />
+  1841→                          <span className="hidden xl:inline">View</span>
+  1842→                        </Button>
+  1843→                      </TableCell>
+  1844→                    </TableRow>
+  1845→                  );
+  1846→                })
+  1847→              )}
+  1848→            </TableBody>
+  1849→          </Table>
+  1850→        </div>
+  1851→      </Card>
+  1852→    </div>
+  1853→  );
+  1854→}
+  1855→
+  1856→// =========================================================
+  1857→// Depreciation Detail Dialog — AreaChart of value decline
+  1858→// =========================================================
+  1859→
+  1860→function DepreciationDetailDialog({
+  1861→  asset,
+  1862→  onClose,
+  1863→}: {
+  1864→  asset: DepreciationRow | null;
+  1865→  onClose: () => void;
+  1866→}) {
+  1867→  const { data, isLoading, isError } = useQuery({
+  1868→    queryKey: ["assets", "depreciation", "detail", asset?.id],
+  1869→    queryFn: async () => {
+  1870→      if (!asset) return null;
+  1871→      const r = await fetch(`/api/assets/${asset.id}/depreciation`);
+  1872→      if (!r.ok) throw new Error("Failed to load depreciation history");
+  1873→      return r.json();
+  1874→    },
+  1875→    enabled: !!asset,
+  1876→  });
+  1877→
+  1878→  const detail: DepreciationDetail | null = data ?? null;
+  1879→
+  1880→  // Reset when asset changes — no-op state, just to satisfy lint/useEffect import.
+  1881→  useEffect(() => {
+  1882→    // no-op: query is keyed on asset id; nothing local to reset.
+  1883→  }, [asset?.id]);
+  1884→
+  1885→  const chartData = (detail?.history ?? []).map((h) => ({
+  1886→    label: `Yr ${h.year}`,
+  1887→    endValue: h.endValue,
+  1888→    depreciation: h.cumulativeDepreciation,
+  1889→    isProjection: h.isProjection,
+  1890→  }));
+  1891→
+  1892→  return (
+  1893→    <Dialog
+  1894→      open={!!asset}
+  1895→      onOpenChange={(o) => {
+  1896→        if (!o) onClose();
+  1897→      }}
+  1898→    >
+  1899→      <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
+  1900→        <DialogHeader>
+  1901→          <DialogTitle className="flex items-center gap-2">
+  1902→            <TrendingDown className="size-5 text-primary" />
+  1903→            Depreciation Timeline
+  1904→          </DialogTitle>
+  1905→          <DialogDescription>
+  1906→            {asset
+  1907→              ? `Per-year value decline for "${asset.name}".`
+  1908→              : ""}
+  1909→          </DialogDescription>
+  1910→        </DialogHeader>
+  1911→
+  1912→        {!asset ? null : isLoading ? (
+  1913→          <div className="space-y-3">
+  1914→            <Skeleton className="h-8 w-full" />
+  1915→            <Skeleton className="h-64 w-full rounded-xl" />
+  1916→          </div>
+  1917→        ) : isError ? (
+  1918→          <EmptyState
+  1919→            icon={AlertTriangle}
+  1920→            title="Failed to load depreciation history"
+  1921→            description="Please close and try again."
+  1922→          />
+  1923→        ) : detail ? (
+  1924→          <div className="space-y-5">
+  1925→            {/* Summary cards */}
+  1926→            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+  1927→              <SummaryTile
+  1928→                label="Purchase"
+  1929→                value={formatCurrency(detail.asset.purchaseValue)}
+  1930→                tone="primary"
+  1931→              />
+  1932→              <SummaryTile
+  1933→                label="Current"
+  1934→                value={formatCurrency(detail.asset.currentValue)}
+  1935→                tone="emerald"
+  1936→              />
+  1937→              <SummaryTile
+  1938→                label="Depreciated"
+  1939→                value={formatCurrency(detail.asset.totalDepreciation)}
+  1940→                tone="rose"
+  1941→              />
+  1942→              <SummaryTile
+  1943→                label="Rate / yr"
+  1944→                value={`${Math.round(detail.asset.depreciationRate * 100)}%`}
+  1945→                tone="amber"
+  1946→              />
+  1947→            </div>
+  1948→
+  1949→            {/* Asset meta */}
+  1950→            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
+  1951→              <MetaTile label="Age" value={`${detail.asset.age.toFixed(1)} yrs`} />
+  1952→              <MetaTile
+  1953→                label="Purchased"
+  1954→                value={formatDate(detail.asset.purchaseDate)}
+  1955→              />
+  1956→              <MetaTile
+  1957→                label="Annual Loss"
+  1958→                value={formatCurrency(detail.asset.annualDepreciation)}
+  1959→              />
+  1960→              <MetaTile
+  1961→                label="Type"
+  1962→                value={getTypeMeta(detail.asset.type).label}
+  1963→              />
+  1964→            </div>
+  1965→
+  1966→            {/* Area chart */}
+  1967→            <div className="rounded-xl border border-border/60 p-3 bg-muted/20">
+  1968→              <div className="flex items-center justify-between mb-2 px-1">
+  1969→                <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+  1970→                  Value decline over time
+  1971→                </div>
+  1972→                <div className="flex items-center gap-3 text-[10px] text-muted-foreground">
+  1973→                  <span className="flex items-center gap-1">
+  1974→                    <span className="size-2.5 rounded-sm bg-emerald-500" />
+  1975→                    Remaining value
+  1976→                  </span>
+  1977→                  <span className="flex items-center gap-1">
+  1978→                    <span className="size-2.5 rounded-sm bg-rose-400" />
+  1979→                    Cumulative depreciation
+  1980→                  </span>
+  1981→                </div>
+  1982→              </div>
+  1983→              <div className="h-72">
+  1984→                <ResponsiveContainer width="100%" height="100%">
+  1985→                  <AreaChart
+  1986→                    data={chartData}
+  1987→                    margin={{ top: 8, right: 12, bottom: 0, left: 0 }}
+  1988→                  >
+  1989→                    <defs>
+  1990→                      <linearGradient id="valueGrad" x1="0" y1="0" x2="0" y2="1">
+  1991→                        <stop offset="5%" stopColor="#10b981" stopOpacity={0.5} />
+  1992→                        <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
+  1993→                      </linearGradient>
+  1994→                      <linearGradient id="depGrad" x1="0" y1="0" x2="0" y2="1">
+  1995→                        <stop offset="5%" stopColor="#f43f5e" stopOpacity={0.4} />
+  1996→                        <stop offset="95%" stopColor="#f43f5e" stopOpacity={0} />
+  1997→                      </linearGradient>
+  1998→                    </defs>
+  1999→                    <CartesianGrid strokeDasharray="3 3" className="stroke-muted/30" />
+  2000→                    <XAxis
+
+[showing lines 1-2000 of 2858; use offset=2001 with limit to continue reading]

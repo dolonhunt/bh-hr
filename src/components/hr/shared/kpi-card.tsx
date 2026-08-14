@@ -69,7 +69,7 @@ export function KpiCard({
           <div className="text-[10px] sm:text-[11px] font-semibold text-muted-foreground uppercase tracking-wider leading-tight">
             {label}
           </div>
-          <div className="mt-2 sm:mt-2.5 text-lg sm:text-[26px] leading-none font-bold tracking-tight tabular-nums truncate">
+          <div className="mt-2 sm:mt-2.5 text-base sm:text-xl lg:text-2xl leading-none font-bold tracking-tight tabular-nums">
             {value}
           </div>
           {delta && (

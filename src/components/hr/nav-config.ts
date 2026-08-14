@@ -14,6 +14,8 @@ import {
   GraduationCap,
   CalendarClock,
   MessageSquare,
+  Receipt,
+  Clock,
   type LucideIcon,
 } from "lucide-react";
 import type { ModuleKey } from "@/lib/store";
@@ -93,6 +95,18 @@ export const NAV_ITEMS: NavItem[] = [
     label: "Training",
     icon: GraduationCap,
     description: "Courses & development",
+  },
+  {
+    key: "expenses",
+    label: "Expenses",
+    icon: Receipt,
+    description: "Track & approve",
+  },
+  {
+    key: "timesheets",
+    label: "Timesheets",
+    icon: Clock,
+    description: "Time tracking",
   },
   {
     key: "assets",
