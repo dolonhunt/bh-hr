@@ -301,7 +301,7 @@ export function Onboarding({ employeeId }: { employeeId: string }) {
                 <StatPill
                   label="Completed"
                   value={stats.completed}
-                  tone="emerald"
+                  tone="primary"
                 />
                 <StatPill label="Skipped" value={stats.skipped} tone="rose" />
               </div>
@@ -382,7 +382,7 @@ export function Onboarding({ employeeId }: { employeeId: string }) {
                       <Checkbox
                         checked={task.status === "COMPLETED"}
                         className={cn(
-                          "size-5 data-[state=checked]:text-emerald-500 data-[state=checked]:border-primary",
+                          "size-5 data-[state=checked]:bg-primary data-[state=checked]:border-primary",
                           task.status === "IN_PROGRESS" &&
                             "border-amber-500 data-[state=checked]:bg-amber-500 data-[state=checked]:border-amber-500"
                         )}
@@ -579,13 +579,13 @@ function StatPill({
 }: {
   label: string;
   value: number;
-  tone: "amber" | "sky" | "emerald" | "rose";
+  tone: "amber" | "sky" | "primary" | "rose";
 }) {
   const tones: Record<string, string> = {
     amber: "bg-amber-500/10 text-amber-700 dark:text-amber-300",
     sky: "bg-sky-500/10 text-sky-700 dark:text-sky-300",
-    emerald:
-      "text-emerald-500/10 text-primary dark:text-primary/80",
+    primary:
+      "bg-primary/10 text-primary dark:text-primary/80",
     rose: "bg-rose-500/10 text-rose-700 dark:text-rose-300",
   };
   return (

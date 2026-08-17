@@ -51,118 +51,116 @@
 }
 
 :root {
-  --radius: 16px;
+  --radius: 20px;
 
-  /* BH HR V2 Design System — dark navy + bright teal neumorphic */
-  --background: #0B1120;
-  --foreground: #F5F7FA;
+  /* BH HR Soft 3D Premium UI — lavender/cream/purple neumorphic */
+  --background: #F5F0FA;
+  --foreground: #262238;
 
-  --card: #10234A;
-  --card-foreground: #F5F7FA;
+  --card: #FFFD FC;
+  --card-foreground: #262238;
 
-  --popover: #142951;
-  --popover-foreground: #F5F7FA;
+  --popover: #FFFD FC;
+  --popover-foreground: #262238;
 
-  /* Primary: bright teal */
-  --primary: #00E0C3;
-  --primary-foreground: #0A1838;
+  /* Primary: deep purple */
+  --primary: #6D3FC4;
+  --primary-foreground: #FFFFFF;
 
-  /* Secondary: surface navy */
-  --secondary: #182D59;
-  --secondary-foreground: #F5F7FA;
+  /* Secondary: lavender surface */
+  --secondary: #F1ECF7;
+  --secondary-foreground: #262238;
 
-  /* Muted: dark surface */
-  --muted: #142951;
-  --muted-foreground: #7F8BA3;
+  /* Muted: soft lavender-gray */
+  --muted: #F1ECF7;
+  --muted-foreground: #5F5870;
 
-  /* Accent: teal-tinted dark */
-  --accent: #1A3A4A;
-  --accent-foreground: #00E0C3;
+  /* Accent: lavender tint */
+  --accent: #E8DEFB;
+  --accent-foreground: #6D3FC4;
 
-  /* Semantic colors per V2 spec */
-  --destructive: #FF5B62;
+  /* Semantic colors per spec */
+  --destructive: #E9797D;
   --destructive-foreground: #FFFFFF;
-  --success: #00E0C3;
-  --success-foreground: #0A1838;
-  --warning: #FFB52E;
-  --warning-foreground: #0A1838;
-  --info: #00B6DA;
-  --info-foreground: #0A1838;
-  --purple: #8C4DFF;
+  --success: #28B9A9;
+  --success-foreground: #FFFFFF;
+  --warning: #F3A65A;
+  --warning-foreground: #FFFFFF;
+  --info: #A98BE6;
+  --info-foreground: #262238;
 
-  /* Borders: subtle dark */
-  --border: #1E2847;
-  --input: #1E2847;
-  --ring: #00E0C3;
+  /* Borders: soft lavender */
+  --border: #E8DEFB;
+  --input: #E8DEFB;
+  --ring: #6D3FC4;
 
-  /* Charts: V2 palette — teal, orange, coral, purple */
-  --chart-1: #00E0C3;
-  --chart-2: #FFB52E;
-  --chart-3: #FF5B62;
-  --chart-4: #8C4DFF;
-  --chart-5: #00B6DA;
+  /* Charts: purple/pink/orange/teal palette */
+  --chart-1: #6D3FC4;
+  --chart-2: #E8A6C8;
+  --chart-3: #F3A65A;
+  --chart-4: #28B9A9;
+  --chart-5: #A98BE6;
 
-  /* Sidebar: dark navy floating panel */
-  --sidebar: #0A1838;
-  --sidebar-foreground: #B8C2D3;
-  --sidebar-primary: #00E0C3;
-  --sidebar-primary-foreground: #0A1838;
-  --sidebar-accent: #142951;
-  --sidebar-accent-foreground: #00E0C3;
-  --sidebar-border: #1E2847;
-  --sidebar-ring: #00E0C3;
+  /* Sidebar: cream/lavender floating panel */
+  --sidebar: #FBF8F5;
+  --sidebar-foreground: #262238;
+  --sidebar-primary: #6D3FC4;
+  --sidebar-primary-foreground: #FFFFFF;
+  --sidebar-accent: #F1ECF7;
+  --sidebar-accent-foreground: #6D3FC4;
+  --sidebar-border: #E8DEFB;
+  --sidebar-ring: #6D3FC4;
 
-  /* Neumorphic shadow tokens — dark navy */
-  --neu-light: #142951;
-  --neu-dark: #050D1A;
-  --neu-dark-subtle: #07152F;
-  --neu-glow: rgba(0, 224, 195, 0.15);
+  /* Neumorphic shadow tokens — soft lavender */
+  --neu-light: #FFFFFF;
+  --neu-dark: #D4C5F0;
+  --neu-dark-subtle: #DDD0F0;
+  --neu-glow: rgba(109, 63, 196, 0.12);
 }
 
-/* Light theme is same as root (this is a dark-first design) */
 .dark {
-  --background: #0B1120;
-  --foreground: #F5F7FA;
-  --card: #10234A;
-  --card-foreground: #F5F7FA;
-  --popover: #142951;
-  --popover-foreground: #F5F7FA;
-  --primary: #00E0C3;
-  --primary-foreground: #0A1838;
-  --secondary: #182D59;
-  --secondary-foreground: #F5F7FA;
-  --muted: #142951;
-  --muted-foreground: #7F8BA3;
-  --accent: #1A3A4A;
-  --accent-foreground: #00E0C3;
-  --destructive: #FF5B62;
-  --destructive-foreground: #FFFFFF;
-  --success: #00E0C3;
-  --success-foreground: #0A1838;
-  --warning: #FFB52E;
-  --warning-foreground: #0A1838;
-  --info: #00B6DA;
-  --info-foreground: #0A1838;
-  --border: #1E2847;
-  --input: #1E2847;
-  --ring: #00E0C3;
-  --chart-1: #00E0C3;
-  --chart-2: #FFB52E;
-  --chart-3: #FF5B62;
-  --chart-4: #8C4DFF;
-  --chart-5: #00B6DA;
-  --sidebar: #0A1838;
-  --sidebar-foreground: #B8C2D3;
-  --sidebar-primary: #00E0C3;
-  --sidebar-primary-foreground: #0A1838;
-  --sidebar-accent: #142951;
-  --sidebar-accent-foreground: #00E0C3;
-  --sidebar-border: #1E2847;
-  --sidebar-ring: #00E0C3;
-  --neu-light: #142951;
-  --neu-dark: #050D1A;
-  --neu-dark-subtle: #07152F;
-  --neu-glow: rgba(0, 224, 195, 0.15);
+  --background: #1A1528;
+  --foreground: #F5F0FA;
+  --card: #241B38;
+  --card-foreground: #F5F0FA;
+  --popover: #241B38;
+  --popover-foreground: #F5F0FA;
+  --primary: #A98BE6;
+  --primary-foreground: #1A1528;
+  --secondary: #2A2240;
+  --secondary-foreground: #F5F0FA;
+  --muted: #2A2240;
+  --muted-foreground: #9A8FB0;
+  --accent: #2E2448;
+  --accent-foreground: #A98BE6;
+  --destructive: #F08B8B;
+  --destructive-foreground: #1A1528;
+  --success: #36C8B6;
+  --success-foreground: #1A1528;
+  --warning: #F7B86D;
+  --warning-foreground: #1A1528;
+  --info: #B9A0EA;
+  --info-foreground: #1A1528;
+  --border: #2E2448;
+  --input: #2E2448;
+  --ring: #A98BE6;
+  --chart-1: #A98BE6;
+  --chart-2: #E8A6C8;
+  --chart-3: #F7B86D;
+  --chart-4: #36C8B6;
+  --chart-5: #C7B4EF;
+  --sidebar: #241B38;
+  --sidebar-foreground: #F5F0FA;
+  --sidebar-primary: #A98BE6;
+  --sidebar-primary-foreground: #1A1528;
+  --sidebar-accent: #2E2448;
+  --sidebar-accent-foreground: #A98BE6;
+  --sidebar-border: #2E2448;
+  --sidebar-ring: #A98BE6;
+  --neu-light: #2E2448;
+  --neu-dark: #0D0A18;
+  --neu-dark-subtle: #15112A;
+  --neu-glow: rgba(169, 139, 230, 0.15);
 }
 
 @layer base {
@@ -181,63 +179,79 @@
 }
 
 @layer utilities {
-  /* ── Surface Layers (V2 Dark Navy Neumorphic) ── */
+  /* ── Surface Layers (Soft 3D Premium) ── */
 
   .neu-flat { background: var(--background); box-shadow: none; }
 
   .neu-raised {
     background: var(--card);
-    box-shadow: -4px -4px 12px var(--neu-light), 4px 4px 12px var(--neu-dark);
+    box-shadow:
+      -6px -6px 14px var(--neu-light),
+      6px 6px 14px var(--neu-dark);
   }
 
   .neu-raised-sm {
     background: var(--card);
-    box-shadow: -3px -3px 8px var(--neu-light), 3px 3px 8px var(--neu-dark);
+    box-shadow:
+      -4px -4px 10px var(--neu-light),
+      4px 4px 10px var(--neu-dark-subtle);
   }
 
   .neu-inset {
     background: var(--muted);
-    box-shadow: inset 3px 3px 8px var(--neu-dark), inset -3px -3px 8px var(--neu-light);
+    box-shadow:
+      inset 4px 4px 8px var(--neu-dark-subtle),
+      inset -4px -4px 8px var(--neu-light);
   }
 
   .neu-pressed {
     background: var(--muted);
-    box-shadow: inset 2px 2px 5px var(--neu-dark), inset -2px -2px 5px var(--neu-light);
+    box-shadow:
+      inset 3px 3px 6px var(--neu-dark-subtle),
+      inset -3px -3px 6px var(--neu-light);
   }
 
   .neu-raised-primary {
     background: var(--primary);
     color: var(--primary-foreground);
-    box-shadow: -3px -3px 8px var(--neu-light), 3px 3px 8px var(--neu-dark), 0 0 12px var(--neu-glow);
+    box-shadow:
+      -4px -4px 10px var(--neu-light),
+      4px 4px 10px var(--neu-dark-subtle),
+      0 0 16px var(--neu-glow);
   }
   .neu-raised-primary:active {
-    box-shadow: inset 2px 2px 4px rgba(0,0,0,0.2), inset -2px -2px 4px rgba(255,255,255,0.08);
+    box-shadow:
+      inset 2px 2px 4px rgba(0,0,0,0.15),
+      inset -2px -2px 4px rgba(255,255,255,0.1);
   }
 
-  /* ── Elevation Levels ── */
+  /* ── Elevation ── */
   .elev-flat  { box-shadow: none; }
-  .elev-hover { box-shadow: -3px -3px 8px var(--neu-light), 3px 3px 8px var(--neu-dark); }
-  .elev-raised { box-shadow: -4px -4px 12px var(--neu-light), 4px 4px 12px var(--neu-dark); }
-  .elev-modal { box-shadow: -8px -8px 24px var(--neu-light), 8px 8px 24px var(--neu-dark); }
-  .elev-popover { box-shadow: -6px -6px 18px var(--neu-light), 6px 6px 18px var(--neu-dark); }
+  .elev-hover { box-shadow: -4px -4px 10px var(--neu-light), 4px 4px 10px var(--neu-dark-subtle); }
+  .elev-raised { box-shadow: -6px -6px 14px var(--neu-light), 6px 6px 14px var(--neu-dark); }
+  .elev-modal { box-shadow: -10px -10px 28px var(--neu-light), 10px 10px 28px var(--neu-dark); }
+  .elev-popover { box-shadow: -8px -8px 20px var(--neu-light), 8px 8px 20px var(--neu-dark); }
 
-  /* Teal glow for primary elements */
-  .glow-teal { box-shadow: 0 0 12px var(--neu-glow); }
-  .glow-orange { box-shadow: 0 0 12px rgba(255, 181, 46, 0.15); }
-  .glow-coral { box-shadow: 0 0 12px rgba(255, 91, 98, 0.15); }
-  .glow-purple { box-shadow: 0 0 12px rgba(140, 77, 255, 0.15); }
+  /* Glow effects */
+  .glow-purple { box-shadow: 0 0 16px var(--neu-glow); }
+  .glow-teal { box-shadow: 0 0 12px rgba(40, 185, 169, 0.15); }
+  .glow-orange { box-shadow: 0 0 12px rgba(243, 166, 90, 0.15); }
+  .glow-coral { box-shadow: 0 0 12px rgba(233, 121, 125, 0.15); }
+  .glow-pink { box-shadow: 0 0 12px rgba(232, 166, 200, 0.15); }
 
-  /* Legacy compat */
+  /* Background atmosphere */
   .bg-grid {
     background-image:
-      linear-gradient(to right, rgba(255,255,255,0.03) 1px, transparent 1px),
-      linear-gradient(to bottom, rgba(255,255,255,0.03) 1px, transparent 1px);
-    background-size: 24px 24px;
+      linear-gradient(to right, rgba(109, 63, 196, 0.04) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(109, 63, 196, 0.04) 1px, transparent 1px);
+    background-size: 28px 28px;
   }
-  .bg-dots { background-image: radial-gradient(rgba(255,255,255,0.025) 1px, transparent 1px); background-size: 18px 18px; }
-  .glass { background: rgba(11, 17, 32, 0.85); backdrop-filter: blur(12px); }
+  .bg-dots { background-image: radial-gradient(rgba(109, 63, 196, 0.03) 1px, transparent 1px); background-size: 20px 20px; }
+  .glass { background: rgba(255, 253, 252, 0.85); backdrop-filter: blur(12px); }
+  .dark .glass { background: rgba(36, 27, 56, 0.85); }
 
-  .shadow-soft { box-shadow: -3px -3px 8px var(--neu-light), 3px 3px 8px var(--neu-dark); }
-  .shadow-card { box-shadow: -4px -4px 12px var(--neu-light), 4px 4px 12px var(--neu-dark); }
-  .shadow-card-hover { box-shadow: -6px -6px 18px var(--neu-light), 6px 6px 18px var(--neu-dark); }
+  /* Shadow helpers */
+  .shadow-soft { box-shadow: -4px -4px 10px var(--neu-light), 4px 4px 10px var(--neu-dark-subtle); }
+  .shadow-card { box-shadow: -6px -6px 14px var(--neu-light), 6px 6px 14px var(--neu-dark); }
+  .shadow-card-hover { box-shadow: -8px -8px 20px var(--neu-light), 8px 8px 20px var(--neu-dark); }
 }

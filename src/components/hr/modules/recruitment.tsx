@@ -116,8 +116,8 @@ const STAGE_ACCENT: Record<Stage, string> = {
   SHORTLISTED: "border-t-sky-400",
   INTERVIEW: "border-t-sky-500",
   SELECTED: "border-t-teal-500",
-  OFFER: "border-t-emerald-400",
-  HIRED: "border-t-emerald-600",
+  OFFER: "border-t-purple-400",
+  HIRED: "border-t-purple-600",
   REJECTED: "border-t-rose-500",
 };
 
@@ -330,7 +330,7 @@ function JobsTab() {
           label="Hired (this view)"
           value={hiredThisMonth}
           icon={UserCheck}
-          iconClass="text-emerald-500/15 text-primary"
+          iconClass="bg-primary/15 text-primary"
           footer={<span className="text-muted-foreground">HIRED stage</span>}
         />
       </div>
@@ -1578,7 +1578,7 @@ function CandidateDetailDialog({
                 <Badge
                   key={`${s}-${i}`}
                   variant="outline"
-                  className="text-emerald-500/10 text-primary border-primary/20"
+                  className="bg-primary/10 text-primary border-primary/20"
                 >
                   {s}
                 </Badge>

@@ -573,7 +573,7 @@ export function EmailTemplateEditor() {
                             {hasEmail ? (
                               <Badge
                                 variant="outline"
-                                className="text-[9px] px-1.5 py-0 border-primary/30 text-primary text-emerald-500/10"
+                                className="text-[9px] px-1.5 py-0 border-primary/30 text-primary bg-primary/10"
                               >
                                 Email ready
                               </Badge>

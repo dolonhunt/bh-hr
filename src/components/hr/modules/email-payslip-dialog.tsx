@@ -301,7 +301,7 @@ export function EmailPayslipDialog({
           </div>
 
           {/* Attachment note */}
-          <div className="rounded-md border border-primary/30 text-emerald-500/5 p-3 flex items-center gap-2.5">
+          <div className="rounded-md border border-primary/30 bg-primary/5 p-3 flex items-center gap-2.5">
             <Paperclip className="size-4 text-primary flex-shrink-0" />
             <div className="min-w-0 flex-1">
               <div className="text-xs font-medium text-foreground truncate">
@@ -341,7 +341,7 @@ export function EmailPayslipDialog({
           <Button
             onClick={handleSend}
             disabled={sending || !to.trim()}
-            className="bg-emerald-600 hover:bg-emerald-700"
+            className="bg-primary hover:bg-primary/90"
           >
             {sending ? (
               <Loader2 className="size-4 mr-2 animate-spin" />

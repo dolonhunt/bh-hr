@@ -48,9 +48,9 @@ export function LoginScreen() {
       {/* Left hero panel — deep navy with teal glow */}
       <div className="hidden lg:flex lg:w-1/2 bg-background relative overflow-hidden">
         <div className="absolute inset-0 bg-grid opacity-20" />
-        <div className="absolute -top-24 -right-24 w-96 h-96 rounded-full bg-primary/20 blur-3xl glow-teal" />
-        <div className="absolute -bottom-32 -left-20 w-96 h-96 rounded-full bg-primary/10 blur-3xl" />
-        <div className="relative z-10 flex flex-col justify-between p-12 text-foreground w-full">
+        <div className="absolute -top-24 -right-24 w-96 h-96 rounded-full bg-primary/20 blur-3xl glow-purple" />
+        <div className="absolute -bottom-32 -left-20 w-96 h-96 rounded-full bg-primary/8 blur-3xl" />
+        <div className="relative z-10 flex flex-col justify-between p-12 text-primary-foreground w-full">
           <div className="flex items-center gap-3">
             <img src="/bh-logo.png" alt="BH HR — Beyond Headlines" className="h-10 w-auto object-contain brightness-0 invert" />
             <span className="text-xl font-bold tracking-tight">
@@ -59,7 +59,7 @@ export function LoginScreen() {
           </div>
 
           <div className="space-y-6">
-            <div className="inline-flex items-center gap-2 rounded-full border border-primary/20 px-3 py-1 text-xs font-medium text-primary">
+            <div className="inline-flex items-center gap-2 rounded-full border border-primary/25 px-3 py-1 text-xs font-medium text-primary">
               <Sparkles className="size-3.5" /> HR Operations Console
             </div>
             <h1 className="text-4xl font-bold leading-tight tracking-tight">
@@ -69,7 +69,7 @@ export function LoginScreen() {
               <br />
               deliver to employees — fast.
             </h1>
-            <p className="text-foreground/80 max-w-md">
+            <p className="text-primary-foreground/80 max-w-md">
               One unified workspace for employees, attendance, payroll, document
               generation, and direct email delivery. Built for HR teams that
               move fast.
@@ -84,10 +84,10 @@ export function LoginScreen() {
             ].map((s) => (
               <div
                 key={s.v}
-                className="rounded-xl border border-primary/15 px-4 py-3"
+                className="rounded-xl border border-primary/25 px-4 py-3"
               >
                 <div className="text-2xl font-bold">{s.k}</div>
-                <div className="text-xs text-foreground/80">{s.v}</div>
+                <div className="text-xs text-primary-foreground/80">{s.v}</div>
               </div>
             ))}
           </div>
@@ -99,7 +99,7 @@ export function LoginScreen() {
         <Card className="w-full max-w-md shadow-soft border-border/60">
           <CardHeader className="space-y-1">
             <div className="lg:hidden flex items-center gap-2 mb-2">
-              <div className="size-9 rounded-lg bg-primary text-foreground flex items-center justify-center">
+              <div className="size-9 rounded-lg bg-primary text-primary-foreground flex items-center justify-center">
                 <img src="/bh-logo.png" alt="BH HR" className="h-8 w-auto object-contain" />
               </div>
               <span className="font-semibold text-lg">BH HR</span>
@@ -128,7 +128,7 @@ export function LoginScreen() {
                   <Label htmlFor="password">Password</Label>
                   <button
                     type="button"
-                    className="text-xs text-muted-foreground hover:text-foreground"
+                    className="text-xs text-muted-foreground hover:text-primary-foreground"
                     onClick={() => toast.info("Contact your administrator.")}
                   >
                     Forgot password?
@@ -148,7 +148,7 @@ export function LoginScreen() {
                   <button
                     type="button"
                     onClick={() => setShowPw((s) => !s)}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-primary-foreground"
                     aria-label="Toggle password visibility"
                   >
                     {showPw ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
@@ -157,14 +157,14 @@ export function LoginScreen() {
               </div>
 
               <div className="rounded-lg border border-dashed border-border bg-muted/40 p-3 text-xs text-muted-foreground">
-                <div className="font-medium text-foreground mb-1">Demo credentials</div>
+                <div className="font-medium text-primary-foreground mb-1">Demo credentials</div>
                 Email: <code className="font-mono">hr@beyondheadlines.io</code>
                 <br />
                 Password: <code className="font-mono">demo1234</code>
               </div>
             </CardContent>
             <CardFooter className="flex flex-col gap-3">
-              <Button type="submit" className="w-full bg-primary text-foreground neu-raised-sm rounded-xl text-base font-semibold" disabled={loading}>
+              <Button type="submit" className="w-full neu-raised-primary rounded-xl text-base font-semibold" disabled={loading}>
                 {loading ? (
                   <>
                     <Loader2 className="size-4 mr-2 animate-spin" /> Signing in…

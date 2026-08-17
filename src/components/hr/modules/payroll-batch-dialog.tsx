@@ -609,7 +609,7 @@ export function PayrollBatchDialog({ open, onOpenChange }: Props) {
                       className={`rounded-lg p-4 border ${
                         result.failed.length > 0
                           ? "bg-amber-500/5 border-amber-500/30"
-                          : "text-emerald-500/5 border-primary/30"
+                          : "bg-primary/5 border-primary/30"
                       }`}
                     >
                       <div className="flex items-center gap-2">
@@ -633,7 +633,7 @@ export function PayrollBatchDialog({ open, onOpenChange }: Props) {
 
                     {/* Summary chips */}
                     <div className="grid grid-cols-3 gap-2">
-                      <div className="rounded-lg border border-primary/20 text-emerald-500/5 p-3 text-center">
+                      <div className="rounded-lg border border-primary/20 bg-primary/5 p-3 text-center">
                         <div className="text-2xl font-bold text-primary">
                           {result.created.length}
                         </div>

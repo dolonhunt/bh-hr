@@ -247,7 +247,7 @@ export function SignDocumentDialog({
                 className={cn(
                   "flex items-center gap-2 rounded-md border px-3 py-2 text-xs font-medium transition-colors",
                   method === "draw"
-                    ? "border-primary text-emerald-500/10 text-primary"
+                    ? "border-primary bg-primary/10 text-primary"
                     : "border-border bg-background text-muted-foreground hover:bg-muted/40"
                 )}
               >
@@ -260,7 +260,7 @@ export function SignDocumentDialog({
                 className={cn(
                   "flex items-center gap-2 rounded-md border px-3 py-2 text-xs font-medium transition-colors",
                   method === "type"
-                    ? "border-primary text-emerald-500/10 text-primary"
+                    ? "border-primary bg-primary/10 text-primary"
                     : "border-border bg-background text-muted-foreground hover:bg-muted/40"
                 )}
               >
@@ -307,7 +307,7 @@ export function SignDocumentDialog({
           )}
 
           {/* Verification info */}
-          <div className="rounded-md border border-primary/30 text-emerald-500/5 p-3 flex items-start gap-2.5">
+          <div className="rounded-md border border-primary/30 bg-primary/5 p-3 flex items-start gap-2.5">
             <ShieldCheck className="size-4 text-primary flex-shrink-0 mt-0.5" />
             <div className="text-[11px] text-foreground">
               <div className="font-medium">Tamper-evident signature</div>
@@ -327,7 +327,7 @@ export function SignDocumentDialog({
           <Button
             onClick={handleSign}
             disabled={signing || !signerName.trim() || !signerTitle.trim() || (method === "draw" && !signatureData)}
-            className="bg-emerald-600 hover:bg-emerald-700"
+            className="bg-primary hover:bg-primary/90"
           >
             {signing ? (
               <Loader2 className="size-4 mr-2 animate-spin" />

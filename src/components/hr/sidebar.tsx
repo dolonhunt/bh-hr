@@ -109,8 +109,8 @@ export function Sidebar() {
                           className={cn(
                             "w-full group/nav flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all relative",
                             active
-                              ? "bg-primary text-primary-foreground neu-raised-sm glow-teal"
-                              : "text-sidebar-foreground/80 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground",
+                              ? "bg-primary text-primary-foreground neu-raised-sm glow-purple"
+                              : "text-sidebar-foreground/75 hover:bg-sidebar-accent/60 hover:text-sidebar-foreground",
                             sidebarCollapsed && "justify-center px-2"
                           )}
                         >

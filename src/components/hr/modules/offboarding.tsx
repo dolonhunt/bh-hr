@@ -114,7 +114,7 @@ const EXIT_REASON_TONE: Record<ExitReason, string> = {
   RESIGNATION: "bg-rose-500/10 text-rose-700 dark:text-rose-300",
   TERMINATION: "bg-rose-500/15 text-rose-800 dark:text-rose-200",
   CONTRACT_END: "bg-amber-500/10 text-amber-700 dark:text-amber-300",
-  RETIREMENT: "text-emerald-500/10 text-primary dark:text-primary/80",
+  RETIREMENT: "bg-primary/10 text-primary dark:text-primary/80",
 };
 
 function isOverdue(dueDate?: string | null, status?: OffboardingStatus) {
@@ -362,7 +362,7 @@ export function Offboarding({ employeeId }: { employeeId: string }) {
                 <StatPill
                   label="Completed"
                   value={stats.completed}
-                  tone="emerald"
+                  tone="primary"
                 />
                 <StatPill label="Skipped" value={stats.skipped} tone="rose" />
               </div>
@@ -681,12 +681,12 @@ function StatPill({
 }: {
   label: string;
   value: number;
-  tone: "amber" | "sky" | "emerald" | "rose";
+  tone: "amber" | "sky" | "primary" | "rose";
 }) {
   const tones: Record<string, string> = {
     amber: "bg-amber-500/10 text-amber-700 dark:text-amber-300",
     sky: "bg-sky-500/10 text-sky-700 dark:text-sky-300",
-    emerald: "text-emerald-500/10 text-primary dark:text-primary/80",
+    primary: "bg-primary/10 text-primary dark:text-primary/80",
     rose: "bg-rose-500/10 text-rose-700 dark:text-rose-300",
   };
   return (

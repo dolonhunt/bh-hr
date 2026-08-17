@@ -236,7 +236,7 @@ export function AttendanceImportDialog({ open, onOpenChange, onImported }: Props
                     className={cn(
                       "flex items-center gap-1.5 px-2.5 py-1 rounded-full font-medium transition-colors",
                       isCurrent && "bg-primary text-primary-foreground",
-                      isDone && "text-emerald-500/15 text-primary dark:text-primary/80",
+                      isDone && "bg-primary/15 text-primary dark:text-primary/80",
                       !isCurrent && !isDone && "bg-muted text-muted-foreground"
                     )}
                   >
@@ -448,7 +448,7 @@ export function AttendanceImportDialog({ open, onOpenChange, onImported }: Props
                 icon={CheckCircle2}
                 label="Imported"
                 value={result.imported}
-                color="emerald"
+                color="primary"
               />
               <ResultStat
                 icon={RotateCcw}
@@ -495,7 +495,7 @@ export function AttendanceImportDialog({ open, onOpenChange, onImported }: Props
             )}
 
             {result.errors.length === 0 && (
-              <div className="flex items-center gap-2 text-sm text-primary dark:text-primary/80 text-emerald-500/10 rounded-md p-3">
+              <div className="flex items-center gap-2 text-sm text-primary dark:text-primary/80 bg-primary/10 rounded-md p-3">
                 <CheckCircle2 className="size-4 flex-shrink-0" />
                 All rows imported successfully — no errors.
               </div>
@@ -551,14 +551,14 @@ function ResultStat({
   icon: React.ComponentType<{ className?: string }>;
   label: string;
   value: number;
-  color: "emerald" | "amber" | "rose";
+  color: "primary" | "amber" | "rose";
 }) {
   return (
     <Card className="p-3 sm:p-4 border-border/60 shadow-soft text-center">
       <div
         className={cn(
           "mx-auto size-9 rounded-xl flex items-center justify-center mb-2",
-          color === "emerald" && "text-emerald-500/10 text-primary",
+          color === "primary" && "bg-primary/10 text-primary",
           color === "amber" && "bg-amber-500/10 text-amber-600",
           color === "rose" && "bg-rose-500/10 text-rose-600"
         )}

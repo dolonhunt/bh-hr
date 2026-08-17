@@ -121,13 +121,13 @@ export function SalaryHistory({
             icon={Wallet}
             label="Current Net Salary"
             value={formatCurrency(currentNetSalary)}
-            tone="emerald"
+            tone="primary"
           />
           <SummaryTile
             icon={TrendingUp}
             label="Total Increase"
             value={`${totalIncrease >= 0 ? "+" : ""}${formatCurrency(Math.abs(totalIncrease))}`}
-            tone={totalIncrease >= 0 ? "emerald" : "rose"}
+            tone={totalIncrease >= 0 ? "primary" : "rose"}
           />
           <SummaryTile
             icon={Percent}
@@ -137,7 +137,7 @@ export function SalaryHistory({
                 ? `${avgAnnualPct >= 0 ? "+" : ""}${avgAnnualPct.toFixed(1)}%`
                 : "—"
             }
-            tone={avgAnnualPct >= 0 ? "emerald" : "rose"}
+            tone={avgAnnualPct >= 0 ? "primary" : "rose"}
           />
         </div>
 
@@ -170,12 +170,12 @@ export function SalaryHistory({
                   <Minus className="size-3.5" />
                 );
                 const nodeTone = isUp
-                  ? "text-emerald-500 text-white"
+                  ? "bg-primary text-white"
                   : isDown
                     ? "bg-rose-500 text-white"
                     : "bg-muted-foreground text-white";
                 const deltaTone = isUp
-                  ? "text-primary dark:text-emerald-400"
+                  ? "text-primary dark:text-primary/80"
                   : isDown
                     ? "text-rose-600 dark:text-rose-400"
                     : "text-muted-foreground";
@@ -290,7 +290,7 @@ function BreakdownCell({
           className={cn(
             "text-[10px]",
             newV > oldV
-              ? "text-primary dark:text-emerald-400"
+              ? "text-primary dark:text-primary/80"
               : "text-rose-600 dark:text-rose-400"
           )}
         >
@@ -311,10 +311,10 @@ function SummaryTile({
   icon: any;
   label: string;
   value: string;
-  tone: "emerald" | "rose";
+  tone: "primary" | "rose";
 }) {
   const tones: Record<string, string> = {
-    emerald: "text-emerald-500/10 text-primary dark:text-primary/80",
+    primary: "bg-primary/10 text-primary dark:text-primary/80",
     rose: "bg-rose-500/10 text-rose-600 dark:text-rose-300",
   };
   return (

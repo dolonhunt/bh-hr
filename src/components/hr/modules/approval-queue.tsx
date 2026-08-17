@@ -210,7 +210,7 @@ export function ApprovalQueue({
           label="Approved Today"
           value={kpis.approvedToday}
           icon={FileCheck2}
-          iconClass="text-emerald-500/10 text-primary"
+          iconClass="bg-primary/10 text-primary"
         />
         <KpiCard
           label="Issued Today"
@@ -257,7 +257,7 @@ export function ApprovalQueue({
           size="sm"
           onClick={approveAll}
           disabled={approvingAll || docs.length === 0}
-          className="md:w-auto bg-emerald-600 hover:bg-emerald-700 text-white"
+          className="md:w-auto bg-primary hover:bg-primary/90 text-white"
         >
           {approvingAll ? (
             <RefreshCw className="size-4 mr-1.5 animate-spin" />
@@ -372,7 +372,7 @@ export function ApprovalQueue({
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="size-8 text-primary hover:text-emerald-500/10 hover:text-primary"
+                          className="size-8 text-primary hover:bg-primary/10 hover:text-primary"
                           onClick={() => quickApprove(d)}
                           title="Approve"
                         >
@@ -634,7 +634,7 @@ function ApproveDialog({
           <Button
             onClick={submit}
             disabled={submitting}
-            className="bg-emerald-600 hover:bg-emerald-700 text-white"
+            className="bg-primary hover:bg-primary/90 text-white"
           >
             {submitting ? (
               <RefreshCw className="size-4 mr-1.5 animate-spin" />

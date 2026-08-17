@@ -1229,7 +1229,7 @@ function DocumentNumberingTab() {
           </div>
         </div>
 
-        <div className="p-4 rounded-lg text-emerald-500/5 border border-primary/20">
+        <div className="p-4 rounded-lg bg-primary/5 border border-primary/20">
           <div className="text-xs text-muted-foreground uppercase tracking-wider mb-1">
             Live Preview — Next Document Number
           </div>
@@ -1381,7 +1381,7 @@ function DataBackupTab() {
         <CardContent className="p-6 space-y-4">
           <div className="flex items-start justify-between gap-4 pb-3 border-b border-border/60">
             <div className="flex items-start gap-3 min-w-0">
-              <div className="size-10 rounded-xl text-emerald-500/10 text-primary dark:text-primary/80 flex items-center justify-center flex-shrink-0">
+              <div className="size-10 rounded-xl bg-primary/10 text-primary dark:text-primary/80 flex items-center justify-center flex-shrink-0">
                 <Download className="size-5" />
               </div>
               <div className="min-w-0">
@@ -1513,7 +1513,7 @@ function DataBackupTab() {
           )}
 
           {importResult && (
-            <div className="rounded-lg border border-primary/30 text-emerald-500/5 p-4 space-y-3">
+            <div className="rounded-lg border border-primary/30 bg-primary/5 p-4 space-y-3">
               <div className="flex items-center gap-2 text-sm font-medium text-foreground dark:text-muted-foreground">
                 <Check className="size-4" />
                 Import complete —{" "}

@@ -50,13 +50,13 @@ export const NAV_SECTIONS: NavSection[] = [
   {
     label: "Operations",
     items: [
-      { key: "documents", label: "Documents", icon: FileText, description: "Templates & generation", badge: "live" },
       { key: "interviews", label: "Interviews", icon: CalendarClock, description: "Schedule & track" },
+      { key: "feedback", label: "Feedback", icon: MessageSquare, description: "Surveys & feedback" },
+      { key: "documents", label: "Documents", icon: FileText, description: "Templates & generation", badge: "live" },
       { key: "training", label: "Training", icon: GraduationCap, description: "Courses & development" },
       { key: "expenses", label: "Expenses", icon: Receipt, description: "Track & approve" },
-      { key: "assets", label: "Assets", icon: Package, description: "Equipment & assets" },
       { key: "timesheets", label: "Timesheets", icon: Clock, description: "Time tracking" },
-      { key: "feedback", label: "Feedback", icon: MessageSquare, description: "Surveys & feedback" },
+      { key: "assets", label: "Assets", icon: Package, description: "Equipment & assets" },
     ],
   },
   {

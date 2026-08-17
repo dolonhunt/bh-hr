@@ -221,7 +221,7 @@ export function EmployeeProfile({ id }: { id: string }) {
               icon={CalendarCheck}
               label="Attendance Rate"
               value="94%"
-              tone="emerald"
+              tone="primary"
             />
             <StatCard
               icon={CalendarDays}
@@ -808,10 +808,10 @@ function StatCard({
   icon: any;
   label: string;
   value: any;
-  tone: "emerald" | "amber" | "teal" | "violet";
+  tone: "primary" | "amber" | "teal" | "violet";
 }) {
   const tones: Record<string, string> = {
-    emerald: "text-emerald-500/10 text-primary",
+    primary: "bg-primary/10 text-primary",
     amber: "bg-amber-500/10 text-amber-600",
     teal: "bg-teal-500/10 text-teal-600",
     violet: "bg-violet-500/10 text-violet-600",

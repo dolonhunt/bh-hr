@@ -77,11 +77,11 @@ import { AvatarBadge } from "../shared/avatar-badge";
 import { cn, formatCurrency } from "@/lib/utils";
 
 // ============================================================
-// Color palette for chart series — emerald primary, with the
+// Color palette for chart series — purple primary, with the
 // requested accents. No indigo/blue.
 // ============================================================
 const CHART_COLORS = [
-  "#10b981", // emerald
+  "#6D3FC4", // purple
   "#f59e0b", // amber
   "#ef4444", // rose
   "#14b8a6", // teal
@@ -152,7 +152,7 @@ const REPORT_TYPES: ReportType[] = [
     description:
       "Daily check-in/out, working hours, late marks, and overtime for the selected period.",
     icon: CalendarCheck,
-    color: "text-emerald-500/10 text-primary",
+    color: "bg-primary/10 text-primary",
   },
   {
     key: "leave",
@@ -372,7 +372,7 @@ function KpiRow({
         label="Avg Attendance (30d)"
         value={`${data.kpis.avgAttendanceRate}%`}
         icon={CalendarCheck}
-        iconClass="text-emerald-500/10 text-primary"
+        iconClass="bg-primary/10 text-primary"
       />
       <KpiCard
         label="Payroll This Month"
@@ -1022,19 +1022,19 @@ interface PredictionsPayload {
 }
 
 const RISK_TONE: Record<string, string> = {
-  LOW: "text-emerald-500/10 text-primary dark:text-primary/80 border-primary/20",
+  LOW: "bg-primary/10 text-primary dark:text-primary/80 border-primary/20",
   MEDIUM: "bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/20",
   HIGH: "bg-rose-500/10 text-rose-700 dark:text-rose-300 border-rose-500/20",
 };
 
 const RISK_BAR: Record<string, string> = {
-  LOW: "text-emerald-500",
+  LOW: "bg-primary",
   MEDIUM: "bg-amber-500",
   HIGH: "bg-rose-500",
 };
 
 const RISK_GAUGE_STROKE: Record<string, string> = {
-  LOW: "#10b981",
+  LOW: "#6D3FC4",
   MEDIUM: "#f59e0b",
   HIGH: "#ef4444",
 };
@@ -1200,7 +1200,7 @@ function AttritionRiskCard({
               <RiskStat
                 label="Low"
                 value={data.employees.filter((e) => e.riskLevel === "LOW").length}
-                tone="emerald"
+                tone="primary"
               />
             </div>
             <div className="text-xs text-muted-foreground">
@@ -1297,12 +1297,12 @@ function RiskStat({
 }: {
   label: string;
   value: number;
-  tone: "rose" | "amber" | "emerald";
+  tone: "rose" | "amber" | "primary";
 }) {
   const tones: Record<string, string> = {
     rose: "bg-rose-500/10 text-rose-700 dark:text-rose-300",
     amber: "bg-amber-500/10 text-amber-700 dark:text-amber-300",
-    emerald: "text-emerald-500/10 text-primary dark:text-primary/80",
+    primary: "bg-primary/10 text-primary dark:text-primary/80",
   };
   return (
     <div className={cn("rounded-lg px-2 py-1.5 text-center", tones[tone])}>
@@ -1342,7 +1342,7 @@ function PerformanceTrendCard({
             label="Improving"
             value={data.up}
             icon={TrendingUp}
-            tone="emerald"
+            tone="primary"
           />
           <TrendStat
             label="Stable"
@@ -1418,10 +1418,10 @@ function TrendStat({
   label: string;
   value: number;
   icon: any;
-  tone: "emerald" | "rose" | "muted";
+  tone: "primary" | "rose" | "muted";
 }) {
   const tones: Record<string, string> = {
-    emerald: "text-emerald-500/10 text-primary dark:text-primary/80",
+    primary: "bg-primary/10 text-primary dark:text-primary/80",
     rose: "bg-rose-500/10 text-rose-700 dark:text-rose-300",
     muted: "bg-muted text-muted-foreground",
   };
@@ -1508,7 +1508,7 @@ function HeadcountForecastCard({
         </div>
 
         <div className="grid grid-cols-2 gap-2 text-xs">
-          <div className="rounded-lg p-2.5 border border-primary/30 text-emerald-500/5">
+          <div className="rounded-lg p-2.5 border border-primary/30 bg-primary/5">
             <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
               Hire rate
             </div>
@@ -1593,7 +1593,7 @@ function DepartmentRiskCard({
                     level === "MEDIUM" &&
                       "border-amber-500/40 bg-amber-500/5",
                     level === "LOW" &&
-                      "border-primary/40 text-emerald-500/5"
+                      "border-primary/40 bg-primary/5"
                   )}
                 >
                   <div className="flex items-center justify-between gap-2 mb-1.5">

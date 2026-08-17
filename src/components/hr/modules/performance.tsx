@@ -110,18 +110,18 @@ interface PerformanceReview {
   employee: EmployeeOption;
 }
 
-// Score color helpers (red < 40, amber 40-60, yellow 60-75, emerald 75+)
+// Score color helpers (red < 40, amber 40-60, yellow 60-75, purple 75+)
 function scoreBarColor(score: number): string {
   if (score < 40) return "bg-rose-500";
   if (score < 60) return "bg-amber-500";
   if (score < 75) return "bg-yellow-500";
-  return "text-emerald-500";
+  return "bg-primary";
 }
 function scoreTextColor(score: number): string {
   if (score < 40) return "text-rose-600 dark:text-rose-400";
   if (score < 60) return "text-amber-600 dark:text-amber-400";
   if (score < 75) return "text-yellow-600 dark:text-yellow-400";
-  return "text-primary dark:text-emerald-400";
+  return "text-primary dark:text-primary/80";
 }
 
 const DIMENSIONS = [
@@ -247,7 +247,7 @@ export function PerformanceModule() {
             <span className={scoreTextColor(avgScore)}>{avgScore}</span>
           }
           icon={TrendingUp}
-          iconClass="text-emerald-500/15 text-primary"
+          iconClass="bg-primary/15 text-primary"
           footer={
             <span className="text-muted-foreground">Out of 100</span>
           }
@@ -1012,8 +1012,8 @@ function ReviewDetailDialog({
                   <Radar
                     name="Score"
                     dataKey="score"
-                    stroke="#10b981"
-                    fill="#10b981"
+                    stroke="#6D3FC4"
+                    fill="#6D3FC4"
                     fillOpacity={0.35}
                   />
                 </RadarChart>

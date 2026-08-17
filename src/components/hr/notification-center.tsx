@@ -483,7 +483,7 @@ function NotificationRow({
 function EmptyState({ filter }: { filter: "all" | "unread" | "mentions" }) {
   return (
     <div className="flex flex-col items-center justify-center py-16 px-6 text-center">
-      <div className="size-14 rounded-full text-emerald-500/10 text-primary flex items-center justify-center mb-4">
+      <div className="size-14 rounded-full bg-primary/10 text-primary flex items-center justify-center mb-4">
         <Inbox className="size-6" />
       </div>
       <p className="text-sm font-medium">

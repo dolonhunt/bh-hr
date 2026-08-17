@@ -1199,7 +1199,7 @@ function DocumentsTable({
                   {getSignature(d)?.signed && (
                     <Badge
                       variant="outline"
-                      className="gap-1 text-[9px] font-medium border-primary/40 text-emerald-500/10 text-primary px-1.5 h-5"
+                      className="gap-1 text-[9px] font-medium border-primary/40 bg-primary/10 text-primary px-1.5 h-5"
                       title={`Signed by ${getSignature(d)?.signerName ?? ""} on ${formatDate(getSignature(d)?.signedAt)}`}
                     >
                       <ShieldCheck className="size-3" />
@@ -1830,7 +1830,7 @@ function VerifySignatureDialog({
 
           {!loading && isSigned && (
             <>
-              <div className="rounded-md border border-primary/30 text-emerald-500/5 p-4 flex items-start gap-3">
+              <div className="rounded-md border border-primary/30 bg-primary/5 p-4 flex items-start gap-3">
                 <CheckCircle2 className="size-5 text-primary flex-shrink-0 mt-0.5" />
                 <div className="min-w-0">
                   <div className="font-medium text-sm text-foreground">
@@ -1894,7 +1894,7 @@ function VerifySignatureDialog({
                 )}
               </div>
 
-              <div className="rounded-md border border-primary/30 text-emerald-500/5 p-3">
+              <div className="rounded-md border border-primary/30 bg-primary/5 p-3">
                 <div className="text-[10px] uppercase tracking-wider text-primary mb-1 flex items-center gap-1.5">
                   <CopyCheck className="size-3" />
                   Verification Hash (SHA-256, short)

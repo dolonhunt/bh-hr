@@ -29,7 +29,7 @@ export function KpiCard({
   sparkline,
   sparklineColor,
 }: KpiCardProps) {
-  const accentColor = iconClass?.includes("emerald")
+  const accentColor = iconClass?.includes("primary")
     ? "#10b981"
     : iconClass?.includes("amber")
       ? "#f59e0b"
@@ -55,7 +55,7 @@ export function KpiCard({
       <div
         className={cn(
           "absolute top-0 left-0 right-0 h-0.5 opacity-0 group-hover:opacity-100 transition-opacity",
-          iconClass?.includes("emerald") && "text-emerald-500",
+          iconClass?.includes("primary") && "bg-primary",
           iconClass?.includes("amber") && "bg-amber-500",
           iconClass?.includes("rose") && "bg-rose-500",
           iconClass?.includes("violet") && "bg-violet-500",
@@ -77,7 +77,7 @@ export function KpiCard({
               <span
                 className={cn(
                   "inline-flex items-center gap-0.5 font-semibold px-1.5 py-0.5 rounded-md",
-                  delta.trend === "up" && "text-primary text-emerald-500/10",
+                  delta.trend === "up" && "text-primary bg-primary/10",
                   delta.trend === "down" && "text-rose-700 bg-rose-500/10",
                   delta.trend === "flat" && "text-muted-foreground bg-muted"
                 )}

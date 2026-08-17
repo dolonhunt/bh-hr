@@ -374,7 +374,7 @@ export function PayrollModule() {
           label="Basic Salary"
           value={formatCurrency(totalBasic)}
           icon={Wallet}
-          iconClass="text-emerald-500/10 text-primary"
+          iconClass="bg-primary/10 text-primary"
         />
         <KpiCard
           label="Allowances"
@@ -848,7 +848,7 @@ function TaxConfigDialog({
             </div>
           ) : (
             <>
-              <div className="rounded-md border border-primary/20 text-emerald-500/5 p-3 text-xs text-foreground flex items-start gap-2">
+              <div className="rounded-md border border-primary/20 bg-primary/5 p-3 text-xs text-foreground flex items-start gap-2">
                 <Calculator className="size-4 flex-shrink-0 mt-0.5" />
                 <div>
                   <div className="font-medium">How TDS is calculated</div>

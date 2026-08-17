@@ -289,7 +289,7 @@ export function LeaveModule() {
           label="Approved"
           value={approvedCount}
           icon={Check}
-          iconClass="text-emerald-500/10 text-primary"
+          iconClass="bg-primary/10 text-primary"
         />
         <KpiCard
           label="Rejected"
@@ -569,7 +569,7 @@ export function LeaveModule() {
                                 <Button
                                   size="sm"
                                   variant="ghost"
-                                  className="size-8 text-primary hover:text-primary hover:text-emerald-500/10"
+                                  className="size-8 text-primary hover:text-primary hover:bg-primary/10"
                                   onClick={() => {
                                     setDecision({ id: l.id, action: "APPROVED" });
                                     setDecisionNote(l.approverNote || "");
@@ -664,7 +664,7 @@ export function LeaveModule() {
           <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-muted-foreground">
             <span className="font-medium text-foreground">Legend:</span>
             <span className="inline-flex items-center gap-1.5">
-              <span className="size-2.5 rounded-full text-emerald-500" />
+              <span className="size-2.5 rounded-full bg-primary" />
               Approved
             </span>
             <span className="inline-flex items-center gap-1.5">
