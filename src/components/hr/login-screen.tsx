@@ -166,7 +166,7 @@ export function LoginScreen() {
               </div>
             </CardContent>
             <CardFooter className="flex flex-col gap-3">
-              <Button type="submit" className="w-full" disabled={loading}>
+              <Button type="submit" className="w-full bg-primary text-primary-foreground neu-raised-sm rounded-xl text-base font-semibold" disabled={loading}>
                 {loading ? (
                   <>
                     <Loader2 className="size-4 mr-2 animate-spin" /> Signing in…

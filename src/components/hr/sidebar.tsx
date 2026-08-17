@@ -28,12 +28,10 @@ export function Sidebar() {
 
       <aside
         className={cn(
-          "z-50 flex flex-col bg-sidebar border-r border-sidebar-border transition-all duration-300",
-          // Desktop behavior
-          "hidden lg:flex",
+          "z-50 flex flex-col bg-sidebar transition-all duration-300",
+          "hidden lg:flex m-3 rounded-2xl border border-sidebar-border/50 neu-raised overflow-hidden",
           sidebarCollapsed ? "w-[76px]" : "w-[260px]",
-          // Mobile behavior: off-canvas
-          "lg:sticky lg:top-0 lg:h-screen",
+          "lg:sticky lg:top-0 lg:h-[calc(100vh-1.5rem)]",
           "fixed inset-y-0 left-0 lg:static",
           mobileSidebarOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
         )}
@@ -87,17 +85,16 @@ export function Sidebar() {
                     setMobileSidebarOpen(false);
                   }}
                   className={cn(
-                    "w-full group/nav flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all relative",
+                    "w-full group/nav flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all relative",
                     active
-                      ? "bg-sidebar-accent text-sidebar-accent-foreground shadow-soft"
-                      : "text-sidebar-foreground/75 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground",
+                      ? "bg-sidebar-primary text-sidebar-primary-foreground neu-raised-sm"
+                      : "text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground",
                     sidebarCollapsed && "justify-center px-2"
                   )}
                   title={sidebarCollapsed ? item.label : undefined}
                 >
-                  {/* Active indicator bar on the left */}
                   {active && (
-                    <span className="absolute left-0 top-1/2 -translate-y-1/2 h-5 w-1 rounded-r-full bg-sidebar-primary" />
+                    <span className="absolute left-0 top-1/2 -translate-y-1/2 h-5 w-1 rounded-r-full bg-sidebar-primary-foreground/60" />
                   )}
                   <Icon
                     className={cn(
