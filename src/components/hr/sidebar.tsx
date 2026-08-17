@@ -5,7 +5,6 @@ import { NAV_SECTIONS } from "./nav-config";
 import { cn } from "@/lib/utils";
 import { ChevronLeft, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { BrandLogo, BrandMark } from "@/components/brand/brand-logo";
 import {
   Tooltip,
@@ -73,7 +72,7 @@ export function Sidebar() {
         </div>
 
         {/* Nav — sectioned */}
-        <ScrollArea className="flex-1 px-3 py-4">
+        <div className="flex-1 overflow-y-auto overflow-x-hidden px-3 py-4">
           <TooltipProvider delayDuration={200}>
             <div className="space-y-4">
               {NAV_SECTIONS.map((section) => {
@@ -166,7 +165,7 @@ export function Sidebar() {
               })}
             </div>
           </TooltipProvider>
-        </ScrollArea>
+        </div>
 
         {/* Collapse toggle (desktop only) */}
         <div className="hidden lg:block border-t border-sidebar-border/60 p-3">
