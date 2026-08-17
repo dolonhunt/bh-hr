@@ -2014,7 +2014,7 @@ function DepreciationDetailDialog({
                       contentStyle={{
                         borderRadius: 8,
                         fontSize: 12,
-                        border: "1px solid hsl(var(--border))",
+                        border: "1px solid #E8DEFB",
                       }}
                       formatter={(value: number, name: string) => [
                         formatCurrency(value),

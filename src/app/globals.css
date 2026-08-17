@@ -71,9 +71,9 @@
   --secondary: #F1ECF7;
   --secondary-foreground: #262238;
 
-  /* Muted: soft lavender-gray */
-  --muted: #F1ECF7;
-  --muted-foreground: #5F5870;
+  /* Muted: warm muted — darkened for readability on lavender */
+  --muted: #EDE5F5;
+  --muted-foreground: #4A4458;
 
   /* Accent: lavender tint */
   --accent: #E8DEFB;
@@ -130,7 +130,7 @@
   --secondary: #2A2240;
   --secondary-foreground: #F5F0FA;
   --muted: #2A2240;
-  --muted-foreground: #9A8FB0;
+  --muted-foreground: #B0A8C0;
   --accent: #2E2448;
   --accent-foreground: #A98BE6;
   --destructive: #F08B8B;

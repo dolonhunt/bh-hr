@@ -1408,7 +1408,7 @@ function SummaryTab() {
                         formatter={(v: any) => [`${Number(v).toFixed(1)}h`, "Hours"]}
                         contentStyle={{
                           borderRadius: 8,
-                          border: "1px solid hsl(var(--border))",
+                          border: "1px solid #E8DEFB",
                           fontSize: 12,
                         }}
                       />
@@ -1457,7 +1457,7 @@ function SummaryTab() {
                         formatter={(v: any) => [`${Number(v).toFixed(1)}h`, "Hours"]}
                         contentStyle={{
                           borderRadius: 8,
-                          border: "1px solid hsl(var(--border))",
+                          border: "1px solid #E8DEFB",
                           fontSize: 12,
                         }}
                       />

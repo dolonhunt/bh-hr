@@ -10,13 +10,13 @@ const buttonVariants = cva(
     variants: {
       variant: {
         default:
-          "bg-primary text-primary-foreground rounded-lg neu-raised-sm hover:brightness-110 active:neu-pressed",
+          "bg-primary text-primary-foreground rounded-lg neu-raised-sm hover:shadow-card-hover hover:brightness-110 active:neu-pressed",
         destructive:
-          "bg-destructive text-white rounded-lg neu-raised-sm hover:brightness-110 active:neu-pressed",
+          "bg-destructive text-white rounded-lg neu-raised-sm hover:shadow-card-hover hover:brightness-110 active:neu-pressed",
         outline:
-          "bg-background text-foreground rounded-lg neu-raised-sm hover:brightness-95 active:neu-pressed",
+          "bg-background text-foreground rounded-lg neu-raised-sm hover:bg-accent/40 hover:shadow-card-hover active:neu-pressed",
         secondary:
-          "bg-secondary text-secondary-foreground rounded-lg neu-raised-sm hover:brightness-95 active:neu-pressed",
+          "bg-secondary text-secondary-foreground rounded-lg neu-raised-sm hover:brightness-95 hover:shadow-card-hover active:neu-pressed",
         ghost:
           "rounded-lg hover:bg-accent/60 hover:text-accent-foreground",
         link: "text-primary underline-offset-4 hover:underline",

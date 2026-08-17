@@ -570,7 +570,7 @@ function HeroBannerWidget({
                 cy="40"
                 r="34"
                 fill="none"
-                stroke="oklch(0.92 0 0)"
+                stroke="#E8DEFB"
                 strokeWidth="6"
               />
               <circle
@@ -578,7 +578,7 @@ function HeroBannerWidget({
                 cy="40"
                 r="34"
                 fill="none"
-                stroke="#10b981"
+                stroke="#28B9A9"
                 strokeWidth="6"
                 strokeLinecap="round"
                 strokeDasharray={`${
@@ -718,9 +718,9 @@ function AttendanceChartWidget({
           </p>
         </div>
         <div className="flex items-center gap-2 sm:gap-3 text-[10px] sm:text-[11px] flex-wrap justify-end">
-          <Legend2 color="#10b981" label="Present" />
-          <Legend2 color="#f59e0b" label="Late" />
-          <Legend2 color="#ef4444" label="Absent" />
+          <Legend2 color="#28B9A9" label="Present" />
+          <Legend2 color="#F3A65A" label="Late" />
+          <Legend2 color="#E9797D" label="Absent" />
           <Legend2 color="#94a3b8" label="Leave" />
         </div>
       </CardHeader>
@@ -729,32 +729,32 @@ function AttendanceChartWidget({
           <BarChart data={data.attendanceTrend} barCategoryGap="28%">
             <CartesianGrid
               strokeDasharray="3 3"
-              stroke="oklch(0.92 0 0)"
+              stroke="#E8DEFB"
               vertical={false}
             />
             <XAxis
               dataKey="date"
               tickLine={false}
               axisLine={false}
-              tick={{ fontSize: 12, fill: "oklch(0.5 0 0)" }}
+              tick={{ fontSize: 12, fill: "#5F5870" }}
             />
             <YAxis
               tickLine={false}
               axisLine={false}
-              tick={{ fontSize: 12, fill: "oklch(0.5 0 0)" }}
+              tick={{ fontSize: 12, fill: "#5F5870" }}
             />
             <Tooltip
-              cursor={{ fill: "oklch(0.96 0 0)" }}
+              cursor={{ fill: "#F1ECF7" }}
               contentStyle={{
                 borderRadius: 10,
-                border: "1px solid oklch(0.9 0 0)",
+                border: "1px solid #E8DEFB",
                 fontSize: 12,
-                boxShadow: "0 4px 12px oklch(0 0 0 / 0.08)",
+                boxShadow: "0 4px 12px rgba(109,63,196,0.08)",
               }}
             />
-            <Bar dataKey="present" name="Present" stackId="a" fill="#10b981" radius={[0, 0, 0, 0]} />
-            <Bar dataKey="late" name="Late" stackId="a" fill="#f59e0b" />
-            <Bar dataKey="absent" name="Absent" stackId="a" fill="#ef4444" />
+            <Bar dataKey="present" name="Present" stackId="a" fill="#28B9A9" radius={[0, 0, 0, 0]} />
+            <Bar dataKey="late" name="Late" stackId="a" fill="#F3A65A" />
+            <Bar dataKey="absent" name="Absent" stackId="a" fill="#E9797D" />
             <Bar dataKey="leave" name="Leave" stackId="a" fill="#94a3b8" radius={[6, 6, 0, 0]} />
           </BarChart>
         </ResponsiveContainer>
@@ -792,7 +792,7 @@ function DeptDistributionWidget({
               innerRadius={55}
               outerRadius={80}
               paddingAngle={2}
-              stroke="oklch(1 0 0)"
+              stroke="#FFFD FC"
               strokeWidth={2}
             >
               {data.deptDistribution.map((entry, idx) => (
@@ -802,9 +802,9 @@ function DeptDistributionWidget({
             <Tooltip
               contentStyle={{
                 borderRadius: 10,
-                border: "1px solid oklch(0.9 0 0)",
+                border: "1px solid #E8DEFB",
                 fontSize: 12,
-                boxShadow: "0 4px 12px oklch(0 0 0 / 0.08)",
+                boxShadow: "0 4px 12px rgba(109,63,196,0.08)",
               }}
             />
           </RechartsPieChart>

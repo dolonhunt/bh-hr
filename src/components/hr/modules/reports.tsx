@@ -813,11 +813,11 @@ function FunnelBars({
 // ============================================================
 const tooltipStyle = {
   backgroundColor: "#ffffff",
-  border: "1px solid oklch(0.9 0 0)",
+  border: "1px solid #E8DEFB",
   borderRadius: "10px",
   fontSize: "12px",
   color: "#1a1a1a",
-  boxShadow: "0 4px 12px oklch(0 0 0 / 0.08)",
+  boxShadow: "0 4px 12px rgba(109,63,196,0.08)",
 } as const;
 
 function ChartEmpty() {
