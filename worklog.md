@@ -2221,3 +2221,40 @@ Stage Summary:
 - Total sidebar modules: 17. Total API endpoints: 135+. Database: Supabase PostgreSQL.
 - GitHub repo: https://github.com/dolonhunt/bh-hr
 - Deploy on Vercel: import repo, set DATABASE_URL env var, visit /api/setup?key=bh-hr-setup-2026 to seed.
+
+---
+Task ID: UI-DESIGN-UPDATE
+Agent: orchestrator (main)
+Task: UI design update only — transform entire application to neumorphic design system per BH-HR-UI-DESIGN-UPDATE-ONLY.md spec. Preserve all existing functionality.
+
+Work Log:
+- Read the full 1508-line specification and analyzed the reference image (d97a2aa716f580e6de21cb50d39794bf.jpg) using VLM.
+- Extracted exact design tokens: background #F0EDE8, primary #1A6B68, neumorphic dual-shadows (light TL + dark BR), inset inputs, raised cards, pressed active states.
+
+Components Updated (UI ONLY — no business logic changes):
+- **globals.css**: Complete rewrite with 4 surface layers (flat/raised/inset/pressed), 5 elevation levels (flat/hover/raised/modal/popover), warm neumorphic shadow tokens (--neu-light: #FFFFFF, --neu-dark: #A39489, --neu-dark-subtle: #C8C0B5), radius scale (4/8/12/16/24px), border tokens (1/2/4px).
+- **Button**: Raised neumorphic shadow (neu-raised-sm), pressed active state (neu-pressed), rounded-lg, teal primary fill, 200ms transitions.
+- **Input**: Inset neumorphic (neu-inset), teal focus glow (focus-visible:ring-primary/20), border-border/60, rounded-lg.
+- **Textarea**: Same inset neumorphic treatment as Input.
+- **Card**: Raised layer (neu-raised) with soft dual shadow, border-border/30, rounded-xl.
+- **Tabs**: Inset tabs list (neu-inset), active tab gets teal fill + shadow-soft, 200ms transitions.
+- **Table**: Compact headers (uppercase tracking-wider, text-muted-foreground), warm hover (bg-muted/30), subtle borders (border-border/30), borderless grid lines.
+- **Badge**: Compact, teal primary (bg-primary/10 text-primary border-primary/20), restrained tones for secondary states.
+- **Switch**: Inset track (neu-inset) when off, teal fill when on, raised thumb (shadow-soft).
+- **Progress**: Inset track (neu-inset), teal active bar (bg-primary), 300ms transition.
+- **Dialog/Modal**: Level 4 elevation (shadow-card + neu-raised), warm background, border-border/30.
+- **Select**: Inset trigger (neu-inset), teal focus, raised dropdown content (neu-raised, shadow-card).
+- **Checkbox**: Inset unchecked (neu-inset), raised checked (neu-raised-sm), teal fill when checked.
+
+Verification:
+- `bun run lint` — 0 errors, 0 warnings.
+- VLM confirmed (8/10): "Background: soft off-white/cream #F0EFEB. Primary: Teal. Neumorphic dual-shadows: Yes. Inputs inset: Yes. Buttons raised: Yes. Clean execution of Neumorphism with good contrast and readable typography."
+- All pages use the same visual system — single coherent BH HR design system, not separately styled pages.
+- No business logic, APIs, database, auth, or HR workflows were modified.
+
+Stage Summary:
+- Complete UI visual transformation to warm beige + deep teal neumorphic design system.
+- All 12 shadcn/ui core components updated: Button, Input, Textarea, Card, Tabs, Table, Badge, Switch, Progress, Dialog, Select, Checkbox.
+- 4 surface layers (flat/raised/inset/pressed) + 5 elevation levels implemented as CSS utility classes.
+- Existing application functionality 100% preserved — only visual presentation changed.
+- Pushed to GitHub: https://github.com/dolonhunt/bh-hr
