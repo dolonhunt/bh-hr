@@ -2258,3 +2258,51 @@ Stage Summary:
 - 4 surface layers (flat/raised/inset/pressed) + 5 elevation levels implemented as CSS utility classes.
 - Existing application functionality 100% preserved — only visual presentation changed.
 - Pushed to GitHub: https://github.com/dolonhunt/bh-hr
+
+---
+Task ID: UI-REFINED
+Agent: orchestrator (main)
+Task: Refine neumorphic design system using additional visual reference (Ux.png). Preserve all existing HR functionality.
+
+Work Log:
+- Analyzed the additional visual reference (upload/Ux.png) using VLM. Extracted refined design tokens:
+  - Background: #F3EDE1 (warm cream/parchment)
+  - Primary: #2E7D79 (deep teal)
+  - Shadow light: #FFFEFA, Shadow dark: #D5CABB (warm brown-grey)
+  - Inset surfaces with 4px inner shadows
+  - Raised surfaces with 6px dual shadows (12px blur)
+  - Sidebar as a raised neumorphic container
+  - Teal active nav items with raised shadow
+  - Chart palette: teal, orange/peach, light teal
+
+Refined Design Tokens (globals.css):
+- Background: #F0EDE8 → #F3EDE1 (warmer cream)
+- Primary: #1A6B68 → #2E7D79 (slightly brighter teal)
+- Foreground: #2C2C2C → #2F3E4E (warmer dark slate)
+- Muted-foreground: #777777 → #9E957E (warm muted)
+- Border: #DDD8D0 → #E0D8C8 (warmer)
+- Shadow light: #FFFFFF → #FFFEFA (slightly warm white)
+- Shadow dark: #A39489 → #D5CABB (warmer brown)
+- Shadow subtle: #C8C0B5 → #DDD5C5 (softer)
+- Charts: updated to teal #2E7D79, orange #FFC078, light teal #CFE8E6
+- Radius: 12px → 16px (slightly more rounded per reference)
+
+Refined Shadows:
+- neu-raised: 6px offset, 12px blur (was 5px/10px) — more pronounced depth
+- neu-raised-sm: 4px offset, 8px blur (was 3px/6px)
+- neu-inset: 4px inner offset, 8px blur (was 3px/6px) — deeper cavity
+- neu-pressed: 3px inner offset, 6px blur (was 2px/4px)
+
+Sidebar:
+- Changed from flat border-right to raised neumorphic container (neu-raised, rounded-2xl, m-3 margin)
+- Active nav items: bg-sidebar-primary (teal) + neu-raised-sm shadow (pressed/raised effect)
+- Inactive: text-sidebar-foreground/70, hover bg-sidebar-accent/50
+
+Login:
+- Sign-in button: explicit bg-primary text-primary-foreground neu-raised-sm (teal fill + raised shadow)
+- Form panel: neumorphic raised card with inset inputs
+
+VLM Verification: 9/10
+- "Background: Cream #F5F0E8. Primary: Teal #3F7D70. Neumorphic: Yes, soft UI with subtle shadows. Inputs: Inset. Button: Raised with white text. Clean, modern, excellent contrast."
+
+Pushed to GitHub: https://github.com/dolonhunt/bh-hr
