@@ -117,7 +117,7 @@ const EXPENSE_TYPE_META: Record<
   ACCOMMODATION: { label: "Accommodation", icon: Building2, color: "text-violet-600 bg-violet-500/10 border-violet-500/20" },
   SUPPLIES: { label: "Supplies", icon: Package, color: "text-teal-600 bg-teal-500/10 border-teal-500/20" },
   TRANSPORT: { label: "Transport", icon: Bus, color: "text-orange-600 bg-orange-500/10 border-orange-500/20" },
-  TRAINING: { label: "Training", icon: GraduationCap, color: "text-emerald-600 bg-emerald-500/10 border-emerald-500/20" },
+  TRAINING: { label: "Training", icon: GraduationCap, color: "text-primary text-emerald-500/10 border-primary/20" },
   OTHER: { label: "Other", icon: Box, color: "text-muted-foreground bg-muted/50 border-border" },
 };
 
@@ -134,7 +134,7 @@ const ALL_TYPES: ExpenseType[] = [
 const EXPENSE_STATUS_COLOR: Record<ExpenseStatus, string> = {
   DRAFT: "bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/20",
   PENDING: "bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/20",
-  APPROVED: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/20",
+  APPROVED: "text-emerald-500/15 text-primary dark:text-primary/80 border-primary/20",
   REJECTED: "bg-rose-500/15 text-rose-700 dark:text-rose-300 border-rose-500/20",
   REIMBURSED: "bg-teal-500/15 text-teal-700 dark:text-teal-300 border-teal-500/20",
 };
@@ -417,7 +417,7 @@ export function ExpensesModule() {
           label="Approved Amount"
           value={formatCurrency(totalApprovedAmount)}
           icon={Check}
-          iconClass="bg-emerald-500/15 text-emerald-600"
+          iconClass="text-emerald-500/15 text-primary"
           footer={<span className="text-muted-foreground">Awaiting reimbursement</span>}
         />
         <KpiCard
@@ -813,7 +813,7 @@ function ExpenseActions({
           <Button
             size="sm"
             variant="outline"
-            className="h-8 gap-1.5 text-emerald-700 border-emerald-500/30 hover:bg-emerald-500/10"
+            className="h-8 gap-1.5 text-primary border-primary/30 hover:text-emerald-500/10"
             disabled={busy === "approve"}
             onClick={() => run("approve", () => onApprove(expense))}
           >

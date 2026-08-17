@@ -343,7 +343,7 @@ function CompareView({ data }: { data: CompareResponse }) {
         </span>
         {stats.emailBody.added + stats.emailBody.removed > 0 && (
           <span className="text-muted-foreground ml-auto">
-            Email body: <span className="text-emerald-700 dark:text-emerald-400 font-medium">+{stats.emailBody.added}</span>{" "}
+            Email body: <span className="text-primary dark:text-emerald-400 font-medium">+{stats.emailBody.added}</span>{" "}
             <span className="text-rose-700 dark:text-rose-400 font-medium">-{stats.emailBody.removed}</span>
           </span>
         )}
@@ -408,7 +408,7 @@ function TemplateMetaCard({
             "font-mono text-[10px]",
             side === "A"
               ? "border-rose-300 text-rose-700 dark:text-rose-400 dark:border-rose-800"
-              : "border-emerald-300 text-emerald-700 dark:text-emerald-400 dark:border-emerald-800"
+              : "border-emerald-300 text-primary dark:text-emerald-400 dark:border-emerald-800"
           )}
         >
           {side === "A" ? "Template A" : "Template B"}
@@ -430,7 +430,7 @@ function TemplateMetaCard({
           className={cn(
             "px-1.5 py-0.5 rounded-full text-[10px]",
             template.status === "ACTIVE"
-              ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300"
+              ? "text-emerald-500/15 text-primary dark:text-primary/80"
               : template.status === "DRAFT"
                 ? "bg-amber-500/15 text-amber-700 dark:text-amber-300"
                 : "bg-muted text-muted-foreground"
@@ -454,7 +454,7 @@ function StatPill({
     added: {
       icon: Plus,
       label: "added",
-      cls: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300",
+      cls: "text-emerald-500/15 text-primary dark:text-primary/80",
     },
     removed: {
       icon: Minus,
@@ -531,7 +531,7 @@ function SideBySideDiff({ diff }: { diff: LineDiffEntry[] }) {
           Template A
         </div>
         <div className="px-3 py-1.5 flex items-center gap-1.5">
-          <span className="size-2 rounded-full bg-emerald-500/70" />
+          <span className="size-2 rounded-full text-emerald-500/70" />
           Template B
         </div>
       </div>
@@ -544,7 +544,7 @@ function SideBySideDiff({ diff }: { diff: LineDiffEntry[] }) {
             : "bg-muted/30";
           const rightCls = row.right
             ? row.right.type === "added"
-              ? "bg-emerald-500/10 text-emerald-900 dark:text-emerald-200"
+              ? "text-emerald-500/10 text-emerald-900 dark:text-muted-foreground"
               : "bg-transparent"
             : "bg-muted/30";
           const leftMark = row.left
@@ -611,7 +611,7 @@ function FieldDiffRow({
         <span className="text-xs font-medium">{label}</span>
         <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
           {stats.added > 0 && (
-            <span className="text-emerald-700 dark:text-emerald-400">
+            <span className="text-primary dark:text-emerald-400">
               +{stats.added}
             </span>
           )}
@@ -634,7 +634,7 @@ function FieldDiffRow({
             key={idx}
             className={cn(
               entry.type === "added" &&
-                "bg-emerald-500/15 text-emerald-900 dark:text-emerald-200 rounded px-0.5",
+                "text-emerald-500/15 text-emerald-900 dark:text-muted-foreground rounded px-0.5",
               entry.type === "removed" &&
                 "bg-rose-500/15 text-rose-900 dark:text-rose-200 line-through rounded px-0.5",
               entry.type === "unchanged" && "text-foreground"

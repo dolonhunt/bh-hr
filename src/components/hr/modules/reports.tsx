@@ -152,7 +152,7 @@ const REPORT_TYPES: ReportType[] = [
     description:
       "Daily check-in/out, working hours, late marks, and overtime for the selected period.",
     icon: CalendarCheck,
-    color: "bg-emerald-500/10 text-emerald-600",
+    color: "text-emerald-500/10 text-primary",
   },
   {
     key: "leave",
@@ -372,7 +372,7 @@ function KpiRow({
         label="Avg Attendance (30d)"
         value={`${data.kpis.avgAttendanceRate}%`}
         icon={CalendarCheck}
-        iconClass="bg-emerald-500/10 text-emerald-600"
+        iconClass="text-emerald-500/10 text-primary"
       />
       <KpiCard
         label="Payroll This Month"
@@ -1022,13 +1022,13 @@ interface PredictionsPayload {
 }
 
 const RISK_TONE: Record<string, string> = {
-  LOW: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/20",
+  LOW: "text-emerald-500/10 text-primary dark:text-primary/80 border-primary/20",
   MEDIUM: "bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/20",
   HIGH: "bg-rose-500/10 text-rose-700 dark:text-rose-300 border-rose-500/20",
 };
 
 const RISK_BAR: Record<string, string> = {
-  LOW: "bg-emerald-500",
+  LOW: "text-emerald-500",
   MEDIUM: "bg-amber-500",
   HIGH: "bg-rose-500",
 };
@@ -1302,7 +1302,7 @@ function RiskStat({
   const tones: Record<string, string> = {
     rose: "bg-rose-500/10 text-rose-700 dark:text-rose-300",
     amber: "bg-amber-500/10 text-amber-700 dark:text-amber-300",
-    emerald: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
+    emerald: "text-emerald-500/10 text-primary dark:text-primary/80",
   };
   return (
     <div className={cn("rounded-lg px-2 py-1.5 text-center", tones[tone])}>
@@ -1329,7 +1329,7 @@ function PerformanceTrendCard({
     <Card className="border-border/60 shadow-soft">
       <CardHeader className="pb-2 pt-4 px-5">
         <CardTitle className="text-sm font-semibold flex items-center gap-2">
-          <TrendingUp className="size-4 text-emerald-600" />
+          <TrendingUp className="size-4 text-primary" />
           Performance Trends
         </CardTitle>
         <p className="text-[11px] text-muted-foreground">
@@ -1421,7 +1421,7 @@ function TrendStat({
   tone: "emerald" | "rose" | "muted";
 }) {
   const tones: Record<string, string> = {
-    emerald: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
+    emerald: "text-emerald-500/10 text-primary dark:text-primary/80",
     rose: "bg-rose-500/10 text-rose-700 dark:text-rose-300",
     muted: "bg-muted text-muted-foreground",
   };
@@ -1491,7 +1491,7 @@ function HeadcountForecastCard({
                   <div
                     className={cn(
                       "text-[10px] font-medium inline-flex items-center gap-0.5 mt-0.5",
-                      trend === "up" && "text-emerald-600",
+                      trend === "up" && "text-primary",
                       trend === "down" && "text-rose-600",
                       trend === "flat" && "text-muted-foreground"
                     )}
@@ -1508,11 +1508,11 @@ function HeadcountForecastCard({
         </div>
 
         <div className="grid grid-cols-2 gap-2 text-xs">
-          <div className="rounded-lg p-2.5 border border-emerald-500/30 bg-emerald-500/5">
+          <div className="rounded-lg p-2.5 border border-primary/30 text-emerald-500/5">
             <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
               Hire rate
             </div>
-            <div className="text-lg font-bold tabular-nums text-emerald-700 dark:text-emerald-300">
+            <div className="text-lg font-bold tabular-nums text-primary dark:text-primary/80">
               {data.hireRate.toFixed(1)}/mo
             </div>
             <div className="text-[10px] text-muted-foreground mt-0.5">
@@ -1538,7 +1538,7 @@ function HeadcountForecastCard({
           <span
             className={cn(
               "font-semibold tabular-nums",
-              data.netMonthly > 0 && "text-emerald-600",
+              data.netMonthly > 0 && "text-primary",
               data.netMonthly < 0 && "text-rose-600",
               data.netMonthly === 0 && "text-muted-foreground"
             )}
@@ -1593,7 +1593,7 @@ function DepartmentRiskCard({
                     level === "MEDIUM" &&
                       "border-amber-500/40 bg-amber-500/5",
                     level === "LOW" &&
-                      "border-emerald-500/40 bg-emerald-500/5"
+                      "border-primary/40 text-emerald-500/5"
                   )}
                 >
                   <div className="flex items-center justify-between gap-2 mb-1.5">

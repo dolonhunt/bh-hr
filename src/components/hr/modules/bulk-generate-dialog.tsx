@@ -683,11 +683,11 @@ export function BulkGenerateDialog({ open, onOpenChange }: Props) {
                   className={`rounded-lg p-4 border ${
                     result.failed.length > 0
                       ? "bg-amber-500/5 border-amber-500/30"
-                      : "bg-emerald-500/5 border-emerald-500/30"
+                      : "text-emerald-500/5 border-primary/30"
                   }`}
                 >
                   <div className="flex items-center gap-2">
-                    <CheckCircle2 className="size-5 text-emerald-600" />
+                    <CheckCircle2 className="size-5 text-primary" />
                     <div className="text-sm font-semibold">
                       Generated {result.count} of {result.totalRequested}{" "}
                       document(s) successfully.

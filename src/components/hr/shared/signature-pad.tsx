@@ -256,7 +256,7 @@ export function SignaturePad({ onChange, className }: Props) {
             variant="outline"
             onClick={done}
             disabled={!hasStrokes}
-            className="h-7 text-xs border-emerald-500/30 text-emerald-700 hover:bg-emerald-500/10 hover:text-emerald-800"
+            className="h-7 text-xs border-primary/30 text-primary hover:text-emerald-500/10 hover:text-foreground"
           >
             <Check className="size-3.5 mr-1" />
             Done

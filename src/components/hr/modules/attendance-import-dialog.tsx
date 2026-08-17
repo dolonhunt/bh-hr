@@ -236,7 +236,7 @@ export function AttendanceImportDialog({ open, onOpenChange, onImported }: Props
                     className={cn(
                       "flex items-center gap-1.5 px-2.5 py-1 rounded-full font-medium transition-colors",
                       isCurrent && "bg-primary text-primary-foreground",
-                      isDone && "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300",
+                      isDone && "text-emerald-500/15 text-primary dark:text-primary/80",
                       !isCurrent && !isDone && "bg-muted text-muted-foreground"
                     )}
                   >
@@ -495,7 +495,7 @@ export function AttendanceImportDialog({ open, onOpenChange, onImported }: Props
             )}
 
             {result.errors.length === 0 && (
-              <div className="flex items-center gap-2 text-sm text-emerald-700 dark:text-emerald-300 bg-emerald-500/10 rounded-md p-3">
+              <div className="flex items-center gap-2 text-sm text-primary dark:text-primary/80 text-emerald-500/10 rounded-md p-3">
                 <CheckCircle2 className="size-4 flex-shrink-0" />
                 All rows imported successfully — no errors.
               </div>
@@ -558,7 +558,7 @@ function ResultStat({
       <div
         className={cn(
           "mx-auto size-9 rounded-xl flex items-center justify-center mb-2",
-          color === "emerald" && "bg-emerald-500/10 text-emerald-600",
+          color === "emerald" && "text-emerald-500/10 text-primary",
           color === "amber" && "bg-amber-500/10 text-amber-600",
           color === "rose" && "bg-rose-500/10 text-rose-600"
         )}

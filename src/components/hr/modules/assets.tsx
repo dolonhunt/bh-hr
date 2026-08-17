@@ -113,7 +113,7 @@ import { cn, formatDate, formatCurrency } from "@/lib/utils";
 const ASSET_TYPES = [
   { value: "LAPTOP", label: "Laptop", icon: Laptop, color: "text-sky-600 bg-sky-500/10" },
   { value: "MONITOR", label: "Monitor", icon: Monitor, color: "text-violet-600 bg-violet-500/10" },
-  { value: "PHONE", label: "Phone", icon: Smartphone, color: "text-emerald-600 bg-emerald-500/10" },
+  { value: "PHONE", label: "Phone", icon: Smartphone, color: "text-primary text-emerald-500/10" },
   { value: "TABLET", label: "Tablet", icon: Tablet, color: "text-amber-600 bg-amber-500/10" },
   { value: "KEYBOARD", label: "Keyboard", icon: Keyboard, color: "text-teal-600 bg-teal-500/10" },
   { value: "MOUSE", label: "Mouse", icon: Mouse, color: "text-fuchsia-600 bg-fuchsia-500/10" },
@@ -149,7 +149,7 @@ type MaintenanceStatusValue = (typeof MAINTENANCE_STATUSES)[number];
 const MAINTENANCE_TYPE_COLOR: Record<MaintenanceTypeValue, string> = {
   REPAIR: "bg-rose-500/15 text-rose-700 dark:text-rose-300 border-rose-500/20",
   MAINTENANCE:
-    "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/20",
+    "text-emerald-500/15 text-primary dark:text-primary/80 border-primary/20",
   UPGRADE: "bg-violet-500/15 text-violet-700 dark:text-violet-300 border-violet-500/20",
   INSPECTION:
     "bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/20",
@@ -163,7 +163,7 @@ const MAINTENANCE_STATUS_COLOR: Record<MaintenanceStatusValue, string> = {
   IN_PROGRESS:
     "bg-sky-500/15 text-sky-700 dark:text-sky-300 border-sky-500/20",
   COMPLETED:
-    "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/20",
+    "text-emerald-500/15 text-primary dark:text-primary/80 border-primary/20",
   CANCELLED:
     "bg-rose-500/15 text-rose-700 dark:text-rose-300 border-rose-500/20",
 };
@@ -180,14 +180,14 @@ type AssetCondition = (typeof CONDITIONS)[number];
 type AssetStatus = (typeof STATUSES)[number];
 
 const CONDITION_COLOR: Record<AssetCondition, string> = {
-  NEW: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/20",
+  NEW: "text-emerald-500/15 text-primary dark:text-primary/80 border-primary/20",
   GOOD: "bg-sky-500/15 text-sky-700 dark:text-sky-300 border-sky-500/20",
   FAIR: "bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/20",
   DAMAGED: "bg-rose-500/15 text-rose-700 dark:text-rose-300 border-rose-500/20",
 };
 
 const STATUS_COLOR: Record<AssetStatus, string> = {
-  AVAILABLE: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/20",
+  AVAILABLE: "text-emerald-500/15 text-primary dark:text-primary/80 border-primary/20",
   ASSIGNED: "bg-sky-500/15 text-sky-700 dark:text-sky-300 border-sky-500/20",
   RETURNED: "bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/20",
   RETIRED: "bg-rose-500/15 text-rose-700 dark:text-rose-300 border-rose-500/20",
@@ -479,7 +479,7 @@ export function AssetsModule() {
           label="Available"
           value={available}
           icon={PackageOpen}
-          iconClass="bg-emerald-500/15 text-emerald-600"
+          iconClass="text-emerald-500/15 text-primary"
           footer={<span className="text-muted-foreground">Free to assign</span>}
         />
         <KpiCard
@@ -940,7 +940,7 @@ function AssetsGrid({
                 </div>
               </div>
             ) : (
-              <div className="text-xs text-emerald-600 dark:text-emerald-400 italic pt-1 border-t border-border/60">
+              <div className="text-xs text-primary dark:text-emerald-400 italic pt-1 border-t border-border/60">
                 Available for assignment
               </div>
             )}
@@ -1617,14 +1617,14 @@ function ReturnDialog({
 // =========================================================
 
 function depreciationColor(pct: number) {
-  if (pct < 30) return "bg-emerald-500";
+  if (pct < 30) return "text-emerald-500";
   if (pct <= 70) return "bg-amber-500";
   return "bg-rose-500";
 }
 
 function depreciationTone(pct: number) {
   if (pct < 30)
-    return "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/20";
+    return "text-emerald-500/15 text-primary dark:text-primary/80 border-primary/20";
   if (pct <= 70)
     return "bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/20";
   return "bg-rose-500/15 text-rose-700 dark:text-rose-300 border-rose-500/20";
@@ -1719,7 +1719,7 @@ function DepreciationView({
           label="Total Current Value"
           value={summary ? formatCurrency(summary.totalCurrentValue) : "—"}
           icon={Package}
-          iconClass="bg-emerald-500/15 text-emerald-600"
+          iconClass="text-emerald-500/15 text-primary"
           footer={<span className="text-muted-foreground">After depreciation</span>}
         />
         <KpiCard
@@ -1971,7 +1971,7 @@ function DepreciationDetailDialog({
                 </div>
                 <div className="flex items-center gap-3 text-[10px] text-muted-foreground">
                   <span className="flex items-center gap-1">
-                    <span className="size-2.5 rounded-sm bg-emerald-500" />
+                    <span className="size-2.5 rounded-sm text-emerald-500" />
                     Remaining value
                   </span>
                   <span className="flex items-center gap-1">
@@ -2130,7 +2130,7 @@ function SummaryTile({
     tone === "primary"
       ? "bg-primary/10 text-primary"
       : tone === "emerald"
-        ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300"
+        ? "text-emerald-500/15 text-primary dark:text-primary/80"
         : tone === "rose"
           ? "bg-rose-500/15 text-rose-700 dark:text-rose-300"
           : "bg-amber-500/15 text-amber-700 dark:text-amber-300";
@@ -2211,15 +2211,15 @@ function MaintenanceSummaryCard({
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-        <div className="rounded-xl border border-border/60 p-3 bg-emerald-500/5">
+        <div className="rounded-xl border border-border/60 p-3 text-emerald-500/5">
           <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-muted-foreground">
-            <Coins className="size-3.5 text-emerald-600" />
+            <Coins className="size-3.5 text-primary" />
             Total Maintenance Cost
           </div>
           {isLoading ? (
             <Skeleton className="h-7 w-24 mt-2" />
           ) : (
-            <div className="text-lg sm:text-xl font-bold mt-1 tabular-nums text-emerald-700 dark:text-emerald-300">
+            <div className="text-lg sm:text-xl font-bold mt-1 tabular-nums text-primary dark:text-primary/80">
               {formatCurrency(totalCost)}
             </div>
           )}
@@ -2300,7 +2300,7 @@ function MaintenanceSummaryCard({
                 <span className="font-mono text-muted-foreground">
                   #{t.assetId.slice(-6)}
                 </span>
-                <span className="font-semibold text-emerald-700 dark:text-emerald-300 tabular-nums">
+                <span className="font-semibold text-primary dark:text-primary/80 tabular-nums">
                   {formatCurrency(t.cost)}
                 </span>
               </div>
@@ -2661,7 +2661,7 @@ function MaintenanceSummaryTile({
     tone === "primary"
       ? "bg-primary/10 text-primary"
       : tone === "emerald"
-        ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300"
+        ? "text-emerald-500/15 text-primary dark:text-primary/80"
         : tone === "rose"
           ? "bg-rose-500/15 text-rose-700 dark:text-rose-300"
           : "bg-amber-500/15 text-amber-700 dark:text-amber-300";

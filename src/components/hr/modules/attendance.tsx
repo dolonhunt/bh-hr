@@ -160,7 +160,7 @@ export function AttendanceModule() {
           label="Present"
           value={presentToday}
           icon={CalendarCheck}
-          iconClass="bg-emerald-500/10 text-emerald-600"
+          iconClass="text-emerald-500/10 text-primary"
         />
         <KpiCard
           label="Absent"
@@ -446,7 +446,7 @@ export function AttendanceModule() {
 // =========================================================
 
 const INTENSITY_COLORS: Record<string, string> = {
-  PRESENT: "bg-emerald-500",
+  PRESENT: "text-emerald-500",
   LATE: "bg-amber-500/80",
   REMOTE: "bg-amber-500/80",
   HALF_DAY: "bg-sky-500/60",
@@ -471,7 +471,7 @@ const LEGEND_ITEMS = [
   { label: "Leave", color: "bg-amber-500/40" },
   { label: "Half Day", color: "bg-sky-500/60" },
   { label: "Late / Remote", color: "bg-amber-500/80" },
-  { label: "Present", color: "bg-emerald-500" },
+  { label: "Present", color: "text-emerald-500" },
   { label: "More", color: "bg-emerald-600" },
 ];
 

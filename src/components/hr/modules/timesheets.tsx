@@ -99,7 +99,7 @@ type TimesheetStatus = "DRAFT" | "SUBMITTED" | "APPROVED" | "REJECTED";
 const STATUS_COLOR: Record<TimesheetStatus, string> = {
   DRAFT: "bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/20",
   SUBMITTED: "bg-sky-500/15 text-sky-700 dark:text-sky-300 border-sky-500/20",
-  APPROVED: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/20",
+  APPROVED: "text-emerald-500/15 text-primary dark:text-primary/80 border-primary/20",
   REJECTED: "bg-rose-500/15 text-rose-700 dark:text-rose-300 border-rose-500/20",
 };
 
@@ -441,7 +441,7 @@ export function TimesheetsModule() {
           label="Approved Hours"
           value={approvedHours.toFixed(1)}
           icon={CircleCheck}
-          iconClass="bg-emerald-500/15 text-emerald-600"
+          iconClass="text-emerald-500/15 text-primary"
           footer={<span className="text-muted-foreground">All-time total</span>}
         />
         <KpiCard
@@ -713,7 +713,7 @@ function ClockWidget({ onSaved }: { onSaved: () => void }) {
             className={cn(
               "size-12 rounded-2xl flex items-center justify-center flex-shrink-0",
               clock
-                ? "bg-emerald-500/15 text-emerald-600"
+                ? "text-emerald-500/15 text-primary"
                 : "bg-muted text-muted-foreground"
             )}
           >
@@ -725,8 +725,8 @@ function ClockWidget({ onSaved }: { onSaved: () => void }) {
                 {clock ? "Currently Clocked In" : "Time Clock"}
               </h3>
               {clock && (
-                <span className="inline-flex items-center gap-1 text-[10px] uppercase tracking-wider font-semibold text-emerald-700 bg-emerald-500/15 px-1.5 py-0.5 rounded-full">
-                  <span className="size-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                <span className="inline-flex items-center gap-1 text-[10px] uppercase tracking-wider font-semibold text-primary text-emerald-500/15 px-1.5 py-0.5 rounded-full">
+                  <span className="size-1.5 rounded-full text-emerald-500 animate-pulse" />
                   Active
                 </span>
               )}
@@ -1069,7 +1069,7 @@ function EntryActions({
           <Button
             size="sm"
             variant="outline"
-            className="h-8 gap-1.5 text-emerald-700 border-emerald-500/30 hover:bg-emerald-500/10"
+            className="h-8 gap-1.5 text-primary border-primary/30 hover:text-emerald-500/10"
             disabled={busy === "approve"}
             onClick={() => run("approve", () => onApprove(entry))}
           >
@@ -1211,7 +1211,7 @@ function PendingTab({
                       <Button
                         size="sm"
                         variant="outline"
-                        className="h-8 gap-1.5 text-emerald-700 border-emerald-500/30 hover:bg-emerald-500/10"
+                        className="h-8 gap-1.5 text-primary border-primary/30 hover:text-emerald-500/10"
                         onClick={() => onApprove(e)}
                       >
                         <Check className="size-3.5" />

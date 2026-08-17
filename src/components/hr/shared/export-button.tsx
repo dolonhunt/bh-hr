@@ -91,7 +91,7 @@ export function ExportButton({
           onClick={() => triggerDownload("csv")}
           className="cursor-pointer"
         >
-          <FileText className="size-4 mr-2 text-emerald-600" />
+          <FileText className="size-4 mr-2 text-primary" />
           <span>CSV</span>
           <span className="ml-auto text-[10px] uppercase tracking-wider text-muted-foreground">
             .csv
@@ -101,7 +101,7 @@ export function ExportButton({
           onClick={() => triggerDownload("excel")}
           className="cursor-pointer"
         >
-          <FileSpreadsheet className="size-4 mr-2 text-emerald-600" />
+          <FileSpreadsheet className="size-4 mr-2 text-primary" />
           <span>Excel</span>
           <span className="ml-auto text-[10px] uppercase tracking-wider text-muted-foreground">
             .xls

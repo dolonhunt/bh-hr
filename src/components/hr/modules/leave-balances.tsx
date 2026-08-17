@@ -125,7 +125,7 @@ export function LeaveBalances() {
           label="Total Used"
           value={`${totals.used}d`}
           icon={CheckCircle2}
-          iconClass="bg-emerald-500/10 text-emerald-600"
+          iconClass="text-emerald-500/10 text-primary"
         />
         <KpiCard
           label="Total Remaining"
@@ -245,7 +245,7 @@ export function LeaveBalances() {
                     it.allocated === 0
                       ? "text-muted-foreground"
                       : remainingPct > 0.5
-                        ? "text-emerald-600"
+                        ? "text-primary"
                         : remainingPct >= 0.2
                           ? "text-amber-600"
                           : "text-rose-600";
@@ -307,7 +307,7 @@ export function LeaveBalances() {
                                 ? "[&>[data-slot=progress-indicator]]:bg-rose-500"
                                 : pct >= 50
                                   ? "[&>[data-slot=progress-indicator]]:bg-amber-500"
-                                  : "[&>[data-slot=progress-indicator]]:bg-emerald-500"
+                                  : "[&>[data-slot=progress-indicator]]:text-emerald-500"
                             )}
                           />
                           <span className="text-xs tabular-nums text-muted-foreground w-10 text-right">
@@ -329,7 +329,7 @@ export function LeaveBalances() {
         <div className="flex items-center gap-4 text-xs text-muted-foreground flex-wrap">
           <span className="font-medium">Remaining:</span>
           <span className="inline-flex items-center gap-1.5">
-            <span className="size-2.5 rounded-full bg-emerald-500" />
+            <span className="size-2.5 rounded-full text-emerald-500" />
             &gt; 50%
           </span>
           <span className="inline-flex items-center gap-1.5">

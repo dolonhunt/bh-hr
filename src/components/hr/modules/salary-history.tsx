@@ -170,12 +170,12 @@ export function SalaryHistory({
                   <Minus className="size-3.5" />
                 );
                 const nodeTone = isUp
-                  ? "bg-emerald-500 text-white"
+                  ? "text-emerald-500 text-white"
                   : isDown
                     ? "bg-rose-500 text-white"
                     : "bg-muted-foreground text-white";
                 const deltaTone = isUp
-                  ? "text-emerald-600 dark:text-emerald-400"
+                  ? "text-primary dark:text-emerald-400"
                   : isDown
                     ? "text-rose-600 dark:text-rose-400"
                     : "text-muted-foreground";
@@ -290,7 +290,7 @@ function BreakdownCell({
           className={cn(
             "text-[10px]",
             newV > oldV
-              ? "text-emerald-600 dark:text-emerald-400"
+              ? "text-primary dark:text-emerald-400"
               : "text-rose-600 dark:text-rose-400"
           )}
         >
@@ -314,7 +314,7 @@ function SummaryTile({
   tone: "emerald" | "rose";
 }) {
   const tones: Record<string, string> = {
-    emerald: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-300",
+    emerald: "text-emerald-500/10 text-primary dark:text-primary/80",
     rose: "bg-rose-500/10 text-rose-600 dark:text-rose-300",
   };
   return (

@@ -540,10 +540,10 @@ export function PayrollBatchDialog({ open, onOpenChange }: Props) {
 
                 {/* Will-create list */}
                 <div className="space-y-1">
-                  <div className="text-xs font-medium text-emerald-600 uppercase tracking-wider">
+                  <div className="text-xs font-medium text-primary uppercase tracking-wider">
                     Will create DRAFT payroll — {selectedToCreate.length}
                   </div>
-                  <div className="border border-emerald-500/20 rounded-lg max-h-[24vh] overflow-y-auto">
+                  <div className="border border-primary/20 rounded-lg max-h-[24vh] overflow-y-auto">
                     {selectedToCreate.length === 0 && (
                       <div className="p-4 text-center text-xs text-muted-foreground">
                         Nothing to create — every selected employee already has
@@ -609,11 +609,11 @@ export function PayrollBatchDialog({ open, onOpenChange }: Props) {
                       className={`rounded-lg p-4 border ${
                         result.failed.length > 0
                           ? "bg-amber-500/5 border-amber-500/30"
-                          : "bg-emerald-500/5 border-emerald-500/30"
+                          : "text-emerald-500/5 border-primary/30"
                       }`}
                     >
                       <div className="flex items-center gap-2">
-                        <CheckCircle2 className="size-5 text-emerald-600" />
+                        <CheckCircle2 className="size-5 text-primary" />
                         <div className="text-sm font-semibold">
                           Created {result.created.length} of{" "}
                           {result.totalRequested} payroll record(s) for{" "}
@@ -633,8 +633,8 @@ export function PayrollBatchDialog({ open, onOpenChange }: Props) {
 
                     {/* Summary chips */}
                     <div className="grid grid-cols-3 gap-2">
-                      <div className="rounded-lg border border-emerald-500/20 bg-emerald-500/5 p-3 text-center">
-                        <div className="text-2xl font-bold text-emerald-600">
+                      <div className="rounded-lg border border-primary/20 text-emerald-500/5 p-3 text-center">
+                        <div className="text-2xl font-bold text-primary">
                           {result.created.length}
                         </div>
                         <div className="text-[10px] uppercase tracking-wider text-muted-foreground">

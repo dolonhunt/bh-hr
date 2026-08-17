@@ -210,7 +210,7 @@ export function ApprovalQueue({
           label="Approved Today"
           value={kpis.approvedToday}
           icon={FileCheck2}
-          iconClass="bg-emerald-500/10 text-emerald-600"
+          iconClass="text-emerald-500/10 text-primary"
         />
         <KpiCard
           label="Issued Today"
@@ -372,7 +372,7 @@ export function ApprovalQueue({
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="size-8 text-emerald-600 hover:bg-emerald-500/10 hover:text-emerald-700"
+                          className="size-8 text-primary hover:text-emerald-500/10 hover:text-primary"
                           onClick={() => quickApprove(d)}
                           title="Approve"
                         >
@@ -596,7 +596,7 @@ function ApproveDialog({
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <CheckCircle2 className="size-5 text-emerald-600" />
+            <CheckCircle2 className="size-5 text-primary" />
             Review &amp; Approve
           </DialogTitle>
           <DialogDescription>

@@ -811,7 +811,7 @@ function StatCard({
   tone: "emerald" | "amber" | "teal" | "violet";
 }) {
   const tones: Record<string, string> = {
-    emerald: "bg-emerald-500/10 text-emerald-600",
+    emerald: "text-emerald-500/10 text-primary",
     amber: "bg-amber-500/10 text-amber-600",
     teal: "bg-teal-500/10 text-teal-600",
     violet: "bg-violet-500/10 text-violet-600",

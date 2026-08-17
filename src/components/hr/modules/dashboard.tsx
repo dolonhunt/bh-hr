@@ -598,7 +598,7 @@ function HeroBannerWidget({
           </div>
           <div className="hidden sm:block text-sm space-y-0.5">
             <div className="flex items-center gap-2">
-              <span className="size-2 rounded-full bg-emerald-500" />
+              <span className="size-2 rounded-full text-emerald-500" />
               <span className="text-muted-foreground">Present</span>
               <span className="font-semibold tabular-nums">
                 {kpis.presentToday}
@@ -643,7 +643,7 @@ function KpiRowWidget({
         label="Present Today"
         value={kpis.presentToday}
         icon={CalendarCheck}
-        iconClass="bg-emerald-500/10 text-emerald-600"
+        iconClass="text-emerald-500/10 text-primary"
         delta={{ value: "+5%", trend: "up" }}
         onClick={() => setModule("attendance")}
         sparkline={data.attendanceTrend.map((d) => d.present)}
@@ -862,7 +862,7 @@ function QuickActionsWidget({
       key: "add-attendance",
       label: "Add Attendance",
       icon: CalendarCheck,
-      color: "bg-emerald-500/10 text-emerald-600",
+      color: "text-emerald-500/10 text-primary",
     },
     {
       key: "add-leave",

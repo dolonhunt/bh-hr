@@ -247,7 +247,7 @@ export function SignDocumentDialog({
                 className={cn(
                   "flex items-center gap-2 rounded-md border px-3 py-2 text-xs font-medium transition-colors",
                   method === "draw"
-                    ? "border-emerald-500 bg-emerald-500/10 text-emerald-700"
+                    ? "border-primary text-emerald-500/10 text-primary"
                     : "border-border bg-background text-muted-foreground hover:bg-muted/40"
                 )}
               >
@@ -260,7 +260,7 @@ export function SignDocumentDialog({
                 className={cn(
                   "flex items-center gap-2 rounded-md border px-3 py-2 text-xs font-medium transition-colors",
                   method === "type"
-                    ? "border-emerald-500 bg-emerald-500/10 text-emerald-700"
+                    ? "border-primary text-emerald-500/10 text-primary"
                     : "border-border bg-background text-muted-foreground hover:bg-muted/40"
                 )}
               >
@@ -307,11 +307,11 @@ export function SignDocumentDialog({
           )}
 
           {/* Verification info */}
-          <div className="rounded-md border border-emerald-500/30 bg-emerald-500/5 p-3 flex items-start gap-2.5">
-            <ShieldCheck className="size-4 text-emerald-700 flex-shrink-0 mt-0.5" />
-            <div className="text-[11px] text-emerald-800">
+          <div className="rounded-md border border-primary/30 text-emerald-500/5 p-3 flex items-start gap-2.5">
+            <ShieldCheck className="size-4 text-primary flex-shrink-0 mt-0.5" />
+            <div className="text-[11px] text-foreground">
               <div className="font-medium">Tamper-evident signature</div>
-              <div className="mt-0.5 text-emerald-700/80">
+              <div className="mt-0.5 text-primary/80">
                 A SHA-256 verification hash of the document content + signer +
                 date is embedded in the signature block. Anyone can verify the
                 signature later via the &ldquo;Verify Signature&rdquo; action.

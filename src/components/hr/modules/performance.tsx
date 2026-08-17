@@ -115,13 +115,13 @@ function scoreBarColor(score: number): string {
   if (score < 40) return "bg-rose-500";
   if (score < 60) return "bg-amber-500";
   if (score < 75) return "bg-yellow-500";
-  return "bg-emerald-500";
+  return "text-emerald-500";
 }
 function scoreTextColor(score: number): string {
   if (score < 40) return "text-rose-600 dark:text-rose-400";
   if (score < 60) return "text-amber-600 dark:text-amber-400";
   if (score < 75) return "text-yellow-600 dark:text-yellow-400";
-  return "text-emerald-600 dark:text-emerald-400";
+  return "text-primary dark:text-emerald-400";
 }
 
 const DIMENSIONS = [
@@ -247,7 +247,7 @@ export function PerformanceModule() {
             <span className={scoreTextColor(avgScore)}>{avgScore}</span>
           }
           icon={TrendingUp}
-          iconClass="bg-emerald-500/15 text-emerald-600"
+          iconClass="text-emerald-500/15 text-primary"
           footer={
             <span className="text-muted-foreground">Out of 100</span>
           }

@@ -312,7 +312,7 @@ export function PayrollModule() {
                   onClick={() => downloadBankFile("csv")}
                   disabled={bankFileLoading !== ""}
                 >
-                  <FileSpreadsheet className="size-4 text-emerald-600" />
+                  <FileSpreadsheet className="size-4 text-primary" />
                   <div className="min-w-0">
                     <div className="text-xs font-medium">CSV Format</div>
                     <div className="text-[10px] text-muted-foreground">
@@ -374,7 +374,7 @@ export function PayrollModule() {
           label="Basic Salary"
           value={formatCurrency(totalBasic)}
           icon={Wallet}
-          iconClass="bg-emerald-500/10 text-emerald-600"
+          iconClass="text-emerald-500/10 text-primary"
         />
         <KpiCard
           label="Allowances"
@@ -604,7 +604,7 @@ export function PayrollModule() {
                             {p.status === "PAID" && (
                               <DropdownMenuItem
                                 onClick={() => emailPayslip(p.employeeId, p.payrollMonth)}
-                                className="text-emerald-700 focus:text-emerald-700"
+                                className="text-primary focus:text-primary"
                               >
                                 <Send className="size-4 mr-2" /> Email Payslip
                               </DropdownMenuItem>
@@ -848,11 +848,11 @@ function TaxConfigDialog({
             </div>
           ) : (
             <>
-              <div className="rounded-md border border-emerald-500/20 bg-emerald-500/5 p-3 text-xs text-emerald-800 flex items-start gap-2">
+              <div className="rounded-md border border-primary/20 text-emerald-500/5 p-3 text-xs text-foreground flex items-start gap-2">
                 <Calculator className="size-4 flex-shrink-0 mt-0.5" />
                 <div>
                   <div className="font-medium">How TDS is calculated</div>
-                  <div className="mt-0.5 text-emerald-700/80">
+                  <div className="mt-0.5 text-primary/80">
                     Monthly gross × 12 = annual income. Each slab applies its rate
                     to the portion of income within that slab's range. Total annual
                     tax ÷ 12 = monthly TDS deduction.

@@ -148,19 +148,19 @@ const TYPE_META: Record<
   VIDEO: { label: "Video", icon: Video, color: "bg-violet-500/15 text-violet-700 dark:text-violet-300" },
   ONSITE: { label: "Onsite", icon: MapPin, color: "bg-amber-500/15 text-amber-700 dark:text-amber-300" },
   TECHNICAL: { label: "Technical", icon: Code2, color: "bg-teal-500/15 text-teal-700 dark:text-teal-300" },
-  HR: { label: "HR", icon: UsersIcon, color: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300" },
+  HR: { label: "HR", icon: UsersIcon, color: "text-emerald-500/15 text-primary dark:text-primary/80" },
   FINAL: { label: "Final", icon: Trophy, color: "bg-rose-500/15 text-rose-700 dark:text-rose-300" },
 };
 
 const STATUS_TONE: Record<InterviewStatus, string> = {
   SCHEDULED: "bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/20",
-  COMPLETED: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/20",
+  COMPLETED: "text-emerald-500/15 text-primary dark:text-primary/80 border-primary/20",
   CANCELLED: "bg-rose-500/15 text-rose-700 dark:text-rose-300 border-rose-500/20",
   NO_SHOW: "bg-rose-500/15 text-rose-700 dark:text-rose-300 border-rose-500/20",
 };
 
 const RECOMMENDATION_TONE: Record<Recommendation, string> = {
-  HIRE: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/20",
+  HIRE: "text-emerald-500/15 text-primary dark:text-primary/80 border-primary/20",
   REJECT: "bg-rose-500/15 text-rose-700 dark:text-rose-300 border-rose-500/20",
   HOLD: "bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/20",
 };
@@ -296,7 +296,7 @@ function KpiRow() {
         label="Completed this week"
         value={completedThisWeek}
         icon={CheckCircle2}
-        iconClass="bg-emerald-500/15 text-emerald-600"
+        iconClass="text-emerald-500/15 text-primary"
         footer={<span className="text-muted-foreground">Since Monday</span>}
       />
       <KpiCard
@@ -745,7 +745,7 @@ function UpcomingCard({
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-44">
               <DropdownMenuItem onClick={onComplete} className="gap-2 cursor-pointer">
-                <CheckCircle className="size-4 text-emerald-600" />
+                <CheckCircle className="size-4 text-primary" />
                 Complete
               </DropdownMenuItem>
               <DropdownMenuItem onClick={onEdit} className="gap-2 cursor-pointer">
@@ -1613,7 +1613,7 @@ function CompleteDialog({
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <CheckCircle className="size-5 text-emerald-600" />
+            <CheckCircle className="size-5 text-primary" />
             Complete Interview
           </DialogTitle>
           <DialogDescription>
@@ -1709,7 +1709,7 @@ const REC_COLORS: Record<Recommendation, string> = {
 };
 
 const REC_TONE: Record<Recommendation, string> = {
-  HIRE: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/20",
+  HIRE: "text-emerald-500/15 text-primary dark:text-primary/80 border-primary/20",
   REJECT: "bg-rose-500/15 text-rose-700 dark:text-rose-300 border-rose-500/20",
   HOLD: "bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/20",
 };
@@ -1940,7 +1940,7 @@ function CandidateSummaryContent({ agg }: { agg: AggResponse }) {
           label="Recommendations"
           value={totalRecs}
           icon={TrendingUp}
-          iconClass="bg-emerald-500/15 text-emerald-600"
+          iconClass="text-emerald-500/15 text-primary"
           footer={
             <span className="text-muted-foreground">
               H{summary.recommendationCounts.HIRE} · R
@@ -2078,7 +2078,7 @@ function CandidateSummaryContent({ agg }: { agg: AggResponse }) {
                       "absolute -left-2 size-4 rounded-full border-2 border-background",
                       "ring-2 ring-border/40",
                       i.status === "COMPLETED"
-                        ? "bg-emerald-500"
+                        ? "text-emerald-500"
                         : i.status === "CANCELLED" || i.status === "NO_SHOW"
                           ? "bg-rose-500"
                           : "bg-amber-500"

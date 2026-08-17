@@ -330,7 +330,7 @@ function JobsTab() {
           label="Hired (this view)"
           value={hiredThisMonth}
           icon={UserCheck}
-          iconClass="bg-emerald-500/15 text-emerald-600"
+          iconClass="text-emerald-500/15 text-primary"
           footer={<span className="text-muted-foreground">HIRED stage</span>}
         />
       </div>
@@ -1578,7 +1578,7 @@ function CandidateDetailDialog({
                 <Badge
                   key={`${s}-${i}`}
                   variant="outline"
-                  className="bg-emerald-500/10 text-emerald-700 border-emerald-500/20"
+                  className="text-emerald-500/10 text-primary border-primary/20"
                 >
                   {s}
                 </Badge>

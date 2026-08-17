@@ -374,9 +374,9 @@ export function PayslipDialog({
 
                 {/* Calculate Payroll action */}
                 {selectedEmp && !breakdown && (
-                  <div className="rounded-md border border-emerald-500/30 bg-emerald-500/5 p-3 flex items-center justify-between gap-3">
+                  <div className="rounded-md border border-primary/30 text-emerald-500/5 p-3 flex items-center justify-between gap-3">
                     <div className="flex items-center gap-2 min-w-0">
-                      <Calculator className="size-4 text-emerald-700 flex-shrink-0" />
+                      <Calculator className="size-4 text-primary flex-shrink-0" />
                       <div className="text-xs text-muted-foreground min-w-0">
                         <span className="font-medium text-foreground">Calculate Payroll</span>
                         <span className="hidden sm:inline"> — preview HRA, PF, TDS, gratuity & net salary before generating the payslip.</span>
@@ -385,7 +385,7 @@ export function PayslipDialog({
                     <Button
                       size="sm"
                       variant="outline"
-                      className="border-emerald-500/30 text-emerald-700 hover:bg-emerald-500/10 hover:text-emerald-800 flex-shrink-0"
+                      className="border-primary/30 text-primary hover:text-emerald-500/10 hover:text-foreground flex-shrink-0"
                       onClick={handleCalculate}
                       disabled={calculating}
                     >
@@ -412,7 +412,7 @@ export function PayslipDialog({
                       </div>
                       <div className="flex items-center gap-2 flex-shrink-0">
                         {breakdown.taxSlab && (
-                          <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-700 border border-emerald-500/20">
+                          <span className="text-[10px] font-mono px-2 py-0.5 rounded-full text-emerald-500/10 text-primary border border-primary/20">
                             Slab: {breakdown.taxSlab.label} ({Math.round(breakdown.taxSlab.rate * 100)}%)
                           </span>
                         )}
@@ -460,7 +460,7 @@ export function PayslipDialog({
                         )}
                         <div className="flex justify-between items-center pt-1.5 mt-1 border-t border-border">
                           <span className="text-xs font-semibold">Gross Salary</span>
-                          <span className="text-sm font-bold tabular-nums text-emerald-700">
+                          <span className="text-sm font-bold tabular-nums text-primary">
                             {formatCurrency(breakdown.grossSalary)}
                           </span>
                         </div>
@@ -507,14 +507,14 @@ export function PayslipDialog({
                     </div>
 
                     {/* Net Salary */}
-                    <div className="px-3 py-2.5 bg-emerald-500/10 border-t border-emerald-500/20 flex items-center justify-between gap-2">
+                    <div className="px-3 py-2.5 text-emerald-500/10 border-t border-primary/20 flex items-center justify-between gap-2">
                       <div className="flex items-center gap-2 min-w-0">
-                        <Wallet className="size-4 text-emerald-700 flex-shrink-0" />
-                        <span className="text-sm font-semibold text-emerald-800">
+                        <Wallet className="size-4 text-primary flex-shrink-0" />
+                        <span className="text-sm font-semibold text-foreground">
                           Net Salary (Take-home)
                         </span>
                       </div>
-                      <span className="text-lg font-bold tabular-nums text-emerald-700">
+                      <span className="text-lg font-bold tabular-nums text-primary">
                         {formatCurrency(breakdown.netSalary)}
                       </span>
                     </div>
@@ -632,7 +632,7 @@ export function PayslipDialog({
               <div className="px-6 py-4 space-y-4">
                 {/* Success state */}
                 <div className="flex flex-col items-center text-center py-2">
-                  <div className="size-12 rounded-full bg-emerald-500/15 text-emerald-600 flex items-center justify-center mb-2">
+                  <div className="size-12 rounded-full text-emerald-500/15 text-primary flex items-center justify-center mb-2">
                     <CheckCircle2 className="size-6" />
                   </div>
                   <div className="font-semibold">Payslip Generated</div>
@@ -647,13 +647,13 @@ export function PayslipDialog({
                 {/* Breakdown preview (if available) */}
                 {breakdown && (
                   <div className="rounded-lg border border-border bg-card overflow-hidden">
-                    <div className="px-3 py-2 bg-emerald-500/10 border-b border-emerald-500/20 flex items-center gap-2">
-                      <Sparkles className="size-4 text-emerald-700" />
-                      <span className="text-sm font-medium text-emerald-800">
+                    <div className="px-3 py-2 text-emerald-500/10 border-b border-primary/20 flex items-center gap-2">
+                      <Sparkles className="size-4 text-primary" />
+                      <span className="text-sm font-medium text-foreground">
                         Advanced Payroll Breakdown
                       </span>
                       {breakdown.taxSlab && (
-                        <span className="ml-auto text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-700 border border-emerald-500/20">
+                        <span className="ml-auto text-[10px] font-mono px-2 py-0.5 rounded-full text-emerald-500/15 text-primary border border-primary/20">
                           {Math.round(breakdown.taxSlab.rate * 100)}% slab
                         </span>
                       )}
@@ -668,7 +668,7 @@ export function PayslipDialog({
                         <MiniBreakdownRow label="Special Allow." value={formatCurrency(breakdown.specialAllowance)} muted />
                         <div className="flex justify-between items-center pt-1.5 mt-1 border-t border-border text-xs">
                           <span className="font-semibold">Gross</span>
-                          <span className="font-bold tabular-nums text-emerald-700">
+                          <span className="font-bold tabular-nums text-primary">
                             {formatCurrency(breakdown.grossSalary)}
                           </span>
                         </div>
@@ -688,11 +688,11 @@ export function PayslipDialog({
                         </div>
                       </div>
                     </div>
-                    <div className="px-3 py-2 bg-emerald-500/10 border-t border-emerald-500/20 flex items-center justify-between gap-2">
-                      <span className="text-sm font-semibold text-emerald-800">
+                    <div className="px-3 py-2 text-emerald-500/10 border-t border-primary/20 flex items-center justify-between gap-2">
+                      <span className="text-sm font-semibold text-foreground">
                         Net Salary (Take-home)
                       </span>
-                      <span className="text-lg font-bold tabular-nums text-emerald-700">
+                      <span className="text-lg font-bold tabular-nums text-primary">
                         {formatCurrency(breakdown.netSalary)}
                       </span>
                     </div>
@@ -718,7 +718,7 @@ export function PayslipDialog({
                 <Button
                   size="sm"
                   variant="outline"
-                  className="w-full border-emerald-500/40 text-emerald-700 hover:bg-emerald-500/10 hover:text-emerald-800"
+                  className="w-full border-primary/40 text-primary hover:text-emerald-500/10 hover:text-foreground"
                   onClick={() => setEmailPayslipOpen(true)}
                   disabled={!employeeId || !month}
                   title="Email the enhanced payslip PDF to the employee"

@@ -110,19 +110,19 @@ export function Sidebar() {
                           className={cn(
                             "w-full group/nav flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all relative",
                             active
-                              ? "bg-sidebar-primary text-sidebar-primary-foreground neu-raised-sm"
+                              ? "bg-primary text-primary-foreground neu-raised-sm glow-teal"
                               : "text-sidebar-foreground/80 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground",
                             sidebarCollapsed && "justify-center px-2"
                           )}
                         >
                           {active && !sidebarCollapsed && (
-                            <span className="absolute left-0 top-1/2 -translate-y-1/2 h-5 w-1 rounded-r-full bg-sidebar-primary-foreground/50" />
+                            <span className="absolute left-0 top-1/2 -translate-y-1/2 h-5 w-1 rounded-r-full bg-primary-foreground/50" />
                           )}
                           <Icon
                             className={cn(
                               "size-[18px] flex-shrink-0 transition-transform group-hover/nav:scale-110",
                               active
-                                ? "text-sidebar-primary-foreground"
+                                ? "text-primary-foreground"
                                 : "text-muted-foreground group-hover/nav:text-sidebar-foreground"
                             )}
                           />
@@ -137,7 +137,7 @@ export function Sidebar() {
                             </div>
                           )}
                           {!sidebarCollapsed && active && (
-                            <span className="h-1.5 w-1.5 rounded-full bg-sidebar-primary-foreground/60" />
+                            <span className="h-1.5 w-1.5 rounded-full bg-primary-foreground/60" />
                           )}
                         </button>
                       );

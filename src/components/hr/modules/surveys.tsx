@@ -295,7 +295,7 @@ function KpiRow() {
         label="Total Responses"
         value={totalResponses}
         icon={Users}
-        iconClass="bg-emerald-500/15 text-emerald-600"
+        iconClass="text-emerald-500/15 text-primary"
         footer={<span className="text-muted-foreground">All surveys</span>}
       />
       <KpiCard
@@ -537,7 +537,7 @@ function SurveyCard({
           {survey.anonymous && (
             <Badge
               variant="outline"
-              className="text-[10px] px-1.5 py-0 bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/20 gap-1"
+              className="text-[10px] px-1.5 py-0 text-emerald-500/15 text-primary dark:text-primary/80 border-primary/20 gap-1"
             >
               <ShieldCheck className="size-3" />
               Anonymous
@@ -612,7 +612,7 @@ function SurveyCard({
             {survey.status !== "ACTIVE" && (
               <DropdownMenuItem
                 onClick={onActivate}
-                className="gap-2 cursor-pointer text-emerald-600 focus:text-emerald-700"
+                className="gap-2 cursor-pointer text-primary focus:text-primary"
               >
                 <Send className="size-4" />
                 Activate
@@ -742,7 +742,7 @@ function ResponsesAnalytics({ detail }: { detail: SurveyDetail }) {
               {isAnonymous && (
                 <Badge
                   variant="outline"
-                  className="text-[10px] px-1.5 py-0 bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/20 gap-1"
+                  className="text-[10px] px-1.5 py-0 text-emerald-500/15 text-primary dark:text-primary/80 border-primary/20 gap-1"
                 >
                   <ShieldCheck className="size-3" />
                   Anonymous
@@ -775,7 +775,7 @@ function ResponsesAnalytics({ detail }: { detail: SurveyDetail }) {
           </div>
         </div>
         {isAnonymous && (
-          <div className="mt-4 flex items-start gap-2 rounded-md bg-emerald-500/10 border border-emerald-500/20 p-3 text-xs text-emerald-800 dark:text-emerald-200">
+          <div className="mt-4 flex items-start gap-2 rounded-md text-emerald-500/10 border border-primary/20 p-3 text-xs text-foreground dark:text-muted-foreground">
             <ShieldCheck className="size-4 flex-shrink-0 mt-0.5" />
             <span>
               Responses are anonymous. Employee identities will not be stored or displayed.
@@ -1232,7 +1232,7 @@ function SurveyFormDialog({
                     active
                       ? "bg-primary text-primary-foreground"
                       : done
-                        ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300"
+                        ? "text-emerald-500/15 text-primary dark:text-primary/80"
                         : "bg-muted text-muted-foreground"
                   )}
                 >
@@ -1286,7 +1286,7 @@ function SurveyFormDialog({
               </div>
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2 text-sm font-medium">
-                  <ShieldCheck className="size-4 text-emerald-600" />
+                  <ShieldCheck className="size-4 text-primary" />
                   Anonymous responses
                 </div>
                 <p className="text-xs text-muted-foreground mt-1">
@@ -1297,7 +1297,7 @@ function SurveyFormDialog({
               </div>
             </div>
             {anonymous && (
-              <div className="flex items-start gap-2 rounded-md bg-emerald-500/10 border border-emerald-500/20 p-2.5 text-xs text-emerald-800 dark:text-emerald-200">
+              <div className="flex items-start gap-2 rounded-md text-emerald-500/10 border border-primary/20 p-2.5 text-xs text-foreground dark:text-muted-foreground">
                 <Info className="size-4 flex-shrink-0 mt-0.5" />
                 <span>
                   Responses are anonymous. Employee identities will not be stored.

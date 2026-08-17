@@ -99,7 +99,7 @@ const STATUS_ICON: Record<OffboardingStatus, typeof CheckCircle2> = {
 const STATUS_COLOR: Record<OffboardingStatus, string> = {
   PENDING: "text-muted-foreground",
   IN_PROGRESS: "text-amber-600",
-  COMPLETED: "text-emerald-600",
+  COMPLETED: "text-primary",
   SKIPPED: "text-rose-600",
 };
 
@@ -114,7 +114,7 @@ const EXIT_REASON_TONE: Record<ExitReason, string> = {
   RESIGNATION: "bg-rose-500/10 text-rose-700 dark:text-rose-300",
   TERMINATION: "bg-rose-500/15 text-rose-800 dark:text-rose-200",
   CONTRACT_END: "bg-amber-500/10 text-amber-700 dark:text-amber-300",
-  RETIREMENT: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
+  RETIREMENT: "text-emerald-500/10 text-primary dark:text-primary/80",
 };
 
 function isOverdue(dueDate?: string | null, status?: OffboardingStatus) {
@@ -543,7 +543,7 @@ export function Offboarding({ employeeId }: { employeeId: string }) {
                           </span>
                         )}
                         {task.completedAt && (
-                          <span className="inline-flex items-center gap-1 text-emerald-600">
+                          <span className="inline-flex items-center gap-1 text-primary">
                             <CheckCircle className="size-3" />
                             Done {formatDate(task.completedAt)}
                           </span>
@@ -686,7 +686,7 @@ function StatPill({
   const tones: Record<string, string> = {
     amber: "bg-amber-500/10 text-amber-700 dark:text-amber-300",
     sky: "bg-sky-500/10 text-sky-700 dark:text-sky-300",
-    emerald: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
+    emerald: "text-emerald-500/10 text-primary dark:text-primary/80",
     rose: "bg-rose-500/10 text-rose-700 dark:text-rose-300",
   };
   return (

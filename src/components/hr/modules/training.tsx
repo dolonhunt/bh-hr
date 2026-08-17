@@ -130,7 +130,7 @@ const CATEGORIES = [
 const COURSE_STATUS_COLOR: Record<CourseStatus, string> = {
   SCHEDULED: "bg-sky-500/15 text-sky-700 dark:text-sky-300 border-sky-500/20",
   IN_PROGRESS:
-    "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/20",
+    "text-emerald-500/15 text-primary dark:text-primary/80 border-primary/20",
   COMPLETED:
     "bg-violet-500/15 text-violet-700 dark:text-violet-300 border-violet-500/20",
   CANCELLED: "bg-rose-500/15 text-rose-700 dark:text-rose-300 border-rose-500/20",
@@ -139,7 +139,7 @@ const COURSE_STATUS_COLOR: Record<CourseStatus, string> = {
 const ENROLLMENT_STATUS_COLOR: Record<EnrollmentStatus, string> = {
   ENROLLED: "bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/20",
   COMPLETED:
-    "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/20",
+    "text-emerald-500/15 text-primary dark:text-primary/80 border-primary/20",
   DROPPED: "bg-rose-500/15 text-rose-700 dark:text-rose-300 border-rose-500/20",
 };
 
@@ -401,7 +401,7 @@ function CoursesTab() {
           label="Completion Rate"
           value={`${completionRate}%`}
           icon={Award}
-          iconClass="bg-emerald-500/15 text-emerald-600"
+          iconClass="text-emerald-500/15 text-primary"
           footer={
             <span className="text-muted-foreground">
               {completedEnrollments} of {totalEnrollments} completed
@@ -1088,9 +1088,9 @@ function EnrollmentsTab() {
   return (
     <div className="space-y-6">
       {/* Top action bar — Download All Certificates */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 rounded-lg border border-emerald-500/20 bg-emerald-500/5">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 rounded-lg border border-primary/20 text-emerald-500/5">
         <div className="flex items-center gap-2.5 min-w-0">
-          <div className="flex-shrink-0 size-9 rounded-full bg-emerald-500/15 text-emerald-700 flex items-center justify-center">
+          <div className="flex-shrink-0 size-9 rounded-full text-emerald-500/15 text-primary flex items-center justify-center">
             <Award className="size-4" />
           </div>
           <div className="min-w-0">
@@ -1106,7 +1106,7 @@ function EnrollmentsTab() {
         <Button
           size="sm"
           variant="outline"
-          className="border-emerald-500/30 text-emerald-700 hover:bg-emerald-500/10 hover:text-emerald-800"
+          className="border-primary/30 text-primary hover:text-emerald-500/10 hover:text-foreground"
           disabled={downloadingAll || completedEnrollments.length === 0}
           onClick={downloadAllCertificates}
         >
@@ -1255,7 +1255,7 @@ function EnrollmentsTab() {
                           className={cn(
                             "font-medium text-[11px]",
                             e.score >= 80
-                              ? "bg-emerald-500/15 text-emerald-700 border-emerald-500/20"
+                              ? "text-emerald-500/15 text-primary border-primary/20"
                               : e.score >= 50
                                 ? "bg-amber-500/15 text-amber-700 border-amber-500/20"
                                 : "bg-rose-500/15 text-rose-700 border-rose-500/20"
@@ -1307,7 +1307,7 @@ function EnrollmentsTab() {
                           <Button
                             size="sm"
                             variant="outline"
-                            className="h-8 gap-1.5 border-emerald-500/30 text-emerald-700 hover:bg-emerald-500/10 hover:text-emerald-800"
+                            className="h-8 gap-1.5 border-primary/30 text-primary hover:text-emerald-500/10 hover:text-foreground"
                             disabled={certLoading[e.id]}
                             onClick={() => downloadCertificate(e)}
                             title="Download certificate PDF"
@@ -1981,7 +1981,7 @@ function FeedbackTab() {
               label="Would Recommend"
               value={summary ? `${summary.recommendPct}%` : "—"}
               icon={ThumbsUp}
-              iconClass="bg-emerald-500/15 text-emerald-600"
+              iconClass="text-emerald-500/15 text-primary"
               footer={
                 <span className="text-muted-foreground">
                   {summary?.recommendCount ?? 0} of{" "}
@@ -2137,7 +2137,7 @@ function FeedbackCard({ feedback: f }: { feedback: Feedback }) {
                 className={cn(
                   "text-[10px] px-2 py-0.5 gap-1",
                   f.wouldRecommend
-                    ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/20"
+                    ? "text-emerald-500/15 text-primary dark:text-primary/80 border-primary/20"
                     : "bg-rose-500/15 text-rose-700 dark:text-rose-300 border-rose-500/20"
                 )}
               >
@@ -2154,8 +2154,8 @@ function FeedbackCard({ feedback: f }: { feedback: Feedback }) {
           {(f.whatWorked || f.whatCouldImprove) && (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-3">
               {f.whatWorked && (
-                <div className="rounded-md bg-emerald-500/5 border border-emerald-500/20 p-2.5">
-                  <div className="text-[10px] uppercase tracking-wider text-emerald-700 dark:text-emerald-300 font-semibold flex items-center gap-1 mb-1">
+                <div className="rounded-md text-emerald-500/5 border border-primary/20 p-2.5">
+                  <div className="text-[10px] uppercase tracking-wider text-primary dark:text-primary/80 font-semibold flex items-center gap-1 mb-1">
                     <Sparkles className="size-3" />
                     What worked well
                   </div>

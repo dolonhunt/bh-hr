@@ -1199,7 +1199,7 @@ function DocumentsTable({
                   {getSignature(d)?.signed && (
                     <Badge
                       variant="outline"
-                      className="gap-1 text-[9px] font-medium border-emerald-500/40 bg-emerald-500/10 text-emerald-700 px-1.5 h-5"
+                      className="gap-1 text-[9px] font-medium border-primary/40 text-emerald-500/10 text-primary px-1.5 h-5"
                       title={`Signed by ${getSignature(d)?.signerName ?? ""} on ${formatDate(getSignature(d)?.signedAt)}`}
                     >
                       <ShieldCheck className="size-3" />
@@ -1249,14 +1249,14 @@ function DocumentsTable({
                           <DropdownMenuLabel>Workflow</DropdownMenuLabel>
                           <DropdownMenuItem
                             onClick={() => submitForApproval(d)}
-                            className="text-emerald-700 focus:text-emerald-700"
+                            className="text-primary focus:text-primary"
                           >
                             <Forward className="size-4 mr-2" /> Submit for
                             Approval
                           </DropdownMenuItem>
                           <DropdownMenuItem
                             onClick={() => onSign(d)}
-                            className="text-emerald-700 focus:text-emerald-700"
+                            className="text-primary focus:text-primary"
                           >
                             <PenLine className="size-4 mr-2" /> Sign &amp; Issue
                           </DropdownMenuItem>
@@ -1268,7 +1268,7 @@ function DocumentsTable({
                           <DropdownMenuLabel>Approval</DropdownMenuLabel>
                           <DropdownMenuItem
                             onClick={() => approveDoc(d)}
-                            className="text-emerald-700 focus:text-emerald-700"
+                            className="text-primary focus:text-primary"
                           >
                             <CheckCircle2 className="size-4 mr-2" /> Approve
                           </DropdownMenuItem>
@@ -1293,7 +1293,7 @@ function DocumentsTable({
                           </DropdownMenuItem>
                           <DropdownMenuItem
                             onClick={() => onSign(d)}
-                            className="text-emerald-700 focus:text-emerald-700"
+                            className="text-primary focus:text-primary"
                           >
                             <PenLine className="size-4 mr-2" /> Sign &amp; Issue
                           </DropdownMenuItem>
@@ -1305,7 +1305,7 @@ function DocumentsTable({
                           <DropdownMenuLabel>Signature</DropdownMenuLabel>
                           <DropdownMenuItem
                             onClick={() => onVerify(d)}
-                            className="text-emerald-700 focus:text-emerald-700"
+                            className="text-primary focus:text-primary"
                           >
                             <ShieldCheck className="size-4 mr-2" /> Verify
                             Signature
@@ -1830,13 +1830,13 @@ function VerifySignatureDialog({
 
           {!loading && isSigned && (
             <>
-              <div className="rounded-md border border-emerald-500/30 bg-emerald-500/5 p-4 flex items-start gap-3">
-                <CheckCircle2 className="size-5 text-emerald-700 flex-shrink-0 mt-0.5" />
+              <div className="rounded-md border border-primary/30 text-emerald-500/5 p-4 flex items-start gap-3">
+                <CheckCircle2 className="size-5 text-primary flex-shrink-0 mt-0.5" />
                 <div className="min-w-0">
-                  <div className="font-medium text-sm text-emerald-800">
+                  <div className="font-medium text-sm text-foreground">
                     Signature verified
                   </div>
-                  <div className="text-xs text-emerald-700/80 mt-1">
+                  <div className="text-xs text-primary/80 mt-1">
                     This document carries a valid digital signature block
                     appended to its rendered content.
                   </div>
@@ -1894,20 +1894,20 @@ function VerifySignatureDialog({
                 )}
               </div>
 
-              <div className="rounded-md border border-emerald-500/30 bg-emerald-500/5 p-3">
-                <div className="text-[10px] uppercase tracking-wider text-emerald-700 mb-1 flex items-center gap-1.5">
+              <div className="rounded-md border border-primary/30 text-emerald-500/5 p-3">
+                <div className="text-[10px] uppercase tracking-wider text-primary mb-1 flex items-center gap-1.5">
                   <CopyCheck className="size-3" />
                   Verification Hash (SHA-256, short)
                 </div>
-                <div className="font-mono text-xs break-all text-emerald-800">
+                <div className="font-mono text-xs break-all text-foreground">
                   {sig?.shortHash ?? sig?.verificationHash?.slice(0, 16).toUpperCase() ?? "—"}
                 </div>
                 {sig?.verificationHash && (
                   <div className="mt-2">
-                    <div className="text-[10px] uppercase tracking-wider text-emerald-700 mb-1">
+                    <div className="text-[10px] uppercase tracking-wider text-primary mb-1">
                       Full hash
                     </div>
-                    <div className="font-mono text-[10px] break-all text-emerald-700/70 max-h-20 overflow-y-auto">
+                    <div className="font-mono text-[10px] break-all text-primary/70 max-h-20 overflow-y-auto">
                       {sig.verificationHash}
                     </div>
                   </div>
