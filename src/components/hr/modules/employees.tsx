@@ -432,7 +432,7 @@ function EmployeeList() {
             >
               <div
                 className="h-1.5"
-                style={{ background: emp.department?.color ?? "#10b981" }}
+                style={{ background: emp.department?.color ?? "#18A98F" }}
               />
               <CardContent className="p-5">
                 <div className="flex items-start gap-3">

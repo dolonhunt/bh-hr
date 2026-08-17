@@ -149,7 +149,7 @@ export function EmployeeProfile({ id }: { id: string }) {
         <div
           className="h-24"
           style={{
-            background: `linear-gradient(135deg, ${emp.department?.color ?? "#10b981"}, ${emp.department?.color ?? "#10b981"}80)`,
+            background: `linear-gradient(135deg, ${emp.department?.color ?? "#18A98F"}, ${emp.department?.color ?? "#18A98F"}80)`,
           }}
         />
         <CardContent className="p-4 sm:p-6 -mt-12">

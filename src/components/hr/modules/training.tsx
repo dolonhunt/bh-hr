@@ -209,7 +209,7 @@ interface FeedbackResponse {
   summary: FeedbackSummary;
 }
 
-const RATING_BAR_COLORS = ["#ef4444", "#f97316", "#eab308", "#84cc16", "#10b981"];
+const RATING_BAR_COLORS = ["#ef4444", "#f97316", "#eab308", "#84cc16", "#18A98F"];
 
 // =========================================================
 // Main module

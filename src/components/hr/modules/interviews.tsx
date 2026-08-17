@@ -1703,7 +1703,7 @@ interface AggResponse {
 }
 
 const REC_COLORS: Record<Recommendation, string> = {
-  HIRE: "#10b981",
+  HIRE: "#18A98F",
   REJECT: "#f43f5e",
   HOLD: "#f59e0b",
 };

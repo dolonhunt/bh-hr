@@ -1012,8 +1012,8 @@ function ReviewDetailDialog({
                   <Radar
                     name="Score"
                     dataKey="score"
-                    stroke="#6D3FC4"
-                    fill="#6D3FC4"
+                    stroke="#FF6658"
+                    fill="#FF6658"
                     fillOpacity={0.35}
                   />
                 </RadarChart>

@@ -151,7 +151,7 @@ const Q_TYPE_ICON: Record<QuestionType, typeof MessageSquare> = {
 };
 
 const CHART_COLORS = [
-  "#10b981",
+  "#18A98F",
   "#f59e0b",
   "#ef4444",
   "#14b8a6",
@@ -928,7 +928,7 @@ function RatingAnalytics({ answers }: { answers: number[] }) {
               cursor={{ fill: "rgba(16, 185, 129, 0.08)" }}
               contentStyle={{ borderRadius: 8, fontSize: 12 }}
             />
-            <Bar dataKey="count" fill="#10b981" radius={[6, 6, 0, 0]} />
+            <Bar dataKey="count" fill="#18A98F" radius={[6, 6, 0, 0]} />
           </BarChart>
         </ResponsiveContainer>
       </div>
