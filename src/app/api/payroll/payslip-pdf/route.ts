@@ -731,14 +731,14 @@ export async function GET(req: NextRequest) {
   });
   const seq = numbering?.nextSeq ?? 1;
   const padding = numbering?.padding ?? 4;
-  const prefix = numbering?.prefix ?? "NWL";
+  const prefix = numbering?.prefix ?? "BH";
   const padded = String(seq).padStart(padding, "0");
   const yYear = new Date().getFullYear();
   const mMonth = String(new Date().getMonth() + 1).padStart(2, "0");
   const docNumber = `${prefix}/PAYSLIP/${yYear}${mMonth}/${padded}`;
 
   const data: PayslipData = {
-    companyName: company?.name ?? "TeamHub HR",
+    companyName: company?.name ?? "BH HR",
     companyAddress: company?.address ?? null,
     companyEmail: company?.email ?? null,
     companyPhone: company?.phone ?? null,

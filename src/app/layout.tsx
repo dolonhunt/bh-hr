@@ -16,7 +16,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "TeamHub HR — Operations Console",
+  title: "BH HR — Operations Console",
   description:
     "Modern HR Operations Console to manage employees, attendance, leave, payroll, generate documents (DOCX/PDF) and deliver them directly to employees.",
   keywords: [
@@ -28,7 +28,7 @@ export const metadata: Metadata = {
     "Attendance",
     "Recruitment",
   ],
-  authors: [{ name: "TeamHub HR" }],
+  authors: [{ name: "BH HR" }],
   icons: {
     icon: "/logo.svg",
   },

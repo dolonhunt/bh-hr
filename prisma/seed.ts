@@ -30,16 +30,16 @@ async function main() {
   // Company
   const company = await db.company.create({
     data: {
-      name: "Northwind Labs",
-      legalName: "Northwind Labs Pvt Ltd",
+      name: "Beyond Headlines",
+      legalName: "Beyond Headlines Pvt Ltd",
       address: "14 Garden Road, Level 5",
       city: "Dhaka",
       state: "Dhaka",
       country: "Bangladesh",
       zipCode: "1213",
-      email: "hr@northwindlabs.io",
+      email: "hr@beyondheadlines.io",
       phone: "+880 1700-000000",
-      website: "https://northwindlabs.io",
+      website: "https://beyondheadlines.io",
       taxId: "TIN-9988776655",
     },
   });
@@ -47,7 +47,7 @@ async function main() {
   // HR user
   const hrUser = await db.user.create({
     data: {
-      email: "hr@northwindlabs.io",
+      email: "hr@beyondheadlines.io",
       name: "Tahmina Akter",
       password: "demo1234",
       role: "HR_ADMIN",
@@ -157,7 +157,7 @@ async function main() {
         gender: i % 3 === 0 ? "FEMALE" : "MALE",
         phone: `+880 17${String(10000000 + i * 123456).slice(0, 8)}`,
         personalEmail: `${fn.toLowerCase()}.${ln.toLowerCase()}@gmail.com`,
-        officialEmail: `${fn.toLowerCase()}.${ln.toLowerCase()}@northwindlabs.io`,
+        officialEmail: `${fn.toLowerCase()}.${ln.toLowerCase()}@beyondheadlines.io`,
         address: `House ${10 + i}, Road ${5 + (i % 7)}, Block C`,
         city: "Dhaka",
         state: "Dhaka",
@@ -412,7 +412,7 @@ async function main() {
     data: {
       name: "Default",
       pattern: "{COMPANY}/{DEPARTMENT}/{DOCUMENT_TYPE}/{DATE}/{EMPLOYEE_ID}",
-      prefix: "NWL",
+      prefix: "BH",
       padding: 4,
       nextSeq: 1,
     },
@@ -421,11 +421,11 @@ async function main() {
   // Email setting
   await db.emailSetting.create({
     data: {
-      senderName: "Northwind HR",
-      senderEmail: "hr@northwindlabs.io",
+      senderName: "Beyond Headlines HR",
+      senderEmail: "hr@beyondheadlines.io",
       smtpHost: "smtp.gmail.com",
       smtpPort: 587,
-      username: "hr@northwindlabs.io",
+      username: "hr@beyondheadlines.io",
       password: "",
       encryption: "TLS",
       isDefault: true,

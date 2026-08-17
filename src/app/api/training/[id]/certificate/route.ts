@@ -560,7 +560,7 @@ export async function GET(
     duration: courseMeta.duration,
     score: enrollmentMeta.score,
     completedAt: enrollmentMeta.completedAt,
-    companyName: company?.name ?? "TeamHub HR",
+    companyName: company?.name ?? "BH HR",
     companyAddress: company?.address ?? null,
     companyEmail: company?.email ?? null,
     companyPhone: company?.phone ?? null,

@@ -1102,7 +1102,7 @@ function DocumentNumberingTab() {
   const [form, setForm] = useState<any>({
     name: "Default",
     pattern: "{COMPANY}/{DEPARTMENT}/{DOCUMENT_TYPE}/{DATE}/{EMPLOYEE_ID}",
-    prefix: "NWL",
+    prefix: "BH",
     padding: 4,
     nextSeq: 1,
   });
@@ -1130,7 +1130,7 @@ function DocumentNumberingTab() {
   const dateStr = `${today.getFullYear()}${String(today.getMonth() + 1).padStart(2, "0")}${String(today.getDate()).padStart(2, "0")}`;
   const seqStr = String(form.nextSeq ?? 1).padStart(Number(form.padding) || 4, "0");
   const preview = (form.pattern || "")
-    .replace(/\{COMPANY\}/g, form.prefix || "NWL")
+    .replace(/\{COMPANY\}/g, form.prefix || "BH")
     .replace(/\{DEPARTMENT\}/g, "ENG")
     .replace(/\{DOCUMENT_TYPE\}/g, "OFFER")
     .replace(/\{DATE\}/g, dateStr)
@@ -1180,7 +1180,7 @@ function DocumentNumberingTab() {
             <Input
               value={form.prefix}
               onChange={(e) => setForm({ ...form, prefix: e.target.value })}
-              placeholder="NWL"
+              placeholder="BH"
             />
           </div>
           <div className="col-span-2 space-y-1.5">

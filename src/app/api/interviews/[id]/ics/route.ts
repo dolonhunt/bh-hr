@@ -78,7 +78,7 @@ function buildIcsForInterview(
   const lines: string[] = [
     "BEGIN:VCALENDAR",
     "VERSION:2.0",
-    "PRODID:-//TeamHub HR//Interview//EN",
+    "PRODID:-//BH HR//Interview//EN",
     "CALSCALE:GREGORIAN",
     "METHOD:PUBLISH",
     "BEGIN:VEVENT",

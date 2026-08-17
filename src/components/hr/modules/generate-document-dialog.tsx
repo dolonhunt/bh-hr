@@ -671,7 +671,7 @@ export function GenerateDocumentDialog({
 
                   <div className="text-xs text-muted-foreground bg-muted/40 rounded-lg p-3">
                     Document number will be auto-generated (e.g.{" "}
-                    <span className="font-mono">NWL/HR/{type?.slice(0, 4)}/
+                    <span className="font-mono">BH/HR/{type?.slice(0, 4)}/
                       {`${String(new Date().getMonth() + 1).padStart(2, "0")}${String(new Date().getDate()).padStart(2, "0")}${new Date().getFullYear()}`}
                       /{employee.employeeId}
                     </span>

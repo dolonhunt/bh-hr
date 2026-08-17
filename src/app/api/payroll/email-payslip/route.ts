@@ -31,7 +31,7 @@ import {
 // =============================================================
 
 function nextDocNumber(prefix: string | null, seq: number, padding: number) {
-  const p = prefix ?? "NWL";
+  const p = prefix ?? "BH";
   const padded = String(seq).padStart(padding, "0");
   const y = new Date().getFullYear();
   const m = String(new Date().getMonth() + 1).padStart(2, "0");
@@ -134,7 +134,7 @@ export async function POST(req: NextRequest) {
 
   // 4. Build the PDF
   const data: PayslipData = {
-    companyName: company?.name ?? "TeamHub HR",
+    companyName: company?.name ?? "BH HR",
     companyAddress: company?.address ?? null,
     companyEmail: company?.email ?? null,
     companyPhone: company?.phone ?? null,
@@ -151,7 +151,7 @@ export async function POST(req: NextRequest) {
   const pdfBuffer = await buildPayslipPdf(data);
 
   // 5. Resolve auto-filled fields with HR overrides applied
-  const companyName = company?.name ?? "TeamHub HR";
+  const companyName = company?.name ?? "BH HR";
   const recipientTo =
     (to && String(to).trim()) ||
     employee.officialEmail ||

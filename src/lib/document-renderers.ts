@@ -369,7 +369,7 @@ export async function renderDocxBuffer(opts: {
 }): Promise<Buffer> {
   const blocks = parseHtmlBlocks(opts.html);
   const doc = new Document({
-    creator: "TeamHub HR",
+    creator: "BH HR",
     title: opts.title,
     description: opts.title,
     sections: [
@@ -404,7 +404,7 @@ export async function renderPdfBuffer(opts: {
         margins: { top: 56, bottom: 56, left: 56, right: 56 },
         info: {
           Title: opts.title,
-          Author: "TeamHub HR",
+          Author: "BH HR",
         },
       });
       const chunks: Buffer[] = [];

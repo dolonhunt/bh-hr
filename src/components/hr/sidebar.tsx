@@ -3,9 +3,10 @@
 import { useApp } from "@/lib/store";
 import { NAV_ITEMS } from "./nav-config";
 import { cn } from "@/lib/utils";
-import { ChevronLeft, ShieldCheck, X } from "lucide-react";
+import { ChevronLeft, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { BrandLogo, BrandMark } from "@/components/brand/brand-logo";
 
 export function Sidebar() {
   const activeModule = useApp((s) => s.activeModule);
@@ -40,16 +41,18 @@ export function Sidebar() {
         {/* Brand */}
         <div className="h-16 flex items-center justify-between px-4 border-b border-sidebar-border">
           <div className="flex items-center gap-2.5 min-w-0">
-            <div className="size-9 rounded-xl bg-primary text-primary-foreground flex items-center justify-center flex-shrink-0 shadow-soft">
-              <ShieldCheck className="size-5" />
-            </div>
+            {sidebarCollapsed ? (
+              <BrandMark size="md" />
+            ) : (
+              <BrandLogo />
+            )}
             {!sidebarCollapsed && (
               <div className="min-w-0">
-                <div className="font-semibold text-sidebar-foreground leading-tight truncate">
-                  TeamHub HR
+                <div className="font-bold text-sidebar-foreground leading-tight truncate tracking-tight">
+                  BH HR
                 </div>
-                <div className="text-[11px] text-muted-foreground truncate">
-                  Operations Console
+                <div className="text-[10px] text-muted-foreground truncate uppercase tracking-wider">
+                  Beyond Headlines
                 </div>
               </div>
             )}

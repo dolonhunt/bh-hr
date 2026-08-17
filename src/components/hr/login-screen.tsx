@@ -14,11 +14,11 @@ import {
 } from "@/components/ui/card";
 import { useApp } from "@/lib/store";
 import { toast } from "sonner";
-import { Eye, EyeOff, Loader2, ShieldCheck, Sparkles } from "lucide-react";
+import { Eye, EyeOff, Loader2, Sparkles } from "lucide-react";
 
 export function LoginScreen() {
   const setAuthed = useApp((s) => s.setAuthed);
-  const [email, setEmail] = useState("hr@northwindlabs.io");
+  const [email, setEmail] = useState("hr@beyondheadlines.io");
   const [password, setPassword] = useState("demo1234");
   const [showPw, setShowPw] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -53,10 +53,10 @@ export function LoginScreen() {
         <div className="relative z-10 flex flex-col justify-between p-12 text-primary-foreground w-full">
           <div className="flex items-center gap-2">
             <div className="size-10 rounded-xl bg-primary-foreground/15 backdrop-blur flex items-center justify-center">
-              <ShieldCheck className="size-6" />
+              <img src="/bh-logo.png" alt="BH HR — Beyond Headlines" className="h-12 w-auto object-contain brightness-0 invert" />
             </div>
             <span className="text-xl font-semibold tracking-tight">
-              TeamHub HR
+              BH HR
             </span>
           </div>
 
@@ -102,9 +102,9 @@ export function LoginScreen() {
           <CardHeader className="space-y-1">
             <div className="lg:hidden flex items-center gap-2 mb-2">
               <div className="size-9 rounded-lg bg-primary text-primary-foreground flex items-center justify-center">
-                <ShieldCheck className="size-5" />
+                <img src="/bh-logo.png" alt="BH HR" className="h-8 w-auto object-contain" />
               </div>
-              <span className="font-semibold text-lg">TeamHub HR</span>
+              <span className="font-semibold text-lg">BH HR</span>
             </div>
             <CardTitle className="text-2xl">Sign in to your workspace</CardTitle>
             <CardDescription>
@@ -160,7 +160,7 @@ export function LoginScreen() {
 
               <div className="rounded-lg border border-dashed border-border bg-muted/40 p-3 text-xs text-muted-foreground">
                 <div className="font-medium text-foreground mb-1">Demo credentials</div>
-                Email: <code className="font-mono">hr@northwindlabs.io</code>
+                Email: <code className="font-mono">hr@beyondheadlines.io</code>
                 <br />
                 Password: <code className="font-mono">demo1234</code>
               </div>

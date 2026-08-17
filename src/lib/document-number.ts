@@ -1,5 +1,5 @@
 // Document numbering helper.
-// Produces document numbers like  NWL/HR/APPT/08142025/EMP001  using the
+// Produces document numbers like  BH/HR/APPT/08142025/EMP001  using the
 // pattern stored in DocumentNumbering (default "{COMPANY}/{DEPARTMENT}/
 // {DOCUMENT_TYPE}/{DATE}/{EMPLOYEE_ID}") and bumps the nextSeq counter so the
 // total count is tracked.
@@ -74,7 +74,7 @@ function abbreviateDepartment(name?: string | null): string {
 }
 
 function abbreviateCompany(name?: string | null): string {
-  if (!name) return "NWL";
+  if (!name) return "BH";
   // Take first letter of every word, max 4 chars.
   const words = name.trim().split(/\s+/);
   if (words.length === 1) {

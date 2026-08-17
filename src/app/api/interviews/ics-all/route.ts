@@ -46,10 +46,10 @@ function buildIcsForMany(interviews: InterviewWithMeta[]): string {
   const lines: string[] = [
     "BEGIN:VCALENDAR",
     "VERSION:2.0",
-    "PRODID:-//TeamHub HR//Interview//EN",
+    "PRODID:-//BH HR//Interview//EN",
     "CALSCALE:GREGORIAN",
     "METHOD:PUBLISH",
-    `X-WR-CALNAME:TeamHub HR Interviews (${interviews.length})`,
+    `X-WR-CALNAME:BH HR Interviews (${interviews.length})`,
   ];
 
   for (const it of interviews) {

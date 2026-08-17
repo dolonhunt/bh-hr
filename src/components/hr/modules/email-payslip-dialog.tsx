@@ -120,7 +120,7 @@ export function EmailPayslipDialog({
   useEffect(() => {
     if (!open || !employee) return;
     const monthLabel = fmtMonthLabel(month);
-    const companyName = company?.name ?? "TeamHub HR";
+    const companyName = company?.name ?? "BH HR";
 
     if (!toTouched) {
       const autoTo = employee.officialEmail || employee.personalEmail || "";

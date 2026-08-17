@@ -15,11 +15,11 @@ export async function POST(req: NextRequest) {
   const subject: string =
     typeof body.subject === "string" && body.subject.trim()
       ? body.subject
-      : "Test Email from TeamHub HR";
+      : "Test Email from BH HR";
   const emailBody: string =
     typeof body.body === "string" && body.body.trim()
       ? body.body
-      : "This is a test email from TeamHub HR system. SMTP is configured correctly.";
+      : "This is a test email from BH HR system. SMTP is configured correctly.";
 
   // Simulate sending a test email by creating an EmailLog entry
   const log = await db.emailLog.create({

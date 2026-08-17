@@ -20,10 +20,22 @@ export async function POST(req: NextRequest) {
       ipAddress: req.headers.get("x-forwarded-for") || "unknown",
     },
   });
-  return NextResponse.json({
+
+  // Create response with user data
+  const response = NextResponse.json({
     id: user.id,
     name: user.name,
     email: user.email,
     role: user.role,
   });
+
+  // Set auth cookie (httpOnly for security, sameSite for CSRF protection)
+  response.cookies.set("bh-hr-session", user.id, {
+    httpOnly: true,
+    sameSite: "lax",
+    path: "/",
+    maxAge: 60 * 60 * 24 * 7, // 7 days
+  });
+
+  return response;
 }

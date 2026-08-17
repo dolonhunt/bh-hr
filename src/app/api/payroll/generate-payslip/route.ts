@@ -27,7 +27,7 @@ function formatMoney(n: number | null | undefined) {
 }
 
 function nextDocNumber(prefix: string | null, seq: number, padding: number) {
-  const p = prefix ?? "NWL";
+  const p = prefix ?? "BH";
   const padded = String(seq).padStart(padding, "0");
   const y = new Date().getFullYear();
   const m = String(new Date().getMonth() + 1).padStart(2, "0");
