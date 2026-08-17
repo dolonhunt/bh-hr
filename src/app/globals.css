@@ -71,9 +71,9 @@
   --secondary: #EDE5D6;
   --secondary-foreground: #2F3E4E;
 
-  /* Muted: warm light gray */
-  --muted: #EDE5D6;
-  --muted-foreground: #9E957E;
+  /* Muted: warm light gray — improved contrast for readability */
+  --muted: #E8E0D0;
+  --muted-foreground: #6B6258;
 
   /* Accent: teal-tinted warm */
   --accent: #CFE8E6;
@@ -130,7 +130,7 @@
   --secondary: #252522;
   --secondary-foreground: #E5E0DA;
   --muted: #252522;
-  --muted-foreground: #9A978F;
+  --muted-foreground: #A8A29A;
   --accent: #1A3A38;
   --accent-foreground: #2A9B97;
   --destructive: #D66B66;

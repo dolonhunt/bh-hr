@@ -1,12 +1,18 @@
 "use client";
 
 import { useApp } from "@/lib/store";
-import { NAV_ITEMS } from "./nav-config";
+import { NAV_SECTIONS } from "./nav-config";
 import { cn } from "@/lib/utils";
 import { ChevronLeft, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { BrandLogo, BrandMark } from "@/components/brand/brand-logo";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 export function Sidebar() {
   const activeModule = useApp((s) => s.activeModule);
@@ -37,7 +43,7 @@ export function Sidebar() {
         )}
       >
         {/* Brand */}
-        <div className="h-16 flex items-center justify-between px-4 border-b border-sidebar-border">
+        <div className="h-16 flex items-center justify-between px-4 border-b border-sidebar-border/60">
           <div className="flex items-center gap-2.5 min-w-0">
             {sidebarCollapsed ? (
               <BrandMark size="md" />
@@ -49,7 +55,7 @@ export function Sidebar() {
                 <div className="font-bold text-sidebar-foreground leading-tight truncate tracking-tight">
                   BH HR
                 </div>
-                <div className="text-[10px] text-muted-foreground truncate uppercase tracking-wider">
+                <div className="text-[10px] text-muted-foreground/80 truncate uppercase tracking-wider">
                   Beyond Headlines
                 </div>
               </div>
@@ -66,65 +72,104 @@ export function Sidebar() {
           </Button>
         </div>
 
-        {/* Nav */}
+        {/* Nav — sectioned */}
         <ScrollArea className="flex-1 px-3 py-4">
-          <div className="space-y-1">
-            {!sidebarCollapsed && (
-              <div className="px-3 pb-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                Main
-              </div>
-            )}
-            {NAV_ITEMS.map((item) => {
-              const active = activeModule === item.key;
-              const Icon = item.icon;
-              return (
-                <button
-                  key={item.key}
-                  onClick={() => {
-                    setModule(item.key);
-                    setMobileSidebarOpen(false);
-                  }}
-                  className={cn(
-                    "w-full group/nav flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all relative",
-                    active
-                      ? "bg-sidebar-primary text-sidebar-primary-foreground neu-raised-sm"
-                      : "text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground",
-                    sidebarCollapsed && "justify-center px-2"
-                  )}
-                  title={sidebarCollapsed ? item.label : undefined}
-                >
-                  {active && (
-                    <span className="absolute left-0 top-1/2 -translate-y-1/2 h-5 w-1 rounded-r-full bg-sidebar-primary-foreground/60" />
-                  )}
-                  <Icon
-                    className={cn(
-                      "size-[18px] flex-shrink-0 transition-transform group-hover/nav:scale-110",
-                      active
-                        ? "text-sidebar-primary"
-                        : "text-muted-foreground group-hover/nav:text-sidebar-foreground"
-                    )}
-                  />
-                  {!sidebarCollapsed && (
-                    <div className="flex-1 text-left min-w-0">
-                      <div className="truncate flex items-center gap-2">
-                        {item.label}
-                        {item.badge === "live" && (
-                          <span className="inline-flex h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+          <TooltipProvider delayDuration={200}>
+            <div className="space-y-4">
+              {NAV_SECTIONS.map((section) => {
+                // When collapsed, only show section divider line (not label)
+                const hasActive = section.items.some((item) => item.key === activeModule);
+
+                return (
+                  <div key={section.label} className="space-y-1">
+                    {!sidebarCollapsed ? (
+                      <div
+                        className={cn(
+                          "px-3 pb-1 text-[10px] font-bold uppercase tracking-wider",
+                          hasActive ? "text-primary" : "text-muted-foreground/70"
                         )}
+                      >
+                        {section.label}
                       </div>
-                    </div>
-                  )}
-                  {!sidebarCollapsed && active && (
-                    <span className="h-1.5 w-1.5 rounded-full bg-sidebar-primary" />
-                  )}
-                </button>
-              );
-            })}
-          </div>
+                    ) : (
+                      // Collapsed: show a thin divider
+                      <div className="mx-2 border-t border-sidebar-border/40" />
+                    )}
+
+                    {section.items.map((item) => {
+                      const active = activeModule === item.key;
+                      const Icon = item.icon;
+
+                      const navButton = (
+                        <button
+                          key={item.key}
+                          onClick={() => {
+                            setModule(item.key);
+                            setMobileSidebarOpen(false);
+                          }}
+                          className={cn(
+                            "w-full group/nav flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all relative",
+                            active
+                              ? "bg-sidebar-primary text-sidebar-primary-foreground neu-raised-sm"
+                              : "text-sidebar-foreground/80 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground",
+                            sidebarCollapsed && "justify-center px-2"
+                          )}
+                        >
+                          {active && !sidebarCollapsed && (
+                            <span className="absolute left-0 top-1/2 -translate-y-1/2 h-5 w-1 rounded-r-full bg-sidebar-primary-foreground/50" />
+                          )}
+                          <Icon
+                            className={cn(
+                              "size-[18px] flex-shrink-0 transition-transform group-hover/nav:scale-110",
+                              active
+                                ? "text-sidebar-primary-foreground"
+                                : "text-muted-foreground group-hover/nav:text-sidebar-foreground"
+                            )}
+                          />
+                          {!sidebarCollapsed && (
+                            <div className="flex-1 text-left min-w-0">
+                              <div className="truncate flex items-center gap-2">
+                                {item.label}
+                                {item.badge === "live" && (
+                                  <span className="inline-flex h-1.5 w-1.5 rounded-full bg-primary animate-pulse" />
+                                )}
+                              </div>
+                            </div>
+                          )}
+                          {!sidebarCollapsed && active && (
+                            <span className="h-1.5 w-1.5 rounded-full bg-sidebar-primary-foreground/60" />
+                          )}
+                        </button>
+                      );
+
+                      // When collapsed, wrap in tooltip
+                      if (sidebarCollapsed) {
+                        return (
+                          <Tooltip key={item.key}>
+                            <TooltipTrigger asChild>
+                              {navButton}
+                            </TooltipTrigger>
+                            <TooltipContent side="right" sideOffset={8}>
+                              <p className="font-medium">{item.label}</p>
+                              <p className="text-xs text-muted-foreground">
+                                {section.label}
+                              </p>
+                            </TooltipContent>
+                          </Tooltip>
+                        );
+                      }
+
+                      return navButton;
+                    })}
+                  </div>
+                );
+              })}
+            </div>
+          </TooltipProvider>
         </ScrollArea>
 
         {/* Collapse toggle (desktop only) */}
-        <div className="hidden lg:block border-t border-sidebar-border p-3">
+        <div className="hidden lg:block border-t border-sidebar-border/60 p-3">
           <Button
             variant="ghost"
             size="sm"

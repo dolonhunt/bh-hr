@@ -28,108 +28,136 @@ export interface NavItem {
   badge?: "live";
 }
 
-export const NAV_ITEMS: NavItem[] = [
+export interface NavSection {
+  label: string;
+  items: NavItem[];
+}
+
+export const NAV_SECTIONS: NavSection[] = [
   {
-    key: "dashboard",
-    label: "Dashboard",
-    icon: LayoutDashboard,
-    description: "HR overview & KPIs",
+    label: "Main",
+    items: [
+      {
+        key: "dashboard",
+        label: "Dashboard",
+        icon: LayoutDashboard,
+        description: "HR overview & KPIs",
+      },
+      {
+        key: "employees",
+        label: "Employees",
+        icon: Users,
+        description: "Directory & profiles",
+      },
+      {
+        key: "attendance",
+        label: "Attendance",
+        icon: CalendarCheck,
+        description: "Daily check-in/out",
+      },
+      {
+        key: "leave",
+        label: "Leave",
+        icon: CalendarDays,
+        description: "Requests & approvals",
+      },
+      {
+        key: "payroll",
+        label: "Payroll",
+        icon: Wallet,
+        description: "Salaries & payslips",
+      },
+      {
+        key: "performance",
+        label: "Performance",
+        icon: TrendingUp,
+        description: "Reviews & analytics",
+      },
+      {
+        key: "recruitment",
+        label: "Recruitment",
+        icon: Briefcase,
+        description: "Jobs & candidates",
+      },
+    ],
   },
   {
-    key: "employees",
-    label: "Employees",
-    icon: Users,
-    description: "Directory & profiles",
+    label: "Operations",
+    items: [
+      {
+        key: "interviews",
+        label: "Interviews",
+        icon: CalendarClock,
+        description: "Schedule & track",
+      },
+      {
+        key: "feedback",
+        label: "Feedback",
+        icon: MessageSquare,
+        description: "Surveys & feedback",
+      },
+      {
+        key: "documents",
+        label: "Documents",
+        icon: FileText,
+        description: "Templates & generation",
+        badge: "live",
+      },
+      {
+        key: "training",
+        label: "Training",
+        icon: GraduationCap,
+        description: "Courses & development",
+      },
+      {
+        key: "expenses",
+        label: "Expenses",
+        icon: Receipt,
+        description: "Track & approve",
+      },
+      {
+        key: "timesheets",
+        label: "Timesheets",
+        icon: Clock,
+        description: "Time tracking",
+      },
+      {
+        key: "assets",
+        label: "Assets",
+        icon: Package,
+        description: "Equipment & assets",
+      },
+    ],
   },
   {
-    key: "attendance",
-    label: "Attendance",
-    icon: CalendarCheck,
-    description: "Daily check-in/out",
+    label: "Insights",
+    items: [
+      {
+        key: "reports",
+        label: "Reports",
+        icon: BarChart3,
+        description: "Export & analytics",
+      },
+    ],
   },
   {
-    key: "leave",
-    label: "Leave",
-    icon: CalendarDays,
-    description: "Requests & approvals",
-  },
-  {
-    key: "payroll",
-    label: "Payroll",
-    icon: Wallet,
-    description: "Salaries & payslips",
-  },
-  {
-    key: "performance",
-    label: "Performance",
-    icon: TrendingUp,
-    description: "Reviews & analytics",
-  },
-  {
-    key: "recruitment",
-    label: "Recruitment",
-    icon: Briefcase,
-    description: "Jobs & candidates",
-  },
-  {
-    key: "interviews",
-    label: "Interviews",
-    icon: CalendarClock,
-    description: "Schedule & track",
-  },
-  {
-    key: "feedback",
-    label: "Feedback",
-    icon: MessageSquare,
-    description: "Surveys & feedback",
-  },
-  {
-    key: "documents",
-    label: "Documents",
-    icon: FileText,
-    description: "Templates & generation",
-    badge: "live",
-  },
-  {
-    key: "training",
-    label: "Training",
-    icon: GraduationCap,
-    description: "Courses & development",
-  },
-  {
-    key: "expenses",
-    label: "Expenses",
-    icon: Receipt,
-    description: "Track & approve",
-  },
-  {
-    key: "timesheets",
-    label: "Timesheets",
-    icon: Clock,
-    description: "Time tracking",
-  },
-  {
-    key: "assets",
-    label: "Assets",
-    icon: Package,
-    description: "Equipment & assets",
-  },
-  {
-    key: "reports",
-    label: "Reports",
-    icon: BarChart3,
-    description: "Export & analytics",
-  },
-  {
-    key: "audit",
-    label: "Audit Log",
-    icon: History,
-    description: "Activity tracking",
-  },
-  {
-    key: "settings",
-    label: "Settings",
-    icon: Settings,
-    description: "Organization & config",
+    label: "System",
+    items: [
+      {
+        key: "audit",
+        label: "Audit Log",
+        icon: History,
+        description: "Activity tracking",
+      },
+      {
+        key: "settings",
+        label: "Settings",
+        icon: Settings,
+        description: "Organization & config",
+      },
+    ],
   },
 ];
+
+// Flat list for backward compatibility (command palette, topbar lookup, etc.)
+export const NAV_ITEMS: NavItem[] = NAV_SECTIONS.flatMap((s) => s.items);

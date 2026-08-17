@@ -84,7 +84,7 @@ export function Topbar() {
   const badgeCount = unreadNotifs > 0 ? unreadNotifs : pendingCount;
 
   return (
-    <header className="sticky top-0 z-30 h-16 border-b border-border bg-background/80 backdrop-blur-md px-4 md:px-6 flex items-center gap-3">
+    <header className="sticky top-0 z-30 h-16 border-b border-border/50 bg-background/85 backdrop-blur-md px-4 md:px-6 flex items-center gap-3">
       <Button
         variant="ghost"
         size="icon"
@@ -116,7 +116,7 @@ export function Topbar() {
       <div className="flex-1 max-w-xl mx-auto hidden md:block">
         <button
           onClick={() => setCommandOpen(true)}
-          className="group w-full flex items-center gap-2 rounded-lg border border-border bg-muted/40 px-3 py-2 text-sm text-muted-foreground hover:bg-muted/80 hover:border-border/80 transition"
+          className="group w-full flex items-center gap-2 rounded-lg border border-border/50 neu-inset px-3 py-2 text-sm text-muted-foreground hover:border-primary/30 transition"
         >
           <Search className="size-4" />
           <span className="flex-1 text-left">Search employees, documents…</span>
