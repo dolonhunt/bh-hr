@@ -206,7 +206,7 @@ export function LeaveEntryDialog({
                     <span className="flex items-center gap-2">
                       <span
                         className="size-2 rounded-full"
-                        style={{ background: lt.color ?? "#10b981" }}
+                        style={{ background: lt.color ?? "#18A98F" }}
                       />
                       {lt.name}
                       <span className="text-xs text-muted-foreground">

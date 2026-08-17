@@ -104,7 +104,7 @@ const STATUS_COLOR: Record<TimesheetStatus, string> = {
 };
 
 const PROJECT_BAR_COLORS = [
-  "#10b981",
+  "#18A98F",
   "#14b8a6",
   "#f59e0b",
   "#a855f7",
@@ -1461,7 +1461,7 @@ function SummaryTab() {
                           fontSize: 12,
                         }}
                       />
-                      <Bar dataKey="hours" radius={[0, 4, 4, 0]} fill="#10b981" />
+                      <Bar dataKey="hours" radius={[0, 4, 4, 0]} fill="#18A98F" />
                     </BarChart>
                   </ResponsiveContainer>
                 </div>

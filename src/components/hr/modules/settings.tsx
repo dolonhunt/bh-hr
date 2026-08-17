@@ -410,7 +410,7 @@ function DepartmentsTab() {
                     <div className="flex items-center gap-2">
                       <span
                         className="size-4 rounded"
-                        style={{ background: d.color ?? "#10b981" }}
+                        style={{ background: d.color ?? "#18A98F" }}
                       />
                       <span className="text-xs font-mono">
                         {d.color ?? "—"}
@@ -457,7 +457,7 @@ function DepartmentsTab() {
             { key: "description", label: "Description", textarea: true },
             { key: "color", label: "Color (hex)", type: "color" },
           ]}
-          initial={edit ?? { name: "", description: "", color: "#10b981" }}
+          initial={edit ?? { name: "", description: "", color: "#18A98F" }}
           onSubmit={async (form) => {
             const url = edit ? `/api/departments/${edit.id}` : "/api/departments";
             const method = edit ? "PATCH" : "POST";
@@ -784,7 +784,7 @@ function LeaveTypesTab() {
                     <div className="flex items-center gap-2">
                       <span
                         className="size-4 rounded"
-                        style={{ background: lt.color ?? "#10b981" }}
+                        style={{ background: lt.color ?? "#18A98F" }}
                       />
                       <span className="text-xs font-mono">
                         {lt.color ?? "—"}
@@ -839,7 +839,7 @@ function LeaveTypesTab() {
               code: "",
               defaultDays: 0,
               paid: true,
-              color: "#10b981",
+              color: "#18A98F",
             }
           }
           onSubmit={async (form) => {
@@ -1869,7 +1869,7 @@ function SimpleFormDialog({
                 <div className="flex items-center gap-2">
                   <input
                     type="color"
-                    value={form[f.key] ?? "#10b981"}
+                    value={form[f.key] ?? "#18A98F"}
                     onChange={(e) =>
                       setForm({ ...form, [f.key]: e.target.value })
                     }

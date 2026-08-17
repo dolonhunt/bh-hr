@@ -56,7 +56,7 @@ interface OrgChartResponse {
   maxDepth: number;
 }
 
-const DEFAULT_COLOR = "#10b981";
+const DEFAULT_COLOR = "#18A98F";
 
 // Collect every node id in the tree (used for "collapse all").
 function collectIds(nodes: OrgNode[]): Set<string> {

@@ -81,7 +81,7 @@ import { cn, formatCurrency } from "@/lib/utils";
 // requested accents. No indigo/blue.
 // ============================================================
 const CHART_COLORS = [
-  "#6D3FC4", // purple
+  "#FF6658", // purple
   "#f59e0b", // amber
   "#ef4444", // rose
   "#14b8a6", // teal
@@ -1034,7 +1034,7 @@ const RISK_BAR: Record<string, string> = {
 };
 
 const RISK_GAUGE_STROKE: Record<string, string> = {
-  LOW: "#6D3FC4",
+  LOW: "#FF6658",
   MEDIUM: "#f59e0b",
   HIGH: "#ef4444",
 };

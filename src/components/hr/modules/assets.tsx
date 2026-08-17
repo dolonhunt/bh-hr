@@ -1988,8 +1988,8 @@ function DepreciationDetailDialog({
                   >
                     <defs>
                       <linearGradient id="valueGrad" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#10b981" stopOpacity={0.5} />
-                        <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
+                        <stop offset="5%" stopColor="#18A98F" stopOpacity={0.5} />
+                        <stop offset="95%" stopColor="#18A98F" stopOpacity={0} />
                       </linearGradient>
                       <linearGradient id="depGrad" x1="0" y1="0" x2="0" y2="1">
                         <stop offset="5%" stopColor="#f43f5e" stopOpacity={0.4} />
@@ -2024,7 +2024,7 @@ function DepreciationDetailDialog({
                     <Area
                       type="monotone"
                       dataKey="endValue"
-                      stroke="#10b981"
+                      stroke="#18A98F"
                       strokeWidth={2}
                       fill="url(#valueGrad)"
                     />
