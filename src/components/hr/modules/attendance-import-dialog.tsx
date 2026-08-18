@@ -377,7 +377,7 @@ export function AttendanceImportDialog({ open, onOpenChange, onImported }: Props
                   <span className="font-medium text-foreground">Import</span>{" "}
                   to process all rows.
                 </div>
-                <Card className="border-border/60 shadow-soft overflow-hidden">
+                <Card className="border-border/30 shadow-soft overflow-hidden">
                   <div className="overflow-x-auto max-h-72 overflow-y-auto">
                     <Table>
                       <TableHeader>
@@ -465,7 +465,7 @@ export function AttendanceImportDialog({ open, onOpenChange, onImported }: Props
             </div>
 
             {result.errors.length > 0 && (
-              <Card className="border-border/60 shadow-soft overflow-hidden">
+              <Card className="border-border/30 shadow-soft overflow-hidden">
                 <div className="px-3 py-2 bg-rose-500/5 border-b border-border/60 text-xs font-semibold text-rose-700 dark:text-rose-300">
                   Error details ({result.errors.length})
                 </div>

@@ -30,7 +30,7 @@ export const metadata: Metadata = {
   ],
   authors: [{ name: "BH HR" }],
   icons: {
-    icon: "/logo.svg",
+    icon: "/bh-mark.png",
   },
 };
 

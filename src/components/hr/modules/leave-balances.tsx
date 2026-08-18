@@ -187,7 +187,7 @@ export function LeaveBalances() {
 
       {/* Loading */}
       {isLoading && (
-        <Card className="border-border/60 shadow-soft p-4">
+        <Card className="border-border/30 shadow-soft p-4">
           <div className="space-y-3">
             {Array.from({ length: 8 }).map((_, i) => (
               <div
@@ -214,7 +214,7 @@ export function LeaveBalances() {
 
       {/* Table */}
       {!isLoading && filtered.length > 0 && (
-        <Card className="border-border/60 shadow-soft overflow-hidden">
+        <Card className="border-border/30 shadow-soft overflow-hidden">
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>

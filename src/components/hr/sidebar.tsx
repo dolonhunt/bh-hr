@@ -34,30 +34,20 @@ export function Sidebar() {
       <aside
         className={cn(
           "z-50 flex flex-col bg-sidebar transition-all duration-300",
-          "hidden lg:flex m-3 rounded-2xl border border-sidebar-border/50 neu-raised overflow-hidden",
-          sidebarCollapsed ? "w-[76px]" : "w-[260px]",
-          "lg:sticky lg:top-0 lg:h-[calc(100vh-1.5rem)]",
+          "hidden lg:flex m-4 rounded-[24px] border border-sidebar-border/30 neu-raised overflow-hidden",
+          sidebarCollapsed ? "w-[80px]" : "w-[280px]",
+          "lg:sticky lg:top-4 lg:h-[calc(100vh-2rem)]",
           "fixed inset-y-0 left-0 lg:static",
           mobileSidebarOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
         )}
       >
         {/* Brand */}
-        <div className="h-16 flex items-center justify-between px-4 border-b border-sidebar-border/60">
-          <div className="flex items-center gap-2.5 min-w-0">
+        <div className="h-20 flex items-center justify-between px-6 border-b border-sidebar-border/30">
+          <div className="flex items-center gap-3 min-w-0">
             {sidebarCollapsed ? (
               <BrandMark size="md" />
             ) : (
-              <BrandLogo />
-            )}
-            {!sidebarCollapsed && (
-              <div className="min-w-0">
-                <div className="font-bold text-sidebar-foreground leading-tight truncate tracking-tight">
-                  BH HR
-                </div>
-                <div className="text-[10px] text-muted-foreground/80 truncate uppercase tracking-wider">
-                  Beyond Headlines
-                </div>
-              </div>
+              <BrandLogo className="h-7" />
             )}
           </div>
           {/* Mobile close */}
@@ -71,28 +61,26 @@ export function Sidebar() {
           </Button>
         </div>
 
-        {/* Nav — sectioned */}
-        <div className="flex-1 overflow-y-auto overflow-x-hidden px-3 py-4">
+        {/* Nav — scrollable */}
+        <div className="flex-1 overflow-y-auto px-4 py-6">
           <TooltipProvider delayDuration={200}>
-            <div className="space-y-4">
+            <div className="space-y-6">
               {NAV_SECTIONS.map((section) => {
-                // When collapsed, only show section divider line (not label)
                 const hasActive = section.items.some((item) => item.key === activeModule);
 
                 return (
-                  <div key={section.label} className="space-y-1">
+                  <div key={section.label} className="space-y-1.5">
                     {!sidebarCollapsed ? (
                       <div
                         className={cn(
-                          "px-3 pb-1 text-[10px] font-bold uppercase tracking-wider",
+                          "px-3 pb-1 text-[11px] font-bold uppercase tracking-wider",
                           hasActive ? "text-primary" : "text-muted-foreground/70"
                         )}
                       >
                         {section.label}
                       </div>
                     ) : (
-                      // Collapsed: show a thin divider
-                      <div className="mx-2 border-t border-sidebar-border/40" />
+                      <div className="mx-3 border-t border-sidebar-border/40 my-3" />
                     )}
 
                     {section.items.map((item) => {
@@ -107,22 +95,19 @@ export function Sidebar() {
                             setMobileSidebarOpen(false);
                           }}
                           className={cn(
-                            "w-full group/nav flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all relative",
+                            "w-full group/nav flex items-center gap-3.5 rounded-xl px-3 py-3 text-[14px] font-semibold transition-all relative",
                             active
-                              ? "bg-primary text-primary-foreground neu-raised-sm glow-coral"
-                              : "text-sidebar-foreground/75 hover:bg-sidebar-accent/60 hover:text-sidebar-foreground",
-                            sidebarCollapsed && "justify-center px-2"
+                              ? "bg-primary text-primary-foreground shadow-soft glow-coral"
+                              : "text-sidebar-foreground/80 hover:bg-muted/60 hover:text-sidebar-foreground hover:shadow-soft",
+                            sidebarCollapsed && "justify-center px-2 py-3"
                           )}
                         >
-                          {active && !sidebarCollapsed && (
-                            <span className="absolute left-0 top-1/2 -translate-y-1/2 h-5 w-1 rounded-r-full bg-primary-foreground/50" />
-                          )}
                           <Icon
                             className={cn(
-                              "size-[18px] flex-shrink-0 transition-transform group-hover/nav:scale-110",
+                              "size-5 flex-shrink-0 transition-transform group-hover/nav:scale-110",
                               active
                                 ? "text-primary-foreground"
-                                : "text-muted-foreground group-hover/nav:text-sidebar-foreground"
+                                : "text-muted-foreground group-hover/nav:text-primary"
                             )}
                           />
                           {!sidebarCollapsed && (
@@ -135,22 +120,18 @@ export function Sidebar() {
                               </div>
                             </div>
                           )}
-                          {!sidebarCollapsed && active && (
-                            <span className="h-1.5 w-1.5 rounded-full bg-primary-foreground/60" />
-                          )}
                         </button>
                       );
 
-                      // When collapsed, wrap in tooltip
                       if (sidebarCollapsed) {
                         return (
                           <Tooltip key={item.key}>
                             <TooltipTrigger asChild>
                               {navButton}
                             </TooltipTrigger>
-                            <TooltipContent side="right" sideOffset={8}>
-                              <p className="font-medium">{item.label}</p>
-                              <p className="text-xs text-muted-foreground">
+                            <TooltipContent side="right" sideOffset={12}>
+                              <p className="font-semibold">{item.label}</p>
+                              <p className="text-[11px] text-muted-foreground">
                                 {section.label}
                               </p>
                             </TooltipContent>
@@ -167,21 +148,21 @@ export function Sidebar() {
           </TooltipProvider>
         </div>
 
-        {/* Collapse toggle (desktop only) */}
-        <div className="hidden lg:block border-t border-sidebar-border/60 p-3">
+        {/* Collapse toggle */}
+        <div className="hidden lg:block border-t border-sidebar-border/30 p-4">
           <Button
             variant="ghost"
             size="sm"
-            className="w-full justify-start text-muted-foreground hover:text-foreground"
+            className="w-full justify-start text-muted-foreground hover:text-foreground font-semibold py-5"
             onClick={toggleSidebar}
           >
             <ChevronLeft
               className={cn(
-                "size-4 transition-transform",
+                "size-5 transition-transform",
                 sidebarCollapsed && "rotate-180"
               )}
             />
-            {!sidebarCollapsed && <span className="ml-2">Collapse</span>}
+            {!sidebarCollapsed && <span className="ml-3">Collapse</span>}
           </Button>
         </div>
       </aside>

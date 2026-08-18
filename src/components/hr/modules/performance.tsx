@@ -219,7 +219,7 @@ export function PerformanceModule() {
       <PageHeader
         title="Performance Management"
         description="Track employee goals, reviews, and ratings"
-        icon={<TrendingUp className="size-5" />}
+
         actions={
           <>
             <ExportButton module="performance" filters={filters} />
@@ -273,7 +273,7 @@ export function PerformanceModule() {
       </div>
 
       {/* Filters */}
-      <div className="flex flex-col md:flex-row gap-3">
+      <div className="flex flex-col md:flex-row gap-4 mb-6">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
           <Input
@@ -327,7 +327,7 @@ export function PerformanceModule() {
 
       {/* Loading */}
       {isLoading && (
-        <Card className="border-border/60 shadow-soft p-4">
+        <Card className="border-border/30 shadow-soft p-4">
           <div className="space-y-3">
             {Array.from({ length: 6 }).map((_, i) => (
               <Skeleton key={i} className="h-12 w-full" />
@@ -353,7 +353,7 @@ export function PerformanceModule() {
 
       {/* Table */}
       {!isLoading && items.length > 0 && (
-        <Card className="border-border/60 shadow-soft overflow-hidden">
+        <Card className="border-border/30 shadow-soft overflow-hidden">
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>

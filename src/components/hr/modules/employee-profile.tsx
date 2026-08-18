@@ -145,7 +145,7 @@ export function EmployeeProfile({ id }: { id: string }) {
       </div>
 
       {/* Profile header card */}
-      <Card className="border-border/60 shadow-soft overflow-hidden">
+      <Card className="border-border/30 shadow-soft overflow-hidden">
         <div
           className="h-24"
           style={{
@@ -244,7 +244,7 @@ export function EmployeeProfile({ id }: { id: string }) {
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <Card className="border-border/60 shadow-soft">
+            <Card className="border-border/30 shadow-soft">
               <CardHeader className="pb-3">
                 <CardTitle className="text-base">Quick Info</CardTitle>
               </CardHeader>
@@ -282,7 +282,7 @@ export function EmployeeProfile({ id }: { id: string }) {
               </CardContent>
             </Card>
 
-            <Card className="border-border/60 shadow-soft">
+            <Card className="border-border/30 shadow-soft">
               <CardHeader className="pb-3">
                 <CardTitle className="text-base">Recent Activity</CardTitle>
               </CardHeader>
@@ -320,7 +320,7 @@ export function EmployeeProfile({ id }: { id: string }) {
 
         {/* Personal */}
         <TabsContent value="personal" className="mt-4">
-          <Card className="border-border/60 shadow-soft">
+          <Card className="border-border/30 shadow-soft">
             <CardHeader>
               <CardTitle className="text-base">Personal Information</CardTitle>
             </CardHeader>
@@ -370,7 +370,7 @@ export function EmployeeProfile({ id }: { id: string }) {
 
         {/* Employment */}
         <TabsContent value="employment" className="mt-4">
-          <Card className="border-border/60 shadow-soft">
+          <Card className="border-border/30 shadow-soft">
             <CardHeader>
               <CardTitle className="text-base">Employment Information</CardTitle>
             </CardHeader>
@@ -428,7 +428,7 @@ export function EmployeeProfile({ id }: { id: string }) {
 
         {/* Attendance */}
         <TabsContent value="attendance" className="mt-4">
-          <Card className="border-border/60 shadow-soft">
+          <Card className="border-border/30 shadow-soft">
             <CardHeader>
               <CardTitle className="text-base">Recent Attendance</CardTitle>
             </CardHeader>
@@ -483,7 +483,7 @@ export function EmployeeProfile({ id }: { id: string }) {
 
         {/* Leave */}
         <TabsContent value="leave" className="mt-4">
-          <Card className="border-border/60 shadow-soft">
+          <Card className="border-border/30 shadow-soft">
             <CardHeader>
               <CardTitle className="text-base">Leave History</CardTitle>
             </CardHeader>
@@ -541,7 +541,7 @@ export function EmployeeProfile({ id }: { id: string }) {
         {/* Payroll */}
         <TabsContent value="payroll" className="mt-4 space-y-4">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-            <Card className="border-border/60 shadow-soft">
+            <Card className="border-border/30 shadow-soft">
               <CardHeader>
                 <CardTitle className="text-base">Salary Structure</CardTitle>
               </CardHeader>
@@ -636,7 +636,7 @@ export function EmployeeProfile({ id }: { id: string }) {
 
         {/* Documents */}
         <TabsContent value="documents" className="mt-4">
-          <Card className="border-border/60 shadow-soft">
+          <Card className="border-border/30 shadow-soft">
             <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle className="text-base">Employee Documents</CardTitle>
               <Button
@@ -702,7 +702,7 @@ export function EmployeeProfile({ id }: { id: string }) {
 
         {/* Activity */}
         <TabsContent value="activity" className="mt-4">
-          <Card className="border-border/60 shadow-soft">
+          <Card className="border-border/30 shadow-soft">
             <CardHeader>
               <CardTitle className="text-base">Activity Timeline</CardTitle>
             </CardHeader>
@@ -817,7 +817,7 @@ function StatCard({
     violet: "bg-violet-500/10 text-violet-600",
   };
   return (
-    <Card className="border-border/60 shadow-soft p-4">
+    <Card className="border-border/30 shadow-soft p-4">
       <div className="flex items-center gap-3">
         <div
           className={`size-10 rounded-xl flex items-center justify-center ${tones[tone]}`}

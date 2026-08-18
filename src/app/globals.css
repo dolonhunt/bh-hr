@@ -54,7 +54,7 @@
   --radius: 20px;
 
   /* BH HR Final UI — Cream/Lavender + Coral/Orange Soft 3D */
-  --background: #F7F2F8;
+  --background: #F8F3F1;
   --foreground: #272333;
 
   --card: #FFFFFF;
@@ -72,12 +72,12 @@
   --secondary-foreground: #7650C8;
 
   /* Muted: warm muted — readable */
-  --muted: #F5F0F5;
+  --muted: #F7F4F1;
   --muted-foreground: #625B6F;
 
-  /* Accent: lavender tint */
-  --accent: #F0EBF7;
-  --accent-foreground: #7650C8;
+  /* Accent: soft coral/peach tint */
+  --accent: #FFF0EB;
+  --accent-foreground: #FF6658;
 
   /* Semantic colors per spec */
   --destructive: #FF6658;
@@ -114,8 +114,8 @@
 
   /* Neumorphic shadow tokens — warm cream */
   --neu-light: #FFFFFF;
-  --neu-dark: #E5DDEF;
-  --neu-dark-subtle: #EBE5F0;
+  --neu-dark: #EAE3EB;
+  --neu-dark-subtle: #F0EAF1;
   --neu-glow: rgba(255, 102, 88, 0.12);
   --neu-glow-purple: rgba(118, 80, 200, 0.1);
 }
@@ -189,15 +189,15 @@
   .neu-raised {
     background: var(--card);
     box-shadow:
-      -5px -5px 12px var(--neu-light),
-      5px 5px 14px var(--neu-dark);
+      -8px -8px 24px var(--neu-light),
+      8px 8px 24px var(--neu-dark);
   }
 
   .neu-raised-sm {
     background: var(--card);
     box-shadow:
-      -3px -3px 8px var(--neu-light),
-      3px 3px 10px var(--neu-dark-subtle);
+      -4px -4px 12px var(--neu-light),
+      4px 4px 12px var(--neu-dark-subtle);
   }
 
   .neu-inset {
@@ -254,7 +254,7 @@
   .dark .glass { background: rgba(36, 27, 56, 0.85); }
 
   /* Shadow helpers */
-  .shadow-soft { box-shadow: -3px -3px 8px var(--neu-light), 3px 3px 10px var(--neu-dark-subtle); }
-  .shadow-card { box-shadow: -5px -5px 12px var(--neu-light), 5px 5px 14px var(--neu-dark); }
-  .shadow-card-hover { box-shadow: -8px -8px 20px var(--neu-light), 8px 8px 20px var(--neu-dark); }
+  .shadow-soft { box-shadow: -4px -4px 12px var(--neu-light), 4px 4px 12px var(--neu-dark-subtle); }
+  .shadow-card { box-shadow: -8px -8px 24px var(--neu-light), 8px 8px 24px var(--neu-dark); }
+  .shadow-card-hover { box-shadow: -10px -10px 28px var(--neu-light), 10px 10px 28px var(--neu-dark); }
 }
