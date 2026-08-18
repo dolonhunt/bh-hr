@@ -269,7 +269,7 @@ export function ApprovalQueue({
       </div>
 
       {/* Table */}
-      <Card className="border-border/60 shadow-soft overflow-hidden">
+      <Card className="border-border/30 shadow-soft overflow-hidden">
         {isLoading ? (
           <div className="p-6 space-y-2">
             {Array.from({ length: 5 }).map((_, i) => (

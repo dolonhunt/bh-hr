@@ -269,7 +269,7 @@ export function PayrollModule() {
       <PageHeader
         title="Payroll"
         description="Manage monthly salary disbursements and payslips"
-        icon={<Wallet className="size-5" />}
+
         actions={
           <>
             <ExportButton
@@ -391,7 +391,7 @@ export function PayrollModule() {
       </div>
 
       {/* Filters */}
-      <div className="flex flex-col md:flex-row gap-3">
+      <div className="flex flex-col md:flex-row gap-4 mb-6">
         <Input
           type="month"
           value={month}
@@ -459,7 +459,7 @@ export function PayrollModule() {
 
       {/* Loading */}
       {isLoading && (
-        <Card className="border-border/60 shadow-soft p-4">
+        <Card className="border-border/30 shadow-soft p-4">
           <div className="space-y-3">
             {Array.from({ length: 6 }).map((_, i) => (
               <div key={i} className="h-12 rounded-md bg-muted/40 animate-pulse" />
@@ -485,7 +485,7 @@ export function PayrollModule() {
 
       {/* Table */}
       {!isLoading && items.length > 0 && (
-        <Card className="border-border/60 shadow-soft overflow-hidden">
+        <Card className="border-border/30 shadow-soft overflow-hidden">
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>

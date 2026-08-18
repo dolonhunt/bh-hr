@@ -707,7 +707,7 @@ function AttendanceChartWidget({
   className?: string;
 }) {
   return (
-    <Card className={cn("border-border/60 shadow-soft", className)}>
+    <Card className={cn("border-border/30 shadow-soft", className)}>
       <CardHeader className="flex flex-row items-center justify-between pb-2">
         <div className="min-w-0">
           <CardTitle className="text-base font-semibold">
@@ -771,7 +771,7 @@ function DeptDistributionWidget({
   className?: string;
 }) {
   return (
-    <Card className={cn("border-border/60 shadow-soft", className)}>
+    <Card className={cn("border-border/30 shadow-soft", className)}>
       <CardHeader className="pb-2">
         <CardTitle className="text-base font-semibold">
           Department Distribution
@@ -872,7 +872,7 @@ function QuickActionsWidget({
     },
   ];
   return (
-    <Card className="border-border/60 shadow-soft">
+    <Card className="border-border/30 shadow-soft">
       <CardHeader className="pb-3">
         <CardTitle className="text-base font-semibold">Quick Actions</CardTitle>
         <p className="text-xs text-muted-foreground">
@@ -916,7 +916,7 @@ function RecentEmployeesWidget({
   setModule: (m: any) => void;
 }) {
   return (
-    <Card className="border-border/60 shadow-soft">
+    <Card className="border-border/30 shadow-soft">
       <CardHeader className="flex flex-row items-center justify-between pb-3">
         <CardTitle className="text-base font-semibold flex items-center gap-2">
           <Users className="size-4 text-primary" /> Recent Employees
@@ -969,7 +969,7 @@ function PendingLeaveWidget({
   setModule: (m: any) => void;
 }) {
   return (
-    <Card className="border-border/60 shadow-soft">
+    <Card className="border-border/30 shadow-soft">
       <CardHeader className="flex flex-row items-center justify-between pb-3">
         <CardTitle className="text-base font-semibold flex items-center gap-2">
           <CalendarDays className="size-4 text-amber-600" /> Pending Leave
@@ -1029,7 +1029,7 @@ function RecentDocumentsWidget({
   setModule: (m: any) => void;
 }) {
   return (
-    <Card className="border-border/60 shadow-soft">
+    <Card className="border-border/30 shadow-soft">
       <CardHeader className="flex flex-row items-center justify-between pb-3">
         <CardTitle className="text-base font-semibold flex items-center gap-2">
           <FileText className="size-4 text-violet-600" /> Recent Documents

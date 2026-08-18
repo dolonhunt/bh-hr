@@ -223,7 +223,7 @@ export function OrgChart() {
 
   if (isLoading) {
     return (
-      <Card className="border-border/60 shadow-soft">
+      <Card className="border-border/30 shadow-soft">
         <CardContent className="p-12 flex flex-col items-center justify-center text-center">
           <Loader2 className="size-8 animate-spin text-muted-foreground" />
           <p className="mt-3 text-sm text-muted-foreground">

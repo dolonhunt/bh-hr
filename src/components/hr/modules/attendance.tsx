@@ -257,7 +257,7 @@ export function AttendanceModule() {
 
       {/* Loading */}
       {isLoading && (
-        <Card className="border-border/60 shadow-soft p-4">
+        <Card className="border-border/30 shadow-soft p-4">
           <div className="space-y-3">
             {Array.from({ length: 6 }).map((_, i) => (
               <div
@@ -286,7 +286,7 @@ export function AttendanceModule() {
 
       {/* Table */}
       {!isLoading && items.length > 0 && (
-        <Card className="border-border/60 shadow-soft overflow-hidden">
+        <Card className="border-border/30 shadow-soft overflow-hidden">
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
@@ -475,8 +475,8 @@ const LEGEND_ITEMS = [
   { label: "More", color: "bg-primary" },
 ];
 
-const CELL_PX = 12;
-const GAP_PX = 3;
+const CELL_PX = 16;
+const GAP_PX = 4;
 
 type HeatmapItem = {
   date: string;
@@ -554,7 +554,7 @@ function AttendanceHeatmap() {
   const todayKey = new Date().toISOString().slice(0, 10);
 
   return (
-    <Card className="border-border/60 shadow-soft p-4 sm:p-5">
+    <Card className="border-border/30 shadow-soft p-4 sm:p-5">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
         <div>
           <h3 className="text-sm font-semibold flex items-center gap-1.5">

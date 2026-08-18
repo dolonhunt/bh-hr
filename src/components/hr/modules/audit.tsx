@@ -257,7 +257,7 @@ export function AuditModule() {
       )}
 
       {!isLoading && logs.length > 0 && (
-        <Card className="border-border/60 shadow-soft overflow-hidden">
+        <Card className="border-border/30 shadow-soft overflow-hidden">
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>

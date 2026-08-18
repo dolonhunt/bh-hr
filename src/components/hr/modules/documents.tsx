@@ -143,7 +143,7 @@ export function DocumentsModule() {
       <PageHeader
         title="Documents"
         description="Generate HR documents from templates, deliver them via email, and track delivery."
-        icon={<FileText className="size-5" />}
+
         actions={
           <>
             <Button
@@ -342,7 +342,7 @@ function AllDocumentsTab({
         <KpiCard label="Failed Emails" value={failedEmails} icon={MailX} iconClass="bg-rose-500/10 text-rose-600" />
       </div>
 
-      <Card className="border-border/60 shadow-soft overflow-hidden">
+      <Card className="border-border/30 shadow-soft overflow-hidden">
         <div className="flex items-center justify-between px-5 py-3 border-b border-border bg-muted/30">
           <div className="font-medium text-sm">Recent Documents</div>
         </div>
@@ -428,7 +428,7 @@ function TemplatesTab({
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-col md:flex-row gap-3">
+      <div className="flex flex-col md:flex-row gap-4 mb-6">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
           <Input
@@ -490,7 +490,7 @@ function TemplatesTab({
           {templates.map((t: any) => (
             <Card
               key={t.id}
-              className="border-border/60 shadow-soft hover:shadow-card-hover hover:-translate-y-0.5 transition-all overflow-hidden flex flex-col"
+              className="border-border/30 shadow-soft hover:shadow-card-hover hover:-translate-y-0.5 transition-all overflow-hidden flex flex-col"
             >
               <CardContent className="p-5 flex-1 flex flex-col">
                 <div className="flex items-start justify-between gap-2 mb-3">
@@ -659,7 +659,7 @@ function GeneratedTab({
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-col md:flex-row gap-3">
+      <div className="flex flex-col md:flex-row gap-4 mb-6">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
           <Input
@@ -722,7 +722,7 @@ function GeneratedTab({
         documents
       </div>
 
-      <Card className="border-border/60 shadow-soft overflow-hidden">
+      <Card className="border-border/30 shadow-soft overflow-hidden">
         <DocumentsTable
           docs={docs}
           loading={isLoading}
@@ -805,7 +805,7 @@ function EmailHistoryTab() {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-col md:flex-row gap-3">
+      <div className="flex flex-col md:flex-row gap-4 mb-6">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
           <Input
@@ -855,7 +855,7 @@ function EmailHistoryTab() {
       )}
 
       {!isLoading && logs.length > 0 && (
-        <Card className="border-border/60 shadow-soft overflow-hidden">
+        <Card className="border-border/30 shadow-soft overflow-hidden">
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>

@@ -268,7 +268,7 @@ export function Onboarding({ employeeId }: { employeeId: string }) {
   return (
     <div className="space-y-4">
       {/* Summary card */}
-      <Card className="border-border/60 shadow-soft">
+      <Card className="border-border/30 shadow-soft">
         <CardContent className="p-4 sm:p-6">
           <div className="flex flex-col sm:flex-row items-center gap-6">
             <ProgressRing percent={stats.percent} />

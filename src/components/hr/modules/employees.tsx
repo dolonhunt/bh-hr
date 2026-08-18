@@ -151,7 +151,7 @@ function EmployeeList() {
       <PageHeader
         title="Employees"
         description="Manage your organization's employee directory"
-        icon={<Users className="size-5" />}
+
         actions={
           <>
             <ExportButton
@@ -213,7 +213,7 @@ function EmployeeList() {
 
       {/* Filters */}
       {view !== "org" && (
-        <div className="flex flex-col md:flex-row gap-3">
+        <div className="flex flex-col md:flex-row gap-4 mb-6">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
             <Input
@@ -306,7 +306,7 @@ function EmployeeList() {
 
       {/* List view */}
       {!isLoading && view === "list" && employees.length > 0 && (
-        <Card className="border-border/60 shadow-soft overflow-hidden">
+        <Card className="border-border/30 shadow-soft overflow-hidden">
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
@@ -427,7 +427,7 @@ function EmployeeList() {
           {employees.map((emp: any) => (
             <Card
               key={emp.id}
-              className="border-border/60 shadow-soft hover:shadow-card-hover hover:-translate-y-0.5 transition-all cursor-pointer overflow-hidden"
+              className="border-border/30 shadow-soft hover:shadow-card-hover hover:-translate-y-0.5 transition-all cursor-pointer overflow-hidden"
               onClick={() => openEmployee(emp.id)}
             >
               <div

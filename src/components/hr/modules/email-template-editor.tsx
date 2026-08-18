@@ -473,7 +473,7 @@ export function EmailTemplateEditor() {
   // ===== Loading state =====
   if (templatesQuery.isLoading) {
     return (
-      <Card className="border-border/60 shadow-soft">
+      <Card className="border-border/30 shadow-soft">
         <CardContent className="p-6">
           <div className="h-96 rounded-lg bg-muted/40 animate-pulse" />
         </CardContent>
@@ -484,7 +484,7 @@ export function EmailTemplateEditor() {
   // ===== Empty state =====
   if (!templatesQuery.isLoading && templates.length === 0) {
     return (
-      <Card className="border-border/60 shadow-soft">
+      <Card className="border-border/30 shadow-soft">
         <CardContent className="p-10 flex flex-col items-center justify-center text-center">
           <div className="size-14 rounded-2xl bg-muted flex items-center justify-center mb-4">
             <Mail className="size-7 text-muted-foreground" />
@@ -506,7 +506,7 @@ export function EmailTemplateEditor() {
     <div className="space-y-4">
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         {/* LEFT: Template list */}
-        <Card className="border-border/60 shadow-soft lg:max-h-[70vh] flex flex-col">
+        <Card className="border-border/30 shadow-soft lg:max-h-[70vh] flex flex-col">
           <CardContent className="p-4 flex flex-col flex-1 min-h-0">
             <div className="flex items-center justify-between mb-3">
               <div className="text-sm font-semibold flex items-center gap-2">
@@ -597,7 +597,7 @@ export function EmailTemplateEditor() {
         </Card>
 
         {/* RIGHT: Editor (subject + body + variables sidebar) */}
-        <Card className="border-border/60 shadow-soft lg:col-span-2">
+        <Card className="border-border/30 shadow-soft lg:col-span-2">
           <CardContent className="p-4 space-y-4">
             {selectedTemplate ? (
               <>
@@ -762,7 +762,7 @@ export function EmailTemplateEditor() {
       </div>
 
       {/* LIVE PREVIEW */}
-      <Card className="border-border/60 shadow-soft">
+      <Card className="border-border/30 shadow-soft">
         <CardContent className="p-4 space-y-3">
           <div className="flex items-center justify-between flex-wrap gap-2 pb-2 border-b border-border/60">
             <div className="text-sm font-semibold flex items-center gap-2">

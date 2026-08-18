@@ -57,7 +57,7 @@ export function SalaryHistory({
 
   if (isLoading) {
     return (
-      <Card className="border-border/60 shadow-soft">
+      <Card className="border-border/30 shadow-soft">
         <CardHeader className="pb-3">
           <CardTitle className="text-base flex items-center gap-2">
             <History className="size-4 text-primary" /> Salary Revision History
@@ -108,7 +108,7 @@ export function SalaryHistory({
   }
 
   return (
-    <Card className="border-border/60 shadow-soft">
+    <Card className="border-border/30 shadow-soft">
       <CardHeader className="pb-3">
         <CardTitle className="text-base flex items-center gap-2">
           <History className="size-4 text-primary" /> Salary Revision History

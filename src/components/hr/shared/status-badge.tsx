@@ -1,7 +1,7 @@
 "use client";
 
 import { Badge } from "@/components/ui/badge";
-import { cn, statusColor } from "@/lib/utils";
+import { cn } from "@/lib/utils";
 
 export function StatusBadge({
   status,
@@ -14,61 +14,44 @@ export function StatusBadge({
   label?: string;
   dot?: boolean;
 }) {
+  const normStatus = status.toUpperCase();
+
+  // Map to the new badge variants
+  let variant: "default" | "secondary" | "destructive" | "success" | "warning" | "info" | "purple" | "outline" = "outline";
+
+  if (["ACTIVE", "PRESENT", "APPROVED", "PAID", "SENT", "DELIVERED", "HIRED", "ISSUED", "OPEN"].includes(normStatus)) {
+    variant = "success";
+  } else if (["PENDING", "DRAFT", "QUEUED", "ON_HOLD", "SCREENING", "APPLIED", "PROBATION", "PENDING_APPROVAL"].includes(normStatus)) {
+    variant = "warning";
+  } else if (["LATE", "REJECTED", "FAILED", "BOUNCED", "TERMINATED", "CANCELLED", "ARCHIVED", "ABSENT", "CLOSED", "RESIGNED"].includes(normStatus)) {
+    variant = "destructive";
+  } else if (["GENERATED", "SUBMITTED", "SHORTLISTED", "INTERVIEW", "SELECTED", "OFFER", "REMOTE", "HALF_DAY", "REVIEWED"].includes(normStatus)) {
+    variant = "info";
+  } else if (["ON_LEAVE", "SPECIAL"].includes(normStatus)) {
+    variant = "purple";
+  }
+
+  // Set dot color based on variant
   const dotColor: Record<string, string> = {
-    ACTIVE: "bg-primary",
-    PRESENT: "bg-primary",
-    APPROVED: "bg-primary",
-    PAID: "bg-primary",
-    SENT: "bg-primary",
-    DELIVERED: "bg-primary",
-    HIRED: "bg-primary",
-    ISSUED: "bg-primary",
-    GENERATED: "bg-sky-500",
-    OPEN: "bg-primary",
-    PENDING: "bg-amber-500",
-    DRAFT: "bg-amber-500",
-    QUEUED: "bg-amber-500",
-    ON_HOLD: "bg-amber-500",
-    SCREENING: "bg-amber-500",
-    APPLIED: "bg-amber-500",
-    PROBATION: "bg-amber-500",
-    PENDING_APPROVAL: "bg-amber-500",
-    SUBMITTED: "bg-sky-500",
-    SHORTLISTED: "bg-sky-500",
-    INTERVIEW: "bg-sky-500",
-    SELECTED: "bg-sky-500",
-    OFFER: "bg-sky-500",
-    REMOTE: "bg-sky-500",
-    HALF_DAY: "bg-sky-500",
-    REVIEWED: "bg-sky-500",
-    LATE: "bg-rose-500",
-    REJECTED: "bg-rose-500",
-    FAILED: "bg-rose-500",
-    BOUNCED: "bg-rose-500",
-    TERMINATED: "bg-rose-500",
-    CANCELLED: "bg-rose-500",
-    ARCHIVED: "bg-rose-500",
-    ABSENT: "bg-rose-500",
-    CLOSED: "bg-rose-500",
-    RESIGNED: "bg-rose-500",
-    ON_LEAVE: "bg-amber-500",
+    success: "bg-success",
+    warning: "bg-warning",
+    destructive: "bg-destructive",
+    info: "bg-info",
+    purple: "bg-purple",
+    outline: "bg-muted-foreground",
+    default: "bg-primary",
+    secondary: "bg-secondary-foreground"
   };
-  const dotCls = dotColor[status.toUpperCase()] ?? "bg-muted-foreground";
 
   return (
     <Badge
-      variant="outline"
-      className={cn(
-        "font-medium border text-[11px] px-2 py-0.5 rounded-full capitalize inline-flex items-center gap-1.5",
-        statusColor(status),
-        className
-      )}
+      variant={variant}
+      className={cn("px-2.5 py-1 inline-flex items-center gap-2", className)}
     >
       {dot && (
-        <span className={cn("size-1.5 rounded-full", dotCls)} />
+        <span className={cn("size-[6px] rounded-full", dotColor[variant])} />
       )}
       {label ?? status.replace(/_/g, " ").toLowerCase()}
     </Badge>
   );
 }
-

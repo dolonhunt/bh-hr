@@ -251,7 +251,7 @@ export function LeaveModule() {
       <PageHeader
         title="Leave Management"
         description="Apply, approve, and track employee leave requests"
-        icon={<CalendarDays className="size-5" />}
+
         actions={
           <>
             <ExportButton
@@ -408,7 +408,7 @@ export function LeaveModule() {
           </Tabs>
 
           {/* Filters */}
-          <div className="flex flex-col md:flex-row gap-3">
+          <div className="flex flex-col md:flex-row gap-4 mb-6">
             <Select
               value={leaveTypeId || "ALL"}
               onValueChange={(v) => {
@@ -451,7 +451,7 @@ export function LeaveModule() {
 
           {/* Loading */}
           {isLoading && (
-            <Card className="border-border/60 shadow-soft p-4">
+            <Card className="border-border/30 shadow-soft p-4">
               <div className="space-y-3">
                 {Array.from({ length: 6 }).map((_, i) => (
                   <div
@@ -480,7 +480,7 @@ export function LeaveModule() {
 
           {/* Table */}
           {!isLoading && items.length > 0 && (
-            <Card className="border-border/60 shadow-soft overflow-hidden">
+            <Card className="border-border/30 shadow-soft overflow-hidden">
               <div className="overflow-x-auto">
                 <Table>
                   <TableHeader>
@@ -688,7 +688,7 @@ export function LeaveModule() {
             </span>
           </div>
 
-          <Card className="border-border/60 shadow-soft p-3 sm:p-4">
+          <Card className="border-border/30 shadow-soft p-3 sm:p-4">
             {calLoading ? (
               <div className="space-y-2">
                 <div className="grid grid-cols-7 gap-1.5">

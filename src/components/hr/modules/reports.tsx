@@ -304,7 +304,7 @@ export function ReportsModule() {
             return (
               <Card
                 key={r.key}
-                className="border-border/60 shadow-soft hover:shadow-card-hover transition-all flex flex-col"
+                className="border-border/30 shadow-soft hover:shadow-card-hover transition-all flex flex-col"
               >
                 <CardContent className="p-5 flex flex-col flex-1">
                   <div
@@ -405,7 +405,7 @@ function ChartCard({
   children: React.ReactNode;
 }) {
   return (
-    <Card className="border-border/60 shadow-soft overflow-hidden">
+    <Card className="border-border/30 shadow-soft overflow-hidden">
       <CardHeader className="pb-2 pt-4 px-5">
         <CardTitle className="text-sm font-semibold flex items-center gap-2">
           {title}
@@ -730,7 +730,7 @@ function RecruitmentFunnelSection({
           Cumulative candidates reaching each pipeline stage
         </span>
       </div>
-      <Card className="border-border/60 shadow-soft">
+      <Card className="border-border/30 shadow-soft">
         <CardContent className="p-5">
           {loading ? (
             <div className="space-y-2">
@@ -1102,7 +1102,7 @@ function PredictionsSection() {
 
 function PredictionsCardSkeleton() {
   return (
-    <Card className="border-border/60 shadow-soft">
+    <Card className="border-border/30 shadow-soft">
       <CardContent className="p-5">
         <Skeleton className="h-5 w-40 mb-4" />
         <Skeleton className="h-32 w-full mb-3" />
@@ -1171,7 +1171,7 @@ function AttritionRiskCard({
   const shown = expanded ? data.employees : top;
 
   return (
-    <Card className="border-border/60 shadow-soft">
+    <Card className="border-border/30 shadow-soft">
       <CardHeader className="pb-2 pt-4 px-5">
         <CardTitle className="text-sm font-semibold flex items-center gap-2">
           <ShieldAlert className="size-4 text-rose-600" />
@@ -1326,7 +1326,7 @@ function PerformanceTrendCard({
   const declining = data.employees.filter((e) => e.trend === "DOWN");
 
   return (
-    <Card className="border-border/60 shadow-soft">
+    <Card className="border-border/30 shadow-soft">
       <CardHeader className="pb-2 pt-4 px-5">
         <CardTitle className="text-sm font-semibold flex items-center gap-2">
           <TrendingUp className="size-4 text-primary" />
@@ -1453,7 +1453,7 @@ function HeadcountForecastCard({
   ];
 
   return (
-    <Card className="border-border/60 shadow-soft">
+    <Card className="border-border/30 shadow-soft">
       <CardHeader className="pb-2 pt-4 px-5">
         <CardTitle className="text-sm font-semibold flex items-center gap-2">
           <Gauge className="size-4 text-amber-600" />
@@ -1564,7 +1564,7 @@ function DepartmentRiskCard({
   const depts = data.departments ?? [];
 
   return (
-    <Card className="border-border/60 shadow-soft">
+    <Card className="border-border/30 shadow-soft">
       <CardHeader className="pb-2 pt-4 px-5">
         <CardTitle className="text-sm font-semibold flex items-center gap-2">
           <Building2 className="size-4 text-violet-600" />

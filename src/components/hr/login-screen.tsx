@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { BrandLogo } from "@/components/brand/brand-logo";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -52,7 +53,7 @@ export function LoginScreen() {
         <div className="absolute -bottom-32 -left-20 w-96 h-96 rounded-full bg-primary/8 blur-3xl" />
         <div className="relative z-10 flex flex-col justify-between p-12 text-primary-foreground w-full">
           <div className="flex items-center gap-3">
-            <img src="/bh-logo.png" alt="BH HR — Beyond Headlines" className="h-10 w-auto object-contain brightness-0 invert" />
+            <BrandLogo className="h-10" inverted />
             <span className="text-xl font-bold tracking-tight">
               BH HR
             </span>
@@ -100,7 +101,7 @@ export function LoginScreen() {
           <CardHeader className="space-y-1">
             <div className="lg:hidden flex items-center gap-2 mb-2">
               <div className="size-9 rounded-lg bg-primary text-primary-foreground flex items-center justify-center">
-                <img src="/bh-logo.png" alt="BH HR" className="h-8 w-auto object-contain" />
+                <BrandLogo />
               </div>
               <span className="font-semibold text-lg">BH HR</span>
             </div>

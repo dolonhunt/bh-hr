@@ -218,7 +218,7 @@ function OrganizationTab() {
 
   if (isLoading) {
     return (
-      <Card className="border-border/60 shadow-soft">
+      <Card className="border-border/30 shadow-soft">
         <CardContent className="p-6">
           <div className="h-96 rounded-lg bg-muted/40 animate-pulse" />
         </CardContent>
@@ -261,7 +261,7 @@ function OrganizationTab() {
 
   return (
     <div className="space-y-4">
-      <Card className="border-border/60 shadow-soft">
+      <Card className="border-border/30 shadow-soft">
         <CardContent className="p-6 space-y-5">
           {/* Header with logo preview */}
           <div className="flex items-start justify-between pb-4 border-b border-border/60 gap-4">
@@ -369,7 +369,7 @@ function DepartmentsTab() {
   const items = data?.items ?? [];
 
   return (
-    <Card className="border-border/60 shadow-soft">
+    <Card className="border-border/30 shadow-soft">
       <CardContent className="p-6">
         <SimpleTableHeader
           title="Departments"
@@ -489,7 +489,7 @@ function RolesTab() {
   const items = data?.items ?? [];
 
   return (
-    <Card className="border-border/60 shadow-soft">
+    <Card className="border-border/30 shadow-soft">
       <CardContent className="p-6">
         <SimpleTableHeader
           title="Roles"
@@ -602,7 +602,7 @@ function DesignationsTab() {
   const items = designations?.items ?? [];
 
   return (
-    <Card className="border-border/60 shadow-soft">
+    <Card className="border-border/30 shadow-soft">
       <CardContent className="p-6">
         <SimpleTableHeader
           title="Designations"
@@ -729,7 +729,7 @@ function LeaveTypesTab() {
   const items = data?.items ?? [];
 
   return (
-    <Card className="border-border/60 shadow-soft">
+    <Card className="border-border/30 shadow-soft">
       <CardContent className="p-6">
         <SimpleTableHeader
           title="Leave Types"
@@ -918,7 +918,7 @@ function EmailSettingsTab() {
   }
 
   return (
-    <Card className="border-border/60 shadow-soft">
+    <Card className="border-border/30 shadow-soft">
       <CardContent className="p-6 space-y-4">
         <div className="flex items-center justify-between pb-3 border-b border-border/60">
           <div>
@@ -1158,7 +1158,7 @@ function DocumentNumberingTab() {
   const tokens = ["{COMPANY}", "{DEPARTMENT}", "{DOCUMENT_TYPE}", "{DATE}", "{EMPLOYEE_ID}", "{SEQ}"];
 
   return (
-    <Card className="border-border/60 shadow-soft">
+    <Card className="border-border/30 shadow-soft">
       <CardContent className="p-6 space-y-4">
         <div className="pb-3 border-b border-border/60">
           <div className="font-semibold">Document Numbering</div>
@@ -1377,7 +1377,7 @@ function DataBackupTab() {
   return (
     <div className="space-y-6">
       {/* Export */}
-      <Card className="border-border/60 shadow-soft">
+      <Card className="border-border/30 shadow-soft">
         <CardContent className="p-6 space-y-4">
           <div className="flex items-start justify-between gap-4 pb-3 border-b border-border/60">
             <div className="flex items-start gap-3 min-w-0">
@@ -1458,7 +1458,7 @@ function DataBackupTab() {
       </Card>
 
       {/* Import */}
-      <Card className="border-border/60 shadow-soft">
+      <Card className="border-border/30 shadow-soft">
         <CardContent className="p-6 space-y-4">
           <div className="flex items-start justify-between gap-4 pb-3 border-b border-border/60">
             <div className="flex items-start gap-3 min-w-0">
