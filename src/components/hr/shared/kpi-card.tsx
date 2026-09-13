@@ -30,18 +30,18 @@ export function KpiCard({
   sparklineColor,
 }: KpiCardProps) {
   const accentColor = iconClass?.includes("primary")
-    ? "#FF6658"
+    ? "#2E7069"
     : iconClass?.includes("amber")
       ? "#F3A65A"
       : iconClass?.includes("rose")
-        ? "#FF6658"
+        ? "#2E7069"
         : iconClass?.includes("violet")
-          ? "#7650C8"
+          ? "#2E7069"
           : iconClass?.includes("teal")
-            ? "#18A98F"
+            ? "#2E7069"
             : iconClass?.includes("primary")
-              ? "#FF6658"
-              : "#FF6658";
+              ? "#2E7069"
+              : "#2E7069";
 
   return (
     <Card

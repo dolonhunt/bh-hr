@@ -48,7 +48,7 @@ export function LoginScreen() {
       {/* Left hero panel — deep navy with teal glow */}
       <div className="hidden lg:flex lg:w-1/2 bg-background relative overflow-hidden">
         <div className="absolute inset-0 bg-grid opacity-20" />
-        <div className="absolute -top-24 -right-24 w-96 h-96 rounded-full bg-primary/20 blur-3xl glow-purple" />
+        <div className="absolute -top-24 -right-24 w-96 h-96 rounded-full bg-primary/20 blur-3xl glow-teal" />
         <div className="absolute -bottom-32 -left-20 w-96 h-96 rounded-full bg-primary/8 blur-3xl" />
         <div className="relative z-10 flex flex-col justify-between p-12 text-primary-foreground w-full">
           <div className="flex items-center gap-3">

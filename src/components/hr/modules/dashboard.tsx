@@ -720,7 +720,7 @@ function AttendanceChartWidget({
         <div className="flex items-center gap-2 sm:gap-3 text-[10px] sm:text-[11px] flex-wrap justify-end">
           <Legend2 color="#18A98F" label="Present" />
           <Legend2 color="#F3A65A" label="Late" />
-          <Legend2 color="#FF6658" label="Absent" />
+          <Legend2 color="#2E7069" label="Absent" />
           <Legend2 color="#94a3b8" label="Leave" />
         </div>
       </CardHeader>
@@ -754,7 +754,7 @@ function AttendanceChartWidget({
             />
             <Bar dataKey="present" name="Present" stackId="a" fill="#18A98F" radius={[0, 0, 0, 0]} />
             <Bar dataKey="late" name="Late" stackId="a" fill="#F3A65A" />
-            <Bar dataKey="absent" name="Absent" stackId="a" fill="#FF6658" />
+            <Bar dataKey="absent" name="Absent" stackId="a" fill="#2E7069" />
             <Bar dataKey="leave" name="Leave" stackId="a" fill="#94a3b8" radius={[6, 6, 0, 0]} />
           </BarChart>
         </ResponsiveContainer>
