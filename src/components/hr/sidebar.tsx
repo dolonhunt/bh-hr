@@ -107,15 +107,15 @@ export function Sidebar() {
                             setMobileSidebarOpen(false);
                           }}
                           className={cn(
-                            "w-full group/nav flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all relative",
+                            "w-full group/nav flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all relative cursor-pointer",
                             active
-                              ? "bg-primary text-white neu-raised-sm glow-teal"
-                              : "text-sidebar-foreground/60 hover:bg-accent/50 hover:text-sidebar-foreground",
+                              ? "bg-accent text-accent-foreground neu-raised-sm"
+                              : "text-sidebar-foreground/70 cursor-pointer hover:bg-accent/60 hover:text-accent-foreground",
                             sidebarCollapsed && "justify-center px-2"
                           )}
                         >
                           {active && !sidebarCollapsed && (
-                            <span className="absolute left-0 top-1/2 -translate-y-1/2 h-5 w-1 rounded-r-full bg-primary-foreground/50" />
+                            <span className="absolute left-0 top-1/2 -translate-y-1/2 h-5 w-1 rounded-r-full bg-accent-foreground/40" />
                           )}
                           <Icon
                             className={cn(
