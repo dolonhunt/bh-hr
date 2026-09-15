@@ -78,7 +78,7 @@ export function AppShell() {
             </AnimatePresence>
           </div>
         </main>
-        <footer className="mt-auto border-t border-border/50 bg-card/70 backdrop-blur-sm px-6 py-3 text-xs text-muted-foreground flex flex-col sm:flex-row items-center justify-between gap-2">
+        <footer className="mt-auto border-t border-border/50 bg-card/70 backdrop-blur-sm px-6 py-3 text-xs text-foreground/60 flex flex-col sm:flex-row items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             <span className="size-1.5 rounded-full bg-primary animate-pulse" />
             <span className="font-medium text-foreground">BH HR</span>

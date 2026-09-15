@@ -45,31 +45,31 @@ export function LoginScreen() {
 
   return (
     <div className="min-h-screen flex flex-col lg:flex-row">
-      {/* Left hero panel — deep navy with teal glow */}
-      <div className="hidden lg:flex lg:w-1/2 bg-background relative overflow-hidden">
-        <div className="absolute inset-0 bg-grid opacity-20" />
-        <div className="absolute -top-24 -right-24 w-96 h-96 rounded-full bg-primary/20 blur-3xl glow-teal" />
-        <div className="absolute -bottom-32 -left-20 w-96 h-96 rounded-full bg-primary/8 blur-3xl" />
-        <div className="relative z-10 flex flex-col justify-between p-12 text-primary-foreground w-full">
+      {/* Left hero panel — deep teal with glow */}
+      <div className="hidden lg:flex lg:w-1/2 bg-primary relative overflow-hidden">
+        <div className="absolute inset-0 bg-grid opacity-10" />
+        <div className="absolute -top-24 -right-24 w-96 h-96 rounded-full bg-white/10 blur-3xl" />
+        <div className="absolute -bottom-32 -left-20 w-96 h-96 rounded-full bg-white/5 blur-3xl" />
+        <div className="relative z-10 flex flex-col justify-between p-12 text-white w-full">
           <div className="flex items-center gap-3">
             <img src="/bh-logo.png" alt="BH HR — Beyond Headlines" className="h-10 w-auto object-contain brightness-0 invert" />
-            <span className="text-xl font-bold tracking-tight">
+            <span className="text-xl font-bold tracking-tight text-white">
               BH HR
             </span>
           </div>
 
           <div className="space-y-6">
-            <div className="inline-flex items-center gap-2 rounded-full border border-primary/25 px-3 py-1 text-xs font-medium text-primary">
+            <div className="inline-flex items-center gap-2 rounded-full bg-white/15 px-3 py-1 text-xs font-medium text-white">
               <Sparkles className="size-3.5" /> HR Operations Console
             </div>
-            <h1 className="text-4xl font-bold leading-tight tracking-tight">
+            <h1 className="text-4xl font-bold leading-tight tracking-tight text-white">
               Manage your workforce,
               <br />
               generate HR documents,
               <br />
               deliver to employees — fast.
             </h1>
-            <p className="text-primary-foreground/80 max-w-md">
+            <p className="text-white/80 max-w-md">
               One unified workspace for employees, attendance, payroll, document
               generation, and direct email delivery. Built for HR teams that
               move fast.
@@ -84,10 +84,10 @@ export function LoginScreen() {
             ].map((s) => (
               <div
                 key={s.v}
-                className="rounded-xl border border-primary/25 px-4 py-3"
+                className="rounded-xl bg-white/10 px-4 py-3"
               >
-                <div className="text-2xl font-bold">{s.k}</div>
-                <div className="text-xs text-primary-foreground/80">{s.v}</div>
+                <div className="text-2xl font-bold text-white">{s.k}</div>
+                <div className="text-xs text-white/70">{s.v}</div>
               </div>
             ))}
           </div>

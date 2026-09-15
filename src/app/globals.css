@@ -57,7 +57,7 @@
   --background: #F3EDE1;
   --foreground: #1A3C38;
 
-  --card: #FBF8F3;
+  --card: #F3EDE1;
   --card-foreground: #1A3C38;
 
   --popover: #FBF8F3;
@@ -73,7 +73,7 @@
 
   /* Muted: warm gray — readable */
   --muted: #EDE5D6;
-  --muted-foreground: #5D5D5D;
+  --muted-foreground: #4A4458;
 
   /* Accent: teal-tinted cream */
   --accent: #D4E8E7;
