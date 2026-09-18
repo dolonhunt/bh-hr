@@ -74,20 +74,26 @@ export function KpiCard({
           </div>
           {delta && (
             <div className="mt-3 flex items-center gap-1.5 text-xs whitespace-nowrap overflow-hidden">
-              <span
-                className={cn(
-                  "inline-flex items-center gap-0.5 font-semibold px-1.5 py-0.5 rounded-md flex-shrink-0",
-                  delta.trend === "up" && "text-primary bg-primary/10",
-                  delta.trend === "down" && "text-rose-700 bg-rose-500/10",
-                  delta.trend === "flat" && "text-muted-foreground bg-muted"
-                )}
-              >
-                {delta.trend === "up" && "▲"}
-                {delta.trend === "down" && "▼"}
-                {delta.trend === "flat" && "→"}
-                {delta.value}
-              </span>
-              <span className="text-muted-foreground truncate">vs last week</span>
+              {delta.trend === "flat" ? (
+                <span className="text-muted-foreground truncate">
+                  {delta.value}
+                </span>
+              ) : (
+                <>
+                  <span
+                    className={cn(
+                      "inline-flex items-center gap-0.5 font-semibold px-1.5 py-0.5 rounded-md flex-shrink-0",
+                      delta.trend === "up" && "text-primary bg-primary/10",
+                      delta.trend === "down" && "text-rose-700 bg-rose-500/10"
+                    )}
+                  >
+                    {delta.trend === "up" && "▲"}
+                    {delta.trend === "down" && "▼"}
+                    {delta.value}
+                  </span>
+                  <span className="text-muted-foreground truncate">vs last week</span>
+                </>
+              )}
             </div>
           )}
           {footer && <div className="mt-2 text-xs">{footer}</div>}

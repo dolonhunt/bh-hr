@@ -22,6 +22,7 @@ export type ModuleKey =
   | "expenses"
   | "timesheets"
   | "announcements"
+  | "myhr"
   | "search";
 
 export type EmployeeView = "list" | "grid" | "new" | "profile";

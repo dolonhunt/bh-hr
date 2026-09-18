@@ -13,6 +13,7 @@ import {
   Wallet,
   CalendarX,
   Info,
+  Megaphone,
   CheckCheck,
   Settings2,
   Loader2,
@@ -51,6 +52,7 @@ type NotificationType =
   | "TASK_OVERDUE"
   | "PAYROLL_PENDING"
   | "ATTENDANCE_ANOMALY"
+  | "ANNOUNCEMENT"
   | "SYSTEM";
 
 type Severity = "info" | "warning" | "urgent";
@@ -114,6 +116,11 @@ const TYPE_META: Record<
     icon: CalendarX,
     label: "Attendance anomalies",
     description: "Unusual attendance patterns or absences",
+  },
+  ANNOUNCEMENT: {
+    icon: Megaphone,
+    label: "Announcements",
+    description: "High-priority notices from the last 7 days",
   },
   SYSTEM: {
     icon: Info,

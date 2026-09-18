@@ -21,9 +21,11 @@ model User {
   password  String
   role      String   @default("HR_ADMIN") // HR_ADMIN | HR_EXECUTIVE
   avatar    String?
+  linkedEmployeeId String? // Self-service: which Employee record this user "is" (My HR portal)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  linkedEmployee Employee? @relation(fields: [linkedEmployeeId], references: [id])
   auditLogs AuditLog[]
   sentEmails EmailLog[] @relation("EmailSender")
   generatedDocuments GeneratedDocument[] @relation("DocGenerator")
@@ -168,6 +170,7 @@ model Employee {
   performances    Performance[]
   activities      Activity[]
   jobsApplied     Candidate[]
+  portalUsers     User[] // users linked to this employee (self-service)
 
   // Self-relation for reporting manager
   subordinates    Employee[] @relation("ReportingManager")

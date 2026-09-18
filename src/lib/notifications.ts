@@ -15,6 +15,7 @@ export type NotificationType =
   | "TASK_OVERDUE"
   | "PAYROLL_PENDING"
   | "ATTENDANCE_ANOMALY"
+  | "ANNOUNCEMENT"
   | "SYSTEM";
 
 export type NotificationSeverity = "info" | "warning" | "urgent";
@@ -38,6 +39,7 @@ export const ALL_NOTIFICATION_TYPES: NotificationType[] = [
   "TASK_OVERDUE",
   "PAYROLL_PENDING",
   "ATTENDANCE_ANOMALY",
+  "ANNOUNCEMENT",
   "SYSTEM",
 ];
 
@@ -48,6 +50,7 @@ export const DEFAULT_PREFERENCES: Record<NotificationType, boolean> = {
   TASK_OVERDUE: true,
   PAYROLL_PENDING: true,
   ATTENDANCE_ANOMALY: true,
+  ANNOUNCEMENT: true,
   SYSTEM: true,
 };
 
@@ -91,6 +94,7 @@ export async function generateNotifications(): Promise<NotificationDTO[]> {
     draftPayrolls,
     onboardingTasks,
     employees,
+    recentAnnouncements,
   ] = await Promise.all([
     db.leaveRequest.findMany({
       where: { status: "PENDING" },
@@ -136,6 +140,15 @@ export async function generateNotifications(): Promise<NotificationDTO[]> {
         dateOfBirth: true,
         department: { select: { name: true } },
       },
+    }),
+    db.announcement.findMany({
+      where: {
+        priority: { in: ["HIGH", "URGENT"] },
+        publishedAt: { gte: new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000) },
+        OR: [{ expiresAt: null }, { expiresAt: { gte: now } }],
+      },
+      orderBy: [{ pinned: "desc" }, { publishedAt: "desc" }],
+      take: 10,
     }),
   ]);
 
@@ -314,6 +327,29 @@ export async function generateNotifications(): Promise<NotificationDTO[]> {
           employeeId: emp.id,
           employeeName: emp.fullName,
           dateOfBirth: emp.dateOfBirth.toISOString(),
+        },
+      });
+    }
+  }
+
+  // ANNOUNCEMENT (high/urgent or pinned notices from the last 7 days)
+  if (prefs.ANNOUNCEMENT) {
+    for (const a of recentAnnouncements) {
+      const id = nid("ANNOUNCEMENT", a.id);
+      out.push({
+        id,
+        type: "ANNOUNCEMENT",
+        title: `${a.pinned ? "📌 " : ""}${a.title}`,
+        message:
+          a.body.length > 90 ? `${a.body.slice(0, 90)}…` : a.body,
+        severity: a.priority === "URGENT" ? "urgent" : "warning",
+        link: "/?module=announcements",
+        read: readSet.has(id),
+        createdAt: a.publishedAt?.toISOString?.() ?? now.toISOString(),
+        metadata: {
+          announcementId: a.id,
+          priority: a.priority,
+          pinned: a.pinned,
         },
       });
     }

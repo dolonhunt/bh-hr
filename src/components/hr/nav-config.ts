@@ -18,6 +18,7 @@ import {
   Clock,
   Bell,
   Megaphone,
+  CircleUserRound,
   type LucideIcon,
 } from "lucide-react";
 import type { ModuleKey } from "@/lib/store";
@@ -40,6 +41,7 @@ export const NAV_SECTIONS: NavSection[] = [
     label: "Main",
     items: [
       { key: "dashboard", label: "Dashboard", icon: LayoutDashboard, description: "HR overview & KPIs" },
+      { key: "myhr", label: "My HR", icon: CircleUserRound, description: "Self-service portal" },
       { key: "employees", label: "Employees", icon: Users, description: "Directory & profiles" },
       { key: "attendance", label: "Attendance", icon: CalendarCheck, description: "Daily check-in/out" },
       { key: "leave", label: "Leave", icon: CalendarDays, description: "Requests & approvals" },
