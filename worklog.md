@@ -2387,3 +2387,36 @@ Stage Summary:
 - Communications pillar established (Notice Board + Holidays) — groundwork for employee self-service portal (next): staff-facing view of announcements, holidays, payslips, leave balance.
 - DB workflow honored: schema provider flipped to postgresql before this push; .env not committed.
 - Risks/next: real SMTP email, employee self-service portal (P0 recommendation), holiday-aware working-day calculations for payroll, announcements -> notification center integration.
+---
+Task ID: QA-FINAL-3
+Agent: orchestrator (main, cron webDevReview round 3)
+Task: Status assessment + QA smoke + new features: My HR self-service portal (P0 from QA-FINAL-2 recommendations) + announcements-to-notifications integration + layout/style fixes.
+
+Work Log (current status assessment first):
+- Read worklog; QA-FINAL-2 state confirmed live (commit 96aa9f5 pushed, Vercel deploying). Git clean except expected local-only changes (.env, sqlite provider, db file). Dev server healthy, all key APIs return 401 without cookie (auth intact) and dashboard/announcements/holidays render in browser with 0 console errors (only HMR dev noise). QA smoke found no regressions -> proceeded to feature work.
+
+Features Added:
+1. **My HR self-service portal** (new sidebar entry "My HR" in Main section, second position; ModuleKey "myhr"; auto-picked-up by command palette).
+   - Prisma: `User.linkedEmployeeId` (nullable relation to Employee) + `Employee.portalUsers` back-relation. Auto-link on GET /api/me when user email matches employee officialEmail/personalEmail.
+   - API `/api/me`: GET aggregate (user, profile w/ dept+designation+manager, leave balances computed from leaveTypes minus approved/pending usage, 6 recent leave requests, 6 payslips, this-month attendance summary w/ rate, pending counts, document count); PATCH to link/unlink (validated + audit-logged).
+   - UI `modules/my-hr.tsx`: profile hero (avatar, employee code chip, status badge, designation/department/employment type, 4 facts grid), 4 KPI cards (Leave Remaining / Attendance this month / Pending Requests / Payslips & Docs), Leave Balances card (color-coded progress bars w/ used+pending annotations), Recent Leave Requests list w/ StatusBadge, My Payslips list (month tile, net salary, paid date, status), Quick Leave Request form (type select, date range, reason) with **live working-days preview excluding Fri/Sat weekend + holidays** (Bangladesh calendar), Notice Board preview (pinned + 3 latest, priority dots), Upcoming Holidays preview (date tiles, "In N days" labels). Not-linked state: centered link-profile card with employee search picker (avatar list, accent selected state). "Change Profile" dialog + "Full HR Profile" deep-link to Employees module (openEmployee).
+   - UI wiring: `ui/progress.tsx` extended with optional indicatorClassName/indicatorStyle (backwards-compatible) so leave-type colors drive the bars.
+2. **Announcements -> Notification Center integration**: new "ANNOUNCEMENT" type in notifications lib (union + ALL_NOTIFICATION_TYPES + DEFAULT_PREFERENCES true; prefs route merges defaults so old stored prefs stay valid) and in notification-center TYPE_META (Megaphone icon, "Announcements"). Generator surfaces HIGH/URGENT announcements from last 7 days (not expired, pinned first, take 10) with urgent/warning severity + deep link to module. Verified: badge count incremented, API returns 2 ANNOUNCEMENT items, type filter available in preferences.
+
+Bugs fixed this round:
+- [APP-WIDE UX] Sidebar/topbar/footer scrolled away with the page on long modules: app-shell root was `min-h-screen` so the window scrolled and the whole nav moved out of view. Fixed with `h-screen overflow-hidden` wrapper -> main scrolls internally; sidebar (lg:h-[calc(100vh-1.5rem)]), topbar and footer stay pinned on desktop AND mobile. Verified scrolling My HR content while nav stays fixed.
+- KpiCard flat ("trend: flat") deltas rendered a misleading "→" arrow + "vs last week" label for static context strings (e.g. "of 168 allocated", "awaiting approval") causing truncation ("→awaiting approv…"). Flat deltas now render as plain muted text without comparison label; up/down deltas unchanged. Dashboard verified unaffected.
+- Toast grammar: "1 off days excluded" -> "1 non-working day(s) excluded" (pluralized).
+
+Verification:
+- bun run lint: 0 errors, 0 warnings.
+- Browser flows verified end-to-end: link profile via picker (toast + instant re-render with EMP021 data), unlink -> not-linked state, relink (Arif Hossain EMP001 kept for demo), quick leave request Oct 12-16 2026 -> working-days preview "4 working days · 1 weekend" (math correct: Fri 16 is BD weekend) -> submit -> toast -> Casual balance 10->5 remaining with 5 pending -> appears in Recent Leave Requests -> leave notification appears at top of notification center ("just now").
+- Dark mode: full module verified (hero, cards, form all readable, consistent). Mobile 390px: hero stacks, facts 2-col, KPIs stacked, footer visible. Light desktop 1280px verified. Command palette lists "My HR Self-service portal".
+- API smoke: login 200, /api/me 200 (employee null + autoLinked false when no match), PATCH link/unlink 200 + audit log, /api/leave-types, /api/announcements, /api/holidays, /api/leave POST 201 all healthy.
+- DB workflow honored: postgres provider + schema committed/pushed (commit 25ec509), then sqlite restored for local dev. .env NOT committed.
+
+Stage Summary:
+- Module count: 19 sidebar modules. API endpoints: 141+.
+- Self-service pillar delivered (was P0 recommendation): profile, leave, payslips, attendance, notices, holidays in one place with holiday-aware working-day math.
+- Remaining recommendations: real SMTP email delivery, employee self-service with separate staff auth (currently the single HR login links to one employee record; multi-user staff logins would need role-based auth), payroll working-day/holiday-aware proration, leave approval actions from the My HR notification (one-click approve/reject), WhatsApp/SMS announcements.
+- VLM review of new module: 9/10 (flagged truncation already fixed by KpiCard change; 2026 dates are demo data).
