@@ -262,12 +262,12 @@ export function PerformanceModule() {
           }
         />
         <KpiCard
-          label="Pending Reviews"
+          label="Awaiting Sign-off"
           value={pendingReviews}
           icon={Target}
           iconClass="bg-rose-500/15 text-rose-600"
           footer={
-            <span className="text-muted-foreground">Awaiting review</span>
+            <span className="text-muted-foreground">Submitted reviews</span>
           }
         />
       </div>

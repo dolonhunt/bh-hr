@@ -311,7 +311,7 @@ interface GlobalMaintenanceSummary extends MaintenanceSummary {
   assetsWithMaintenanceCount: number;
   damagedAssetCount: number;
   typeDistribution: Record<string, number>;
-  topAssets: { assetId: string; cost: number }[];
+  topAssets: { assetId: string; assetName?: string; cost: number }[];
 }
 
 interface GlobalMaintenanceResponse {
@@ -2294,13 +2294,13 @@ function MaintenanceSummaryCard({
             {topSpenders.map((t) => (
               <div
                 key={t.assetId}
-                className="inline-flex items-center gap-1.5 rounded-full bg-muted/60 border border-border/60 px-2.5 py-1 text-xs"
-                title={t.assetId}
+                className="inline-flex items-center gap-1.5 rounded-full bg-muted/60 border border-border/60 px-2.5 py-1 text-xs max-w-[220px]"
+                title={t.assetName ?? t.assetId}
               >
-                <span className="font-mono text-muted-foreground">
-                  #{t.assetId.slice(-6)}
+                <span className="font-medium text-foreground/80 truncate">
+                  {t.assetName ?? `#${t.assetId.slice(-6)}`}
                 </span>
-                <span className="font-semibold text-primary dark:text-primary/80 tabular-nums">
+                <span className="font-semibold text-primary dark:text-primary/80 tabular-nums flex-shrink-0">
                   {formatCurrency(t.cost)}
                 </span>
               </div>

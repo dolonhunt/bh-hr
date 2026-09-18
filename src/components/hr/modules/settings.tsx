@@ -78,6 +78,7 @@ import {
   ShieldCheck,
   Clock,
   Sun,
+  Sparkles,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn, formatDate, downloadBlob } from "@/lib/utils";
@@ -1253,6 +1254,136 @@ function DocumentNumberingTab() {
 }
 
 // ============================== DATA & BACKUP ==============================
+function DemoDataCard() {
+  const qc = useQueryClient();
+  const [seeding, setSeeding] = useState(false);
+  const [lastResult, setLastResult] = useState<any>(null);
+
+  const { data: preview } = useQuery<any>({
+    queryKey: ["demo-data-preview"],
+    queryFn: () => fetch("/api/demo-data").then((r) => r.json()),
+  });
+
+  const datasets: { key: string; label: string }[] = [
+    { key: "interviews", label: "Interviews" },
+    { key: "surveys", label: "Surveys" },
+    { key: "expenses", label: "Expenses" },
+    { key: "timesheets", label: "Timesheets" },
+    { key: "assetMaintenance", label: "Asset maintenance" },
+  ];
+  const seedableCount =
+    preview?.datasets
+      ? Object.values<any>(preview.datasets).filter((d) => d.seedable).length
+      : null;
+
+  async function handleSeed() {
+    setSeeding(true);
+    try {
+      const res = await fetch("/api/demo-data", { method: "POST" });
+      const json = await res.json();
+      if (!res.ok || !json.ok) {
+        throw new Error(json.error || "Seeding failed");
+      }
+      setLastResult(json);
+      toast.success(json.message || "Demo data loaded");
+      qc.invalidateQueries();
+    } catch (e: any) {
+      toast.error(e?.message ?? "Seeding failed");
+    } finally {
+      setSeeding(false);
+    }
+  }
+
+  return (
+    <Card className="border-border/60 shadow-soft">
+      <CardContent className="p-6 space-y-4">
+        <div className="flex items-start justify-between gap-4 pb-3 border-b border-border/60">
+          <div className="flex items-start gap-3 min-w-0">
+            <div className="size-10 rounded-xl bg-violet-500/10 text-violet-600 dark:text-violet-300 flex items-center justify-center flex-shrink-0">
+              <Sparkles className="size-5" />
+            </div>
+            <div className="min-w-0">
+              <div className="font-semibold">Load Demo Data</div>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Populate the empty operational modules (interviews, surveys,
+                expenses, timesheets, asset maintenance) with realistic sample
+                records. Existing data is never touched or duplicated.
+              </p>
+            </div>
+          </div>
+          <Button
+            onClick={handleSeed}
+            disabled={seeding || (seedableCount === 0 && !seeding)}
+            className="flex-shrink-0"
+          >
+            {seeding ? (
+              <>
+                <Loader2 className="size-4 mr-1.5 animate-spin" /> Loading…
+              </>
+            ) : (
+              <>
+                <Sparkles className="size-4 mr-1.5" /> Load Demo Data
+              </>
+            )}
+          </Button>
+        </div>
+
+        <div className="flex flex-wrap gap-2">
+          {datasets.map((d) => {
+            const info = preview?.datasets?.[d.key];
+            const seedable = info?.seedable;
+            const existing = info?.existing;
+            return (
+              <span
+                key={d.key}
+                className={cn(
+                  "inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs border",
+                  seedable
+                    ? "bg-violet-500/10 border-violet-500/30 text-violet-700 dark:text-violet-300"
+                    : "bg-muted/50 border-border text-muted-foreground"
+                )}
+              >
+                <span
+                  className={cn(
+                    "size-1.5 rounded-full",
+                    seedable ? "bg-violet-500" : "bg-primary/60"
+                  )}
+                />
+                {d.label}
+                {typeof existing === "number"
+                  ? seedable
+                    ? " — ready to seed"
+                    : ` — ${existing} record${existing === 1 ? "" : "s"}`
+                  : ""}
+              </span>
+            );
+          })}
+        </div>
+
+        {lastResult && (
+          <div className="rounded-lg border border-primary/30 bg-primary/5 p-3 text-xs space-y-1">
+            <div className="font-medium text-primary">Seeding complete</div>
+            {Object.entries(lastResult.created as Record<string, number>).map(
+              ([k, v]) => (
+                <div key={k} className="text-foreground/80">
+                  + {v} · {k}
+                </div>
+              )
+            )}
+            {Object.entries(lastResult.skipped as Record<string, string>).map(
+              ([k, v]) => (
+                <div key={k} className="text-muted-foreground">
+                  = {k} skipped ({v})
+                </div>
+              )
+            )}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 function DataBackupTab() {
   const qc = useQueryClient();
   const [exporting, setExporting] = useState(false);
@@ -1460,6 +1591,9 @@ function DataBackupTab() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Demo Data */}
+      <DemoDataCard />
 
       {/* Import */}
       <Card className="border-border/60 shadow-soft">

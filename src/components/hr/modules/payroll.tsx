@@ -268,7 +268,7 @@ export function PayrollModule() {
     <div className="space-y-6">
       <PageHeader
         title="Payroll"
-        description="Manage monthly salary disbursements and payslips"
+        description="Salaries, payslips & disbursements"
         icon={<Wallet className="size-5" />}
         actions={
           <>
@@ -342,7 +342,7 @@ export function PayrollModule() {
               title="View & edit progressive tax slab configuration"
             >
               <Calculator className="size-4 mr-1.5" />
-              <span className="hidden sm:inline">Tax Configuration</span>
+              <span className="hidden sm:inline">Tax Slabs</span>
               <span className="sm:hidden">Tax</span>
             </Button>
             <Button

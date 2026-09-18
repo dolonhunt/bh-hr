@@ -61,15 +61,22 @@ export async function GET() {
     }
   }
 
-  // Per-asset cost breakdown (top spenders).
+  // Per-asset cost breakdown (top spenders). Resolve display names from the
+  // maintenance DTOs (denormalised assetName) with a safe fallback.
+  const nameByAsset: Record<string, string> = {};
   const costByAsset: Record<string, number> = {};
   for (const r of items) {
+    if (r.assetName) nameByAsset[r.assetId] = r.assetName;
     if (r.status === "COMPLETED") {
       costByAsset[r.assetId] = (costByAsset[r.assetId] ?? 0) + (Number(r.cost) || 0);
     }
   }
   const topAssets = Object.entries(costByAsset)
-    .map(([assetId, cost]) => ({ assetId, cost }))
+    .map(([assetId, cost]) => ({
+      assetId,
+      assetName: nameByAsset[assetId] ?? "Unknown asset",
+      cost,
+    }))
     .sort((a, b) => b.cost - a.cost)
     .slice(0, 5);
 

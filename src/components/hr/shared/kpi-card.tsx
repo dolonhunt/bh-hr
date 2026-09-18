@@ -29,19 +29,16 @@ export function KpiCard({
   sparkline,
   sparklineColor,
 }: KpiCardProps) {
-  const accentColor = iconClass?.includes("primary")
-    ? "#2E7069"
-    : iconClass?.includes("amber")
-      ? "#F3A65A"
-      : iconClass?.includes("rose")
-        ? "#2E7069"
-        : iconClass?.includes("violet")
-          ? "#2E7069"
-          : iconClass?.includes("teal")
-            ? "#2E7069"
-            : iconClass?.includes("primary")
-              ? "#2E7069"
-              : "#2E7069";
+  // Sparkline / accent color follows the icon tint so each KPI reads distinct
+  const accentColor = iconClass?.includes("amber")
+    ? "#E8A44C"
+    : iconClass?.includes("rose")
+      ? "#E05B5B"
+      : iconClass?.includes("violet")
+        ? "#8B5CF6"
+        : iconClass?.includes("sky")
+          ? "#4FA3C7"
+          : "#2E7069";
 
   return (
     <Card
@@ -55,13 +52,11 @@ export function KpiCard({
       <div
         className={cn(
           "absolute top-0 left-0 right-0 h-0.5 opacity-0 group-hover:opacity-100 transition-opacity",
-          iconClass?.includes("primary") && "bg-primary",
           iconClass?.includes("amber") && "bg-amber-500",
           iconClass?.includes("rose") && "bg-rose-500",
           iconClass?.includes("violet") && "bg-violet-500",
-          iconClass?.includes("teal") && "bg-teal-500",
-          iconClass?.includes("primary") && "bg-primary",
-          !iconClass && "bg-primary"
+          iconClass?.includes("sky") && "bg-sky-500",
+          (!iconClass || iconClass?.includes("primary") || iconClass?.includes("teal")) && "bg-primary"
         )}
       />
       <div className="flex items-start justify-between gap-2 sm:gap-3">
@@ -73,26 +68,33 @@ export function KpiCard({
             {value}
           </div>
           {delta && (
-            <div className="mt-3 flex items-center gap-1.5 text-xs whitespace-nowrap overflow-hidden">
+            <div
+              className="mt-3 flex items-center gap-1.5 text-xs min-w-0"
+              title={
+                delta.trend === "flat"
+                  ? undefined
+                  : "Compared to last week"
+              }
+            >
               {delta.trend === "flat" ? (
                 <span className="text-muted-foreground truncate">
                   {delta.value}
                 </span>
               ) : (
-                <>
-                  <span
-                    className={cn(
-                      "inline-flex items-center gap-0.5 font-semibold px-1.5 py-0.5 rounded-md flex-shrink-0",
-                      delta.trend === "up" && "text-primary bg-primary/10",
-                      delta.trend === "down" && "text-rose-700 bg-rose-500/10"
-                    )}
-                  >
-                    {delta.trend === "up" && "▲"}
-                    {delta.trend === "down" && "▼"}
-                    {delta.value}
+                <span
+                  className={cn(
+                    "inline-flex items-center gap-0.5 font-semibold px-1.5 py-0.5 rounded-md flex-shrink-0 cursor-default",
+                    delta.trend === "up" && "text-primary bg-primary/10",
+                    delta.trend === "down" && "text-rose-700 bg-rose-500/10"
+                  )}
+                >
+                  {delta.trend === "up" && "▲"}
+                  {delta.trend === "down" && "▼"}
+                  {delta.value}
+                  <span className="font-normal text-muted-foreground hidden sm:inline">
+                    · wk
                   </span>
-                  <span className="text-muted-foreground truncate">vs last week</span>
-                </>
+                </span>
               )}
             </div>
           )}

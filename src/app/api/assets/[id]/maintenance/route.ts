@@ -55,6 +55,7 @@ export interface MaintenanceMeta {
 export interface MaintenanceDTO {
   id: string;
   assetId: string;
+  assetName: string | null;
   type: MaintenanceType;
   description: string;
   cost: number;
@@ -119,6 +120,7 @@ export function toMaintenanceDTO(a: any): MaintenanceDTO | null {
   return {
     id: a.id,
     assetId: m.assetId || a.title,
+    assetName: m.assetName ?? null,
     type: m.type,
     description: m.description,
     cost: m.cost,

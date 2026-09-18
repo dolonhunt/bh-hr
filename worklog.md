@@ -2420,3 +2420,44 @@ Stage Summary:
 - Self-service pillar delivered (was P0 recommendation): profile, leave, payslips, attendance, notices, holidays in one place with holiday-aware working-day math.
 - Remaining recommendations: real SMTP email delivery, employee self-service with separate staff auth (currently the single HR login links to one employee record; multi-user staff logins would need role-based auth), payroll working-day/holiday-aware proration, leave approval actions from the My HR notification (one-click approve/reject), WhatsApp/SMS announcements.
 - VLM review of new module: 9/10 (flagged truncation already fixed by KpiCard change; 2026 dates are demo data).
+---
+Task ID: QA-FINAL-4
+Agent: orchestrator (main, cron webDevReview round 4)
+Task: Status assessment + agent-browser QA of all 19 nav modules + bug fixes + new "Load Demo Data" seeding feature (interviews, surveys, expenses, timesheets, asset maintenance).
+
+Work Log (status assessment first):
+- Read worklog; QA-FINAL-3 state confirmed live (commit 2336ae9). Dev server healthy, git clean except expected local-only files (.env, sqlite db, provider flip).
+- Full agent-browser sweep of all 19 sidebar modules at 1280px (light), plus dark mode + 390px mobile for changed/new modules. Console clean (only HMR dev noise).
+
+QA findings this round:
+1. [FIXED] KPI delta truncation: "vs last week" text truncated to "vs last w…" on narrow cards (Present Today). Redesigned delta row: badge now self-contained "▲ +5% · wk" (context moved to title tooltip) — no truncation possible at any width. Also removed dead accentColor mapping (was always #2E7069) — sparklines now follow icon tint (amber/rose/violet/sky/teal), visible on Dashboard.
+2. [FIXED] Performance KPI mislabel: "PENDING REVIEWS / Awaiting review" counted status=SUBMITTED rows (which display as "Submitted"). Renamed to "Awaiting Sign-off / Submitted reviews".
+3. [FIXED] Payroll header actions wrapped untidily at 1280px (primary button alone on 3rd row). Shortened description + "Tax Configuration"→"Tax Slabs"; all 5 actions now fit one row.
+4. [FIXED] Assets "Top maintenance spenders" showed raw DB ids (#xa6bfα). API now resolves denormalised assetName (MaintenanceDTO + topAssets payload extended with assetName); UI shows names with id fallback + title tooltip.
+5. [DATA GAP - main issue] Interviews, Feedback/Surveys, Expenses, Timesheets and Assets-maintenance were all EMPTY on prod — modules looked unfinished. → New feature below.
+
+Feature: Demo Data Studio (idempotent, production-safe):
+- src/lib/demo-data.ts — ensureDemoData() seeds ONLY empty datasets, returns {created, skipped}. Realistic BD-context data with dates computed relative to seed time (upcoming interviews stay upcoming, Fri/Sat weekend aware timesheets):
+  * INTERVIEW Activity rows (6): 2 SCHEDULED upcoming (next working days), 2 COMPLETED w/ ratings+recommendation, 1 COMPLETED reject, 1 NO_SHOW; linked to real candidates+jobs.
+  * SURVEY rows (3): ACTIVE "Q3 Employee Engagement Pulse" (4 questions, anonymous), CLOSED "Remote Work Experience Check-in", DRAFT "Winter Offsite Planning"; + 11 SURVEY_RESPONSE rows with per-question answers (7+4).
+  * EXPENSE Activity rows (10): 4 PENDING / 3 APPROVED / 2 REIMBURSED w/ payment refs / 1 REJECTED w/ policy reason; BDT amounts, last-30-day dates, real employees.
+  * TIMESHEET Activity rows (36): last ~6 working days x 6 employees, 4 projects, mixed DRAFT/SUBMITTED/APPROVED with submittedAt/approvedBy metadata; weekend-aware.
+  * ASSET_MAINTENANCE Activity rows (5): repairs/inspections/upgrades tied to existing assets via title join key; 1 IN_PROGRESS, 3 COMPLETED, 1 SCHEDULED future.
+- POST /api/demo-data (auth-protected via proxy) → seeds + audit log + summary message; GET → per-dataset preview {existing, seedable}.
+- Settings → Data & Backup: new "Load Demo Data" card with per-dataset status chips ("ready to seed" / "N records"), button auto-disables when nothing to seed, result breakdown after run.
+- prisma/seed-demo-ops.ts CLI (bunx tsx) for local seeding after clone.
+- Verified idempotency locally: second run reported "already present" for all datasets; surveys re-seeded after deliberate delete showed correct linkage fix (Closed survey now shows 4 responses; totals 11).
+
+Styling details:
+- Sparkline color variety per KPI (see fix 1); delta badge · wk suffix hidden on <sm screens.
+- Settings demo-data chips use violet accent for seedable vs neutral for populated states.
+
+Verification:
+- bun run lint: 0 errors, 0 warnings.
+- Browser: Interviews (2 upcoming cards w/ Join/Calendar actions), Feedback (3 survey cards, 11 responses, avg rating 4.0), Expenses (4/3/2/1 status split KPIs + table), Timesheets (184.5h week, 9 pending, 36 entries), Assets (maintenance summary ৳13,000 + named top spenders) — all verified light + dark; Expenses verified at 390px.
+- API smoke (browser session): interviews/surveys/expenses/timesheets/assets-maintenance/demo-data all 200. Dev log clean (2 stale linkedEmployee errors in old log section predate client regen; current tail all 200s).
+
+Stage Summary:
+- Module data completeness restored: 0 empty operational modules remain on dev; same data available on prod via one-click (or curl) POST /api/demo-data after deploy.
+- DB workflow honored: schema flipped to postgresql before push, then sqlite restored for local dev; .env not committed.
+- Next recommendations: trigger /api/demo-data on Vercel post-deploy; leave-approval one-click from notification center; real SMTP; payroll holiday-aware proration.
