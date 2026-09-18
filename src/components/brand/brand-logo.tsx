@@ -17,7 +17,12 @@ export function BrandLogo({
     <img
       src="/bh-logo.png"
       alt="BH HR — Beyond Headlines"
-      className={cn("h-8 w-auto object-contain", inverted && "brightness-0 invert", className)}
+      className={cn(
+        "h-8 w-auto object-contain",
+        // Invert when explicitly requested (teal surfaces) OR automatically in dark mode (black logo -> white)
+        inverted ? "brightness-0 invert" : "dark:brightness-0 dark:invert",
+        className
+      )}
     />
   );
 }
@@ -42,7 +47,7 @@ export function BrandMark({
     <img
       src="/bh-mark.png"
       alt="BH"
-      className={cn(sizes[size], "object-contain", className)}
+      className={cn(sizes[size], "object-contain dark:brightness-0 dark:invert", className)}
     />
   );
 }

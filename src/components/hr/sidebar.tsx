@@ -21,6 +21,9 @@ export function Sidebar() {
   const mobileSidebarOpen = useApp((s) => s.mobileSidebarOpen);
   const setMobileSidebarOpen = useApp((s) => s.setMobileSidebarOpen);
 
+  // Mobile drawer always shows the expanded layout
+  const expanded = !sidebarCollapsed || mobileSidebarOpen;
+
   return (
     <>
       {/* Mobile overlay */}
@@ -34,22 +37,22 @@ export function Sidebar() {
       <aside
         className={cn(
           "z-50 flex flex-col bg-sidebar transition-all duration-300",
-          "hidden lg:flex m-3 rounded-2xl border border-sidebar-border/50 neu-raised overflow-hidden",
-          sidebarCollapsed ? "w-[76px]" : "w-[260px]",
-          "lg:sticky lg:top-0 lg:h-[calc(100vh-1.5rem)]",
-          "fixed inset-y-0 left-0 lg:static",
+          "m-3 rounded-2xl border border-sidebar-border/50 neu-raised overflow-hidden",
+          // Mobile: fixed off-canvas drawer, always 260px wide. Desktop: static, collapsible.
+          "w-[260px] fixed inset-y-0 left-0 lg:static lg:h-[calc(100vh-1.5rem)]",
+          sidebarCollapsed && "lg:w-[76px]",
           mobileSidebarOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
         )}
       >
         {/* Brand */}
         <div className="h-16 flex items-center justify-between px-4 border-b border-sidebar-border/60">
           <div className="flex items-center gap-2.5 min-w-0">
-            {sidebarCollapsed ? (
-              <BrandMark size="md" />
-            ) : (
+            {expanded ? (
               <BrandLogo />
+            ) : (
+              <BrandMark size="md" />
             )}
-            {!sidebarCollapsed && (
+            {expanded && (
               <div className="min-w-0">
                 <div className="font-bold text-sidebar-foreground leading-tight truncate tracking-tight">
                   BH HR
@@ -81,7 +84,7 @@ export function Sidebar() {
 
                 return (
                   <div key={section.label} className="space-y-1">
-                    {!sidebarCollapsed ? (
+                    {expanded ? (
                       <div
                         className={cn(
                           "px-3 pb-1 text-[10px] font-bold uppercase tracking-wider",
@@ -111,21 +114,21 @@ export function Sidebar() {
                             active
                               ? "bg-accent text-accent-foreground neu-raised-sm"
                               : "text-sidebar-foreground/70 cursor-pointer hover:bg-accent/60 hover:text-accent-foreground",
-                            sidebarCollapsed && "justify-center px-2"
+                            !expanded && "justify-center px-2"
                           )}
                         >
-                          {active && !sidebarCollapsed && (
+                          {active && expanded && (
                             <span className="absolute left-0 top-1/2 -translate-y-1/2 h-5 w-1 rounded-r-full bg-accent-foreground/40" />
                           )}
                           <Icon
                             className={cn(
                               "size-[18px] flex-shrink-0 transition-transform group-hover/nav:scale-110",
                               active
-                                ? "text-primary-foreground"
+                                ? "text-accent-foreground"
                                 : "text-muted-foreground group-hover/nav:text-sidebar-foreground"
                             )}
                           />
-                          {!sidebarCollapsed && (
+                          {expanded && (
                             <div className="flex-1 text-left min-w-0">
                               <div className="truncate flex items-center gap-2">
                                 {item.label}
@@ -135,14 +138,14 @@ export function Sidebar() {
                               </div>
                             </div>
                           )}
-                          {!sidebarCollapsed && active && (
-                            <span className="h-1.5 w-1.5 rounded-full bg-primary-foreground/60" />
+                          {expanded && active && (
+                            <span className="h-1.5 w-1.5 rounded-full bg-accent-foreground/60" />
                           )}
                         </button>
                       );
 
-                      // When collapsed, wrap in tooltip
-                      if (sidebarCollapsed) {
+                      // When collapsed (desktop), wrap in tooltip
+                      if (!expanded) {
                         return (
                           <Tooltip key={item.key}>
                             <TooltipTrigger asChild>

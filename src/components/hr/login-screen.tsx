@@ -128,7 +128,7 @@ export function LoginScreen() {
                   <Label htmlFor="password">Password</Label>
                   <button
                     type="button"
-                    className="text-xs text-muted-foreground hover:text-primary-foreground"
+                    className="text-xs text-muted-foreground hover:text-primary transition-colors cursor-pointer"
                     onClick={() => toast.info("Contact your administrator.")}
                   >
                     Forgot password?
@@ -148,7 +148,7 @@ export function LoginScreen() {
                   <button
                     type="button"
                     onClick={() => setShowPw((s) => !s)}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-primary-foreground"
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-primary transition-colors cursor-pointer"
                     aria-label="Toggle password visibility"
                   >
                     {showPw ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
@@ -157,7 +157,7 @@ export function LoginScreen() {
               </div>
 
               <div className="rounded-lg border border-dashed border-border bg-muted/40 p-3 text-xs text-muted-foreground">
-                <div className="font-medium text-primary-foreground mb-1">Demo credentials</div>
+                <div className="font-medium text-foreground mb-1">Demo credentials</div>
                 Email: <code className="font-mono">hr@beyondheadlines.io</code>
                 <br />
                 Password: <code className="font-mono">demo1234</code>

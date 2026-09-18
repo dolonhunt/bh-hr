@@ -58,7 +58,7 @@ async function main() {
       endDate: new Date(Date.now() + 9 * 86400000),
       duration: 16,
       capacity: 20,
-      status: "ACTIVE",
+      status: "IN_PROGRESS",
     },
     {
       title: "Effective Communication Skills",
@@ -69,7 +69,7 @@ async function main() {
       endDate: new Date(Date.now() + 15 * 86400000),
       duration: 8,
       capacity: 15,
-      status: "ACTIVE",
+      status: "IN_PROGRESS",
     },
     {
       title: "Leadership Essentials",
@@ -80,7 +80,7 @@ async function main() {
       endDate: new Date(Date.now() + 23 * 86400000),
       duration: 12,
       capacity: 10,
-      status: "ACTIVE",
+      status: "IN_PROGRESS",
     },
     {
       title: "SQL & Database Fundamentals",

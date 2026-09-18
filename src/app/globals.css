@@ -132,7 +132,7 @@
   --muted: #2D2A25;
   --muted-foreground: #B0A8C0;
   --accent: #1A3A38;
-  --accent-foreground: #2A9B97;
+  --accent-foreground: #A9E6E0;
   --destructive: #D66B66;
   --destructive-foreground: #FFFFFF;
   --success: #2A9B97;
@@ -154,7 +154,7 @@
   --sidebar-primary: #2A9B97;
   --sidebar-primary-foreground: #FFFFFF;
   --sidebar-accent: #1A3A38;
-  --sidebar-accent-foreground: #2A9B97;
+  --sidebar-accent-foreground: #A9E6E0;
   --sidebar-border: #2D2A25;
   --sidebar-ring: #2A9B97;
   --neu-light: #2D2A25;
@@ -183,29 +183,28 @@
 
   .neu-flat { background: var(--background); box-shadow: none; }
 
+  /* NOTE: surface classes are SHADOW-ONLY. Backgrounds must come from
+     explicit bg-* utilities (bg-card / bg-muted / bg-primary ...) so they
+     never override component colors (e.g. bg-primary on buttons). */
   .neu-raised {
-    background: var(--card);
     box-shadow:
       -5px -5px 12px var(--neu-light),
       5px 5px 14px var(--neu-dark);
   }
 
   .neu-raised-sm {
-    background: var(--card);
     box-shadow:
       -3px -3px 8px var(--neu-light),
       3px 3px 10px var(--neu-dark-subtle);
   }
 
   .neu-inset {
-    background: var(--muted);
     box-shadow:
       inset 3px 3px 8px var(--neu-dark-subtle),
       inset -3px -3px 8px var(--neu-light);
   }
 
   .neu-pressed {
-    background: var(--muted);
     box-shadow:
       inset 2px 2px 5px var(--neu-dark-subtle),
       inset -2px -2px 5px var(--neu-light);

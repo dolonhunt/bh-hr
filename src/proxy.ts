@@ -6,7 +6,7 @@ const PUBLIC_API_ROUTES = [
   "/api/setup",
 ];
 
-export function middleware(req: NextRequest) {
+export default function proxy(req: NextRequest) {
   const path = req.nextUrl.pathname;
 
   // Only protect /api/* routes

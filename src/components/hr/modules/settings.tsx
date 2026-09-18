@@ -122,7 +122,7 @@ export function SettingsModule() {
                   className={cn(
                     "flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap",
                     tab === t.key
-                      ? "bg-primary text-primary-foreground shadow-soft"
+                      ? "bg-accent text-accent-foreground neu-raised-sm"
                       : "hover:bg-muted text-muted-foreground hover:text-foreground"
                   )}
                 >

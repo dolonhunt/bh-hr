@@ -89,9 +89,9 @@ export default function DesignSystemPage() {
           <Card className="shadow-soft">
             <CardHeader><CardTitle>Radius &amp; Surfaces</CardTitle></CardHeader>
             <CardContent className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div className="neu-raised rounded-lg p-4 text-center text-sm">Raised<br/><span className="text-xs text-muted-foreground">Cards, KPIs</span></div>
-              <div className="neu-inset rounded-lg p-4 text-center text-sm">Inset<br/><span className="text-xs text-muted-foreground">Inputs, Search</span></div>
-              <div className="neu-pressed rounded-lg p-4 text-center text-sm">Pressed<br/><span className="text-xs text-muted-foreground">Active, Toggle</span></div>
+              <div className="neu-raised bg-card rounded-lg p-4 text-center text-sm">Raised<br/><span className="text-xs text-muted-foreground">Cards, KPIs</span></div>
+              <div className="neu-inset bg-muted rounded-lg p-4 text-center text-sm">Inset<br/><span className="text-xs text-muted-foreground">Inputs, Search</span></div>
+              <div className="neu-pressed bg-muted rounded-lg p-4 text-center text-sm">Pressed<br/><span className="text-xs text-muted-foreground">Active, Toggle</span></div>
               <div className="neu-flat rounded-lg p-4 text-center text-sm border border-border">Flat<br/><span className="text-xs text-muted-foreground">Tables, BG</span></div>
             </CardContent>
           </Card>

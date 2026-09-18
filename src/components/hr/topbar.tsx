@@ -116,7 +116,7 @@ export function Topbar() {
       <div className="flex-1 max-w-xl mx-auto hidden md:block">
         <button
           onClick={() => setCommandOpen(true)}
-          className="group w-full flex items-center gap-2 rounded-lg border border-border/40 neu-inset cursor-pointer px-3 py-2 text-sm text-muted-foreground hover:border-primary/30 transition"
+          className="group w-full flex items-center gap-2 rounded-lg border border-border/40 neu-inset bg-muted cursor-pointer px-3 py-2 text-sm text-muted-foreground hover:border-primary/30 transition"
         >
           <Search className="size-4" />
           <span className="flex-1 text-left">Search employees, documents…</span>

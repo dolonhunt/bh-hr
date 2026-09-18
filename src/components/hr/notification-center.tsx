@@ -395,11 +395,19 @@ function NotificationRow({
       exit={{ opacity: 0, x: 12 }}
       transition={{ duration: 0.18 }}
     >
-      <button
+      <div
+        role="button"
+        tabIndex={0}
         onClick={onClick}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            onClick();
+          }
+        }}
         className={cn(
-          "group w-full text-left flex items-start gap-3 rounded-xl border p-3 transition-all",
-          "hover:shadow-sm hover:bg-muted/40",
+          "group w-full text-left flex items-start gap-3 rounded-xl border p-3 transition-all cursor-pointer",
+          "hover:shadow-sm hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
           n.read
             ? "border-border/50 bg-transparent"
             : "border-border bg-card"
@@ -473,7 +481,7 @@ function NotificationRow({
             </span>
           </div>
         </div>
-      </button>
+      </div>
     </motion.li>
   );
 }
