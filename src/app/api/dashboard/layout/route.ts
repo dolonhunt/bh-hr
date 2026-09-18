@@ -31,6 +31,8 @@ export const DEFAULT_WIDGETS: DashboardWidgetConfig[] = [
   { id: "recent_employees", visible: true, order: 5 },
   { id: "pending_leave", visible: true, order: 6 },
   { id: "recent_documents", visible: true, order: 7 },
+  { id: "announcements", visible: true, order: 8 },
+  { id: "upcoming_holidays", visible: true, order: 9 },
 ];
 
 export const WIDGET_IDS = DEFAULT_WIDGETS.map((w) => w.id);

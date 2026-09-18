@@ -61,8 +61,9 @@ model Department {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  employees Employee[]
-  jobs      Job[]
+  employees    Employee[]
+  jobs         Job[]
+  announcements Announcement[]
 }
 
 model Role {
@@ -459,4 +460,35 @@ model Setting {
   id    String @id @default(cuid())
   key   String @unique
   value String
+}
+
+// ============================================================
+// COMMUNICATIONS
+// ============================================================
+
+model Announcement {
+  id           String    @id @default(cuid())
+  title        String
+  body         String
+  priority     String    @default("NORMAL") // LOW | NORMAL | HIGH | URGENT
+  audience     String    @default("ALL") // ALL | DEPARTMENT
+  departmentId String?
+  department   Department? @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  pinned       Boolean   @default(false)
+  publishedAt  DateTime  @default(now())
+  expiresAt    DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+}
+
+model Holiday {
+  id          String   @id @default(cuid())
+  name        String
+  date        DateTime
+  type        String   @default("PUBLIC") // PUBLIC | OPTIONAL | COMPANY
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([name, date])
 }

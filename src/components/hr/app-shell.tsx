@@ -20,6 +20,7 @@ import { AssetsModule } from "./modules/assets";
 import { TrainingModule } from "./modules/training";
 import { ExpensesModule } from "./modules/expenses";
 import { TimesheetsModule } from "./modules/timesheets";
+import { AnnouncementsModule } from "./modules/announcements";
 import { CommandPalette } from "./command-palette";
 import { QuickActions } from "./quick-actions";
 import { useKeyboardShortcuts } from "@/hooks/use-keyboard-shortcuts";
@@ -45,6 +46,7 @@ const MODULE_COMPONENTS: Record<string, React.ComponentType> = {
   training: TrainingModule,
   expenses: ExpensesModule,
   timesheets: TimesheetsModule,
+  announcements: AnnouncementsModule,
 };
 
 export function AppShell() {

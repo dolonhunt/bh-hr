@@ -21,6 +21,7 @@ export type ModuleKey =
   | "training"
   | "expenses"
   | "timesheets"
+  | "announcements"
   | "search";
 
 export type EmployeeView = "list" | "grid" | "new" | "profile";

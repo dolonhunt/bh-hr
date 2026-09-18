@@ -77,12 +77,14 @@ import {
   Loader2,
   ShieldCheck,
   Clock,
+  Sun,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn, formatDate, downloadBlob } from "@/lib/utils";
 import { StatusBadge } from "../shared/status-badge";
 import { EmptyState } from "../shared/empty-state";
 import { EmailTemplateEditor } from "./email-template-editor";
+import { HolidaysTab } from "./settings-holidays-tab";
 
 const TABS = [
   { key: "organization", label: "Organization", icon: Building2 },
@@ -90,6 +92,7 @@ const TABS = [
   { key: "roles", label: "Roles", icon: Briefcase },
   { key: "designations", label: "Designations", icon: Award },
   { key: "leave-types", label: "Leave Types", icon: CalendarDays },
+  { key: "holidays", label: "Holidays", icon: Sun },
   { key: "email", label: "Email Settings", icon: Mail },
   { key: "email-templates", label: "Email Templates", icon: FileText },
   { key: "numbering", label: "Document Numbering", icon: Hash },
@@ -145,6 +148,7 @@ export function SettingsModule() {
           {tab === "email-templates" && <EmailTemplatesTab />}
           {tab === "numbering" && <DocumentNumberingTab />}
           {tab === "backup" && <DataBackupTab />}
+          {tab === "holidays" && <HolidaysTab />}
         </div>
       </div>
     </div>

@@ -17,6 +17,7 @@ import {
   Receipt,
   Clock,
   Bell,
+  Megaphone,
   type LucideIcon,
 } from "lucide-react";
 import type { ModuleKey } from "@/lib/store";
@@ -57,6 +58,7 @@ export const NAV_SECTIONS: NavSection[] = [
       { key: "expenses", label: "Expenses", icon: Receipt, description: "Track & approve" },
       { key: "timesheets", label: "Timesheets", icon: Clock, description: "Time tracking" },
       { key: "assets", label: "Assets", icon: Package, description: "Equipment & assets" },
+      { key: "announcements", label: "Announcements", icon: Megaphone, description: "Notice board" },
     ],
   },
   {

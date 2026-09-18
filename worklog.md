@@ -2347,3 +2347,43 @@ Stage Summary:
 - Total modules: 17. Total API endpoints: 135+. All data flows verified.
 - Known non-bugs: Reports "AVG ATTENDANCE 19%" and heatmap gaps are data artifacts (only today's attendance seeded); OFFER letter "position of in" gap appears only when designation empty (data-driven template).
 - Remaining recommendations: real SMTP sending, employee self-service portal, multi-tenant support, WhatsApp/SMS notifications, HR compliance dashboard.
+
+---
+Task ID: QA-FINAL-2
+Agent: orchestrator (main, cron webDevReview round 2)
+Task: Status assessment + QA smoke + new features: Announcements (Notice Board) module & Company Holidays management + dashboard widgets + style polish.
+
+Work Log (current status assessment first):
+- Read worklog; QA-FINAL-1 state confirmed: all 14 fixes live on Vercel, dev server healthy, 0 lint errors, 0 console errors. Git clean except expected local-only changes (.env, sqlite provider).
+- Browser QA smoke: session persisted, APIs healthy (dashboard 200). No regressions found -> proceeded to feature work.
+
+Features Added:
+1. **Announcements (Notice Board) module** — new sidebar entry (Megaphone icon, Operations section) + ModuleKey "announcements".
+   - Prisma model `Announcement` (title, body, priority LOW|NORMAL|HIGH|URGENT, audience ALL|DEPARTMENT, departmentId relation, pinned, publishedAt, expiresAt).
+   - API: /api/announcements (GET with includeExpired/priority/departmentId/search filters; POST with validation + audit log), /api/announcements/[id] (GET/PATCH/DELETE).
+   - UI: AnnouncementsModule with 4 KPI cards (Active / Urgent-High / Pinned / This Month), search, filter tabs (All/Urgent/Pinned/Expired), priority-color-coded announcement cards with pinned indicator, department badge, expiry, relative timestamps, hover actions (pin toggle, edit, delete w/ confirm). Compose/Edit dialog: title, message, priority select, target department (All staff or specific), expiry date, pin-to-top switch.
+   - Verified in browser: publish (High priority "Eid-ul-Adha Office Closure" -> toast + card + KPI update), pin/unpin, edit dialog prefill, delete w/ confirm, expired filter. Command palette picks module up automatically via NAV_ITEMS.
+2. **Company Holidays management** — new Settings tab "Holidays" (Sun icon).
+   - Prisma model `Holiday` (name, date, type PUBLIC|OPTIONAL|COMPANY, description; unique name+date).
+   - API: /api/holidays (GET ?year= or ?upcoming=true&limit=; POST), /api/holidays/[id] (PATCH/DELETE).
+   - UI: HolidaysTab with year selector, stats (total/remaining + per-type badge counts), Add Holiday form, month-grouped list with date tiles, type badges, past-holiday dimming, delete-on-hover. Bangladesh 2026 holidays seeded (Language Martyrs Day, Independence Day, Pohela Boishakh, May Day, Eid-ul-Adha x3, Ashura, Eid-e-Miladunnabi, Durga Puja, Victory Day, Christmas + 2 company events: Founders' Day, Annual Retreat).
+3. **Dashboard widgets** — 2 new customizable widgets in catalog + DEFAULT_LAYOUT (orders 8/9) + layout API DEFAULT_WIDGETS (auto-reconciles existing stored layouts):
+   - "Notice Board" widget: pinned + 4 latest active announcements with priority icons/dots, relative times, "View all" -> module. Self-fetching with 60s refetch.
+   - "Upcoming Holidays" widget: next 4 holidays with date tiles, "In N days / Tomorrow / Today" labels, type labels, "Calendar" link -> Settings.
+4. **Style polish**: KPI card delta row no longer wraps awkwardly (whitespace-nowrap + truncate on "vs last week" label — PRESENT TODAY card fix from QA-FINAL-1 screenshots).
+
+Bugs fixed this round:
+- KpiCard icon prop misuse in new module (JSX element vs component — caught immediately via runtime error overlay, fixed).
+- "Urgent / High" KPI counted only URGENT (label said both) — now counts URGENT + HIGH.
+
+Verification:
+- bun run lint: 0 errors, 0 warnings.
+- Browser verified: Announcements module full CRUD flows; Holidays tab add/delete round-trip (form -> 201 -> list refresh -> cleanup); Dashboard widgets render seeded data; no console errors (only normal HMR Fast Refresh notices during dev).
+- API smoke: announcements GET/POST/PATCH/DELETE, holidays GET/POST/DELETE all 200/201; DB persistence confirmed (curl round-trip, final count 14 seeded holidays).
+- Note: browser automation (agent-browser) could not type into native <input type=date> segments — automation limitation, not an app bug (validated via API round-trip + React value-tracker workaround produced identical user result; same input type already works in Employee forms).
+
+Stage Summary:
+- Module count: 18 sidebar modules. API endpoints: 139+.
+- Communications pillar established (Notice Board + Holidays) — groundwork for employee self-service portal (next): staff-facing view of announcements, holidays, payslips, leave balance.
+- DB workflow honored: schema provider flipped to postgresql before this push; .env not committed.
+- Risks/next: real SMTP email, employee self-service portal (P0 recommendation), holiday-aware working-day calculations for payroll, announcements -> notification center integration.

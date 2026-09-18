@@ -42,6 +42,12 @@ import {
   LayoutDashboard,
   PieChart,
   Zap,
+  Megaphone,
+  Sun,
+  Pin,
+  AlertTriangle,
+  Info,
+  CalendarRange,
 } from "lucide-react";
 import {
   BarChart,
@@ -156,6 +162,16 @@ const WIDGET_CATALOG: Record<
     description: "Latest 6 generated documents",
     icon: FileText,
   },
+  announcements: {
+    label: "Notice Board",
+    description: "Pinned and latest company announcements",
+    icon: Megaphone,
+  },
+  upcoming_holidays: {
+    label: "Upcoming Holidays",
+    description: "Next company holidays from the work calendar",
+    icon: Sun,
+  },
 };
 
 const DEFAULT_LAYOUT: WidgetConfig[] = [
@@ -167,6 +183,8 @@ const DEFAULT_LAYOUT: WidgetConfig[] = [
   { id: "recent_employees", visible: true, order: 5 },
   { id: "pending_leave", visible: true, order: 6 },
   { id: "recent_documents", visible: true, order: 7 },
+  { id: "announcements", visible: true, order: 8 },
+  { id: "upcoming_holidays", visible: true, order: 9 },
 ];
 
 // ============================================================
@@ -354,6 +372,8 @@ function DashboardGrid({
       "recent_employees",
       "pending_leave",
       "recent_documents",
+      "announcements",
+      "upcoming_holidays",
     ]);
     while (i < visibleWidgets.length) {
       const w = visibleWidgets[i];
@@ -417,9 +437,13 @@ function DashboardGrid({
         if (
           group.length >= 2 &&
           group.every((w) =>
-            ["recent_employees", "pending_leave", "recent_documents"].includes(
-              w.id
-            )
+            [
+              "recent_employees",
+              "pending_leave",
+              "recent_documents",
+              "announcements",
+              "upcoming_holidays",
+            ].includes(w.id)
           )
         ) {
           return (
@@ -517,6 +541,10 @@ function WidgetRenderer(props: WidgetRendererProps) {
       return (
         <RecentDocumentsWidget data={props.data} setModule={props.setModule} />
       );
+    case "announcements":
+      return <AnnouncementsWidget setModule={props.setModule} />;
+    case "upcoming_holidays":
+      return <UpcomingHolidaysWidget setModule={props.setModule} />;
     default:
       return null;
   }
@@ -1086,6 +1114,227 @@ function Legend2({ color, label }: { color: string; label: string }) {
       />
       {label}
     </span>
+  );
+}
+
+// ============================================================
+// Notice Board Widget — pinned + latest announcements
+// ============================================================
+
+interface DashAnnouncement {
+  id: string;
+  title: string;
+  body: string;
+  priority: "LOW" | "NORMAL" | "HIGH" | "URGENT";
+  pinned: boolean;
+  publishedAt: string;
+}
+
+const ANN_PRIORITY_STYLE: Record<
+  DashAnnouncement["priority"],
+  { dot: string; bg: string }
+> = {
+  LOW: { dot: "bg-slate-400", bg: "bg-muted text-muted-foreground" },
+  NORMAL: { dot: "bg-primary", bg: "bg-primary/10 text-primary" },
+  HIGH: { dot: "bg-amber-500", bg: "bg-amber-500/10 text-amber-600" },
+  URGENT: { dot: "bg-rose-500", bg: "bg-rose-500/10 text-rose-600" },
+};
+
+function AnnouncementsWidget({ setModule }: { setModule: (m: any) => void }) {
+  const { data, isLoading } = useQuery({
+    queryKey: ["dashboard-announcements"],
+    queryFn: async () => {
+      const r = await fetch("/api/announcements");
+      if (!r.ok) throw new Error("Failed to load announcements");
+      return r.json();
+    },
+    refetchInterval: 60_000,
+  });
+
+  const items: DashAnnouncement[] = (data?.items ?? []).slice(0, 4);
+
+  return (
+    <Card className="border-border/60 shadow-soft">
+      <CardHeader className="flex flex-row items-center justify-between pb-3">
+        <CardTitle className="text-base font-semibold flex items-center gap-2">
+          <Megaphone className="size-4 text-primary" /> Notice Board
+        </CardTitle>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="text-xs"
+          onClick={() => setModule("announcements")}
+        >
+          View all <ChevronRight className="size-3.5 ml-1" />
+        </Button>
+      </CardHeader>
+      <CardContent className="space-y-2">
+        {isLoading ? (
+          <div className="space-y-2 py-1">
+            {[...Array(3)].map((_, i) => (
+              <div key={i} className="h-12 rounded-lg bg-muted/40 animate-pulse" />
+            ))}
+          </div>
+        ) : items.length === 0 ? (
+          <p className="text-sm text-muted-foreground py-6 text-center">
+            No announcements yet. Company notices will appear here.
+          </p>
+        ) : (
+          items.map((a) => {
+            const st = ANN_PRIORITY_STYLE[a.priority];
+            return (
+              <button
+                key={a.id}
+                onClick={() => setModule("announcements")}
+                className="w-full flex items-start gap-3 p-2 rounded-lg hover:bg-muted/60 transition text-left cursor-pointer"
+              >
+                <div
+                  className={cn(
+                    "size-9 rounded-lg flex items-center justify-center flex-shrink-0",
+                    st.bg
+                  )}
+                >
+                  {a.priority === "URGENT" ? (
+                    <AlertTriangle className="size-4" />
+                  ) : a.priority === "LOW" ? (
+                    <Info className="size-4" />
+                  ) : a.priority === "HIGH" ? (
+                    <AlertTriangle className="size-4" />
+                  ) : (
+                    <Megaphone className="size-4" />
+                  )}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-medium truncate flex items-center gap-1.5">
+                    {a.pinned && (
+                      <Pin className="size-3 text-amber-600 fill-amber-500/30 flex-shrink-0" />
+                    )}
+                    {a.title}
+                  </div>
+                  <div className="text-xs text-muted-foreground line-clamp-1">
+                    {a.body}
+                  </div>
+                  <div className="text-[11px] text-muted-foreground mt-0.5 flex items-center gap-1.5">
+                    <span className={cn("size-1.5 rounded-full", st.dot)} />
+                    {relativeTime(a.publishedAt)}
+                  </div>
+                </div>
+              </button>
+            );
+          })
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+// ============================================================
+// Upcoming Holidays Widget
+// ============================================================
+
+interface DashHoliday {
+  id: string;
+  name: string;
+  date: string;
+  type: "PUBLIC" | "OPTIONAL" | "COMPANY";
+}
+
+function UpcomingHolidaysWidget({
+  setModule,
+}: {
+  setModule: (m: any) => void;
+}) {
+  const { data, isLoading } = useQuery({
+    queryKey: ["dashboard-holidays"],
+    queryFn: async () => {
+      const r = await fetch("/api/holidays?upcoming=true&limit=5");
+      if (!r.ok) throw new Error("Failed to load holidays");
+      return r.json();
+    },
+  });
+
+  const items: DashHoliday[] = (data?.items ?? []).slice(0, 4);
+
+  const typeCls = (t: DashHoliday["type"]) =>
+    t === "PUBLIC"
+      ? "bg-primary/10 text-primary"
+      : t === "OPTIONAL"
+        ? "bg-amber-500/10 text-amber-600"
+        : "bg-sky-500/10 text-sky-600";
+
+  function daysUntil(dateStr: string) {
+    const d = new Date(dateStr);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    d.setHours(0, 0, 0, 0);
+    const diff = Math.round(
+      (d.getTime() - today.getTime()) / (24 * 60 * 60 * 1000)
+    );
+    if (diff === 0) return "Today";
+    if (diff === 1) return "Tomorrow";
+    return `In ${diff} days`;
+  }
+
+  return (
+    <Card className="border-border/60 shadow-soft">
+      <CardHeader className="flex flex-row items-center justify-between pb-3">
+        <CardTitle className="text-base font-semibold flex items-center gap-2">
+          <Sun className="size-4 text-amber-600" /> Upcoming Holidays
+        </CardTitle>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="text-xs"
+          onClick={() => setModule("settings")}
+        >
+          Calendar <ChevronRight className="size-3.5 ml-1" />
+        </Button>
+      </CardHeader>
+      <CardContent className="space-y-2">
+        {isLoading ? (
+          <div className="space-y-2 py-1">
+            {[...Array(3)].map((_, i) => (
+              <div key={i} className="h-12 rounded-lg bg-muted/40 animate-pulse" />
+            ))}
+          </div>
+        ) : items.length === 0 ? (
+          <p className="text-sm text-muted-foreground py-6 text-center">
+            No upcoming holidays. Add them in Settings → Holidays.
+          </p>
+        ) : (
+          items.map((h) => {
+            const d = new Date(h.date);
+            return (
+              <div
+                key={h.id}
+                className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted/60 transition"
+              >
+                <div
+                  className={cn(
+                    "size-10 rounded-lg flex flex-col items-center justify-center flex-shrink-0",
+                    typeCls(h.type)
+                  )}
+                >
+                  <span className="text-sm font-bold leading-none">
+                    {d.getDate()}
+                  </span>
+                  <span className="text-[9px] uppercase leading-none mt-0.5">
+                    {d.toLocaleDateString("en-GB", { month: "short" })}
+                  </span>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-medium truncate">{h.name}</div>
+                  <div className="text-[11px] text-muted-foreground">
+                    {daysUntil(h.date)} · {h.type.toLowerCase()}
+                  </div>
+                </div>
+                <CalendarRange className="size-4 text-muted-foreground/50 flex-shrink-0" />
+              </div>
+            );
+          })
+        )}
+      </CardContent>
+    </Card>
   );
 }
 
