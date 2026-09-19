@@ -17,6 +17,7 @@ type ModuleKey =
   | "audit"
   | "documents"
   | "email-logs"
+  | "message-logs"
   | "assets"
   | "training-courses"
   | "training-enrollments";
@@ -31,6 +32,7 @@ const VALID_MODULES: ModuleKey[] = [
   "audit",
   "documents",
   "email-logs",
+  "message-logs",
   "assets",
   "training-courses",
   "training-enrollments",
@@ -566,6 +568,48 @@ async function fetchEmailLogs(p: ExportParams) {
   return { headers, rows };
 }
 
+async function fetchMessageLogs(p: ExportParams) {
+  const where: any = {};
+  if (p.status) where.status = p.status;
+  if (p.channel) where.channel = p.channel;
+  if (p.search) {
+    where.OR = [
+      { recipientTo: { contains: p.search } },
+      { body: { contains: p.search } },
+    ];
+  }
+
+  const items = await db.messageLog.findMany({
+    where,
+    include: {
+      employee: true,
+      announcement: { select: { title: true } },
+      sentBy: true,
+    },
+    orderBy: { createdAt: "desc" },
+  });
+
+  const headers = [
+    "Channel",
+    "Employee Name",
+    "Recipient",
+    "Announcement",
+    "Status",
+    "Sent At",
+    "Sent By",
+  ];
+  const rows = items.map((l) => [
+    l.channel,
+    l.employee?.fullName ?? "",
+    l.recipientTo,
+    l.announcement?.title ?? "",
+    l.status,
+    l.sentAt ? fmtDate(l.sentAt) : "",
+    l.sentBy?.name ?? l.sentBy?.email ?? "",
+  ]);
+  return { headers, rows };
+}
+
 // ============================================================
 // Assets & Training (stored in Activity model with JSON metadata)
 // ============================================================
@@ -936,6 +980,9 @@ export async function GET(req: NextRequest) {
         break;
       case "email-logs":
         result = await fetchEmailLogs(params);
+        break;
+      case "message-logs":
+        result = await fetchMessageLogs(params);
         break;
       case "assets":
         result = await fetchAssets(params);

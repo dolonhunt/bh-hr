@@ -82,6 +82,7 @@ import {
   Sparkles,
   MailCheck,
   MailX,
+  MessageSquare,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn, formatDate, downloadBlob } from "@/lib/utils";
@@ -90,6 +91,7 @@ import { EmptyState } from "../shared/empty-state";
 import { EmailTemplateEditor } from "./email-template-editor";
 import { HolidaysTab } from "./settings-holidays-tab";
 import { AutomationTab } from "./settings-automation-tab";
+import { MessagingTab } from "./settings-messaging-tab";
 
 const TABS = [
   { key: "organization", label: "Organization", icon: Building2 },
@@ -100,6 +102,7 @@ const TABS = [
   { key: "holidays", label: "Holidays", icon: Sun },
   { key: "automation", label: "Automation", icon: CalendarClock },
   { key: "email", label: "Email Settings", icon: Mail },
+  { key: "messaging", label: "SMS & WhatsApp", icon: MessageSquare },
   { key: "email-templates", label: "Email Templates", icon: FileText },
   { key: "numbering", label: "Document Numbering", icon: Hash },
   { key: "backup", label: "Data & Backup", icon: Database },
@@ -151,6 +154,7 @@ export function SettingsModule() {
           {tab === "designations" && <DesignationsTab />}
           {tab === "leave-types" && <LeaveTypesTab />}
           {tab === "email" && <EmailSettingsTab />}
+          {tab === "messaging" && <MessagingTab />}
           {tab === "automation" && <AutomationTab />}
           {tab === "email-templates" && <EmailTemplatesTab />}
           {tab === "numbering" && <DocumentNumberingTab />}

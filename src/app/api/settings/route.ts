@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getSmtpConfig } from "@/lib/mailer";
+import { getSmsConfig } from "@/lib/sms";
 
 export async function GET() {
-  const [emailSetting, documentNumbering, company, settingsArr, smtp] =
+  const [emailSetting, documentNumbering, company, settingsArr, smtp, sms] =
     await Promise.all([
       db.emailSetting.findFirst({
         orderBy: [{ isDefault: "desc" }, { createdAt: "asc" }],
@@ -16,6 +17,7 @@ export async function GET() {
       }),
       db.setting.findMany(),
       getSmtpConfig(),
+      getSmsConfig(),
     ]);
 
   const settings: Record<string, string> = {};
@@ -45,6 +47,9 @@ export async function GET() {
           from: `${smtp.fromName} <${smtp.fromEmail}>`,
         }
       : { mode: "simulated", source: null, host: null, port: null, from: null, hint: emailHint },
+    smsMode: sms
+      ? { mode: "gateway", source: sms.source, senderId: sms.senderId || null }
+      : { mode: "simulated", source: null, senderId: null },
   });
 }
 
@@ -150,7 +155,7 @@ export async function PATCH(req: NextRequest) {
   });
 
   // Return updated snapshot
-  const [emailSetting, documentNumbering, company, settingsArr, smtp] =
+  const [emailSetting, documentNumbering, company, settingsArr, smtp, sms] =
     await Promise.all([
       db.emailSetting.findFirst({
         orderBy: [{ isDefault: "desc" }, { createdAt: "asc" }],
@@ -159,6 +164,7 @@ export async function PATCH(req: NextRequest) {
       db.company.findFirst({ orderBy: { createdAt: "asc" } }),
       db.setting.findMany(),
       getSmtpConfig(),
+      getSmsConfig(),
     ]);
   const settings: Record<string, string> = {};
   settingsArr.forEach((s) => {
@@ -187,5 +193,8 @@ export async function PATCH(req: NextRequest) {
           from: `${smtp.fromName} <${smtp.fromEmail}>`,
         }
       : { mode: "simulated", source: null, host: null, port: null, from: null, hint: emailHint },
+    smsMode: sms
+      ? { mode: "gateway", source: sms.source, senderId: sms.senderId || null }
+      : { mode: "simulated", source: null, senderId: null },
   });
 }

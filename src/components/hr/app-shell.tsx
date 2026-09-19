@@ -78,9 +78,14 @@ function useUrlSync() {
     }
     if (
       tab &&
-      ["all", "templates", "generated", "email-history", "approval-queue"].includes(
-        tab
-      )
+      [
+        "all",
+        "templates",
+        "generated",
+        "email-history",
+        "message-history",
+        "approval-queue",
+      ].includes(tab)
     ) {
       st.setDocumentsTab(tab as never);
     }

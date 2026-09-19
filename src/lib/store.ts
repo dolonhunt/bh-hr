@@ -50,6 +50,7 @@ export interface AppState {
     | "templates"
     | "generated"
     | "email-history"
+    | "message-history"
     | "approval-queue";
   setDocumentsTab: (t: AppState["documentsTab"]) => void;
 

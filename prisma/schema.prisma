@@ -28,6 +28,7 @@ model User {
   linkedEmployee Employee? @relation(fields: [linkedEmployeeId], references: [id])
   auditLogs AuditLog[]
   sentEmails EmailLog[] @relation("EmailSender")
+  sentMessages MessageLog[] @relation("MessageSender")
   generatedDocuments GeneratedDocument[] @relation("DocGenerator")
 }
 
@@ -171,6 +172,7 @@ model Employee {
   activities      Activity[]
   jobsApplied     Candidate[]
   portalUsers     User[] // users linked to this employee (self-service)
+  messageLogs     MessageLog[] @relation("MessageEmployee")
 
   // Self-relation for reporting manager
   subordinates    Employee[] @relation("ReportingManager")
@@ -302,6 +304,31 @@ model GeneratedDocument {
   @@index([employeeId])
   @@index([type])
   @@index([status])
+}
+
+// ============================================================
+// MESSAGING (SMS / WhatsApp)
+// ============================================================
+
+model MessageLog {
+  id             String   @id @default(cuid())
+  channel        String   @default("SMS") // SMS | WHATSAPP
+  employeeId     String?
+  employee       Employee? @relation("MessageEmployee", fields: [employeeId], references: [id])
+  announcementId String?
+  announcement   Announcement? @relation("MessageAnnouncement", fields: [announcementId], references: [id])
+  recipientTo    String
+  body           String
+  status         String   @default("QUEUED") // QUEUED | SENT | FAILED
+  errorMessage   String?
+  sentById       String?
+  sentBy         User?    @relation("MessageSender", fields: [sentById], references: [id])
+  sentAt         DateTime?
+  createdAt      DateTime @default(now())
+
+  @@index([channel])
+  @@index([status])
+  @@index([announcementId])
 }
 
 model EmailLog {
@@ -482,6 +509,8 @@ model Announcement {
   expiresAt    DateTime?
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
+
+  messageLogs  MessageLog[] @relation("MessageAnnouncement")
 }
 
 model Holiday {

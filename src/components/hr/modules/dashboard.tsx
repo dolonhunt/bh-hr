@@ -49,6 +49,7 @@ import {
   AlertTriangle,
   Info,
   CalendarRange,
+  PartyPopper,
 } from "lucide-react";
 import {
   BarChart,
@@ -223,6 +224,35 @@ export function DashboardModule() {
 
   const layout = layoutQuery.data?.widgets ?? DEFAULT_LAYOUT;
 
+  // Holiday awareness: is TODAY a company holiday (Settings → Holidays)?
+  // Kept as a small non-blocking query — the dashboard renders with the
+  // weekend logic immediately and upgrades the labels if a holiday hits.
+  // NOTE: declared before any early return (Rules of Hooks).
+  const holidaysQuery = useQuery({
+    queryKey: ["holidays", "today"],
+    queryFn: async () => {
+      const y = new Date().getFullYear();
+      const r = await fetch(`/api/holidays?year=${y}`);
+      if (!r.ok) throw new Error("Failed to load holidays");
+      return r.json();
+    },
+    staleTime: 10 * 60_000,
+  });
+  const todayHoliday = useMemo(() => {
+    const items: { name: string; date: string }[] =
+      holidaysQuery.data?.items ?? [];
+    const now = new Date();
+    const same = items.find((h) => {
+      const d = new Date(h.date);
+      return (
+        d.getFullYear() === now.getFullYear() &&
+        d.getMonth() === now.getMonth() &&
+        d.getDate() === now.getDate()
+      );
+    });
+    return same?.name ?? null;
+  }, [holidaysQuery.data]);
+
   // Compute the ordered list of visible widgets.
   const visibleWidgets = useMemo(
     () =>
@@ -322,6 +352,7 @@ export function DashboardModule() {
           greeting={greeting}
           attendanceRate={attendanceRate}
           isWeekendDay={isWeekendDay}
+          todayHoliday={todayHoliday}
           setModule={setModule}
           openEmployee={openEmployee}
           setQuickAction={setQuickAction}
@@ -350,6 +381,7 @@ interface DashboardGridProps {
   greeting: string;
   attendanceRate: number;
   isWeekendDay: boolean;
+  todayHoliday: string | null;
   setModule: (m: any) => void;
   openEmployee: (id: string) => void;
   setQuickAction: (a: string) => void;
@@ -363,6 +395,7 @@ function DashboardGrid({
   greeting,
   attendanceRate,
   isWeekendDay,
+  todayHoliday,
   setModule,
   openEmployee,
   setQuickAction,
@@ -431,6 +464,7 @@ function DashboardGrid({
                   greeting={greeting}
                   attendanceRate={attendanceRate}
                   isWeekendDay={isWeekendDay}
+                  todayHoliday={todayHoliday}
                   setModule={setModule}
                   openEmployee={openEmployee}
                   setQuickAction={setQuickAction}
@@ -465,6 +499,7 @@ function DashboardGrid({
                   greeting={greeting}
                   attendanceRate={attendanceRate}
                   isWeekendDay={isWeekendDay}
+                  todayHoliday={todayHoliday}
                   setModule={setModule}
                   openEmployee={openEmployee}
                   setQuickAction={setQuickAction}
@@ -486,6 +521,7 @@ function DashboardGrid({
                 greeting={greeting}
                 attendanceRate={attendanceRate}
                 isWeekendDay={isWeekendDay}
+                todayHoliday={todayHoliday}
                 setModule={setModule}
                 openEmployee={openEmployee}
                 setQuickAction={setQuickAction}
@@ -510,6 +546,7 @@ interface WidgetRendererProps {
   greeting: string;
   attendanceRate: number;
   isWeekendDay: boolean;
+  todayHoliday: string | null;
   setModule: (m: any) => void;
   openEmployee: (id: string) => void;
   setQuickAction: (a: string) => void;
@@ -570,7 +607,9 @@ function HeroBannerWidget({
   greeting,
   attendanceRate,
   isWeekendDay,
+  todayHoliday,
 }: WidgetRendererProps) {
+  const isOffDay = isWeekendDay || !!todayHoliday;
   return (
     <Card className="relative overflow-hidden border-border/60 shadow-soft bg-gradient-to-br from-primary/5 via-primary/3 to-transparent">
       <div className="absolute top-0 right-0 w-64 h-64 rounded-full bg-primary/8 blur-3xl -mr-20 -mt-20" />
@@ -585,7 +624,15 @@ function HeroBannerWidget({
                 day: "numeric",
               })}
             </span>
-            {isWeekendDay && (
+            {todayHoliday && (
+              <span
+                className="inline-flex items-center gap-1 rounded-full bg-primary/10 text-primary px-2 py-0.5 text-[11px] font-medium cursor-default"
+                title="Public holiday — office closed"
+              >
+                <PartyPopper className="size-3" /> Holiday · {todayHoliday}
+              </span>
+            )}
+            {!todayHoliday && isWeekendDay && (
               <span
                 className="inline-flex items-center gap-1 rounded-full bg-amber-500/10 text-amber-700 dark:text-amber-400 px-2 py-0.5 text-[11px] font-medium cursor-default"
                 title="Friday & Saturday are weekly off-days (Bangladesh)"
@@ -608,21 +655,28 @@ function HeroBannerWidget({
               {kpis.docsGenerated} document
               {kpis.docsGenerated !== 1 ? "s" : ""} generated
             </span>
-            {isWeekendDay && (
+            {todayHoliday && (
+              <span className="text-muted-foreground/80">
+                {" "}· office closed for {todayHoliday}.
+              </span>
+            )}
+            {!todayHoliday && isWeekendDay && (
               <span className="text-muted-foreground/80">
                 {" "}· office reopens Sunday.
               </span>
             )}
-            {!isWeekendDay && "."}
+            {!isOffDay && "."}
           </p>
         </div>
         <div className="flex items-center gap-4 flex-shrink-0">
           <div
             className="relative size-20 flex items-center justify-center"
             title={
-              isWeekendDay
-                ? "Weekly off-day (Fri & Sat) — attendance resumes Sunday"
-                : undefined
+              todayHoliday
+                ? `Public holiday — ${todayHoliday}. Attendance resumes next working day.`
+                : isWeekendDay
+                  ? "Weekly off-day (Fri & Sat) — attendance resumes Sunday"
+                  : undefined
             }
           >
             <svg className="size-20 -rotate-90" viewBox="0 0 80 80">
@@ -650,10 +704,14 @@ function HeroBannerWidget({
             </svg>
             <div className="absolute text-center">
               <div className="text-lg font-bold tabular-nums">
-                {isWeekendDay ? "–" : `${attendanceRate}%`}
+                {isOffDay ? "–" : `${attendanceRate}%`}
               </div>
               <div className="text-[9px] text-muted-foreground uppercase">
-                {isWeekendDay ? "Weekend" : "Present"}
+                {todayHoliday
+                  ? "Holiday"
+                  : isWeekendDay
+                    ? "Weekend"
+                    : "Present"}
               </div>
             </div>
           </div>
@@ -689,7 +747,9 @@ function KpiRowWidget({
   kpis,
   setModule,
   isWeekendDay,
+  todayHoliday,
 }: WidgetRendererProps) {
+  const isOffDay = isWeekendDay || !!todayHoliday;
   return (
     <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
       <KpiCard
@@ -706,14 +766,28 @@ function KpiRowWidget({
         value={kpis.presentToday}
         icon={CalendarCheck}
         iconClass="bg-primary/10 text-primary"
-        delta={isWeekendDay ? undefined : { value: "+5%", trend: "up" }}
+        delta={isOffDay ? undefined : { value: "+5%", trend: "up" }}
         footer={
-          isWeekendDay ? (
+          todayHoliday ? (
+            <span
+              className="text-muted-foreground cursor-default"
+              title={`Public holiday — ${todayHoliday}`}
+            >
+              Holiday — {todayHoliday}
+            </span>
+          ) : isWeekendDay ? (
             <span
               className="text-muted-foreground cursor-default"
               title="Friday & Saturday are weekly off-days (Bangladesh)"
             >
               Weekly off — Fri & Sat
+            </span>
+          ) : kpis.totalEmployees > 0 && kpis.presentToday === 0 ? (
+            <span
+              className="text-amber-600 dark:text-amber-400 cursor-default"
+              title="No attendance has been recorded for today yet"
+            >
+              No check-ins recorded yet
             </span>
           ) : undefined
         }

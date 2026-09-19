@@ -21,6 +21,8 @@ import {
   Mail,
   MailCheck,
   MailX,
+  MessageSquare,
+  Smartphone,
   Send,
 } from "lucide-react";
 import { PageHeader } from "../shared/page-header";
@@ -143,17 +145,33 @@ export function AnnouncementsModule() {
   const [editing, setEditing] = useState<Announcement | null>(null);
   const [deleting, setDeleting] = useState<Announcement | null>(null);
 
-  // ----- Email blast (announcement → all matching employees) -----
+  // ----- Comms blast (announcement → employees via email / SMS / WhatsApp) -----
   const [blasting, setBlasting] = useState<Announcement | null>(null);
+  const [blastChannel, setBlastChannel] = useState<"EMAIL" | "SMS" | "WHATSAPP">(
+    "EMAIL"
+  );
   const [blastRunning, setBlastRunning] = useState(false);
   const [blastResult, setBlastResult] = useState<{
-    mode: "smtp" | "simulated";
+    mode: "smtp" | "simulated" | "gateway";
+    channel: "EMAIL" | "SMS" | "WHATSAPP";
     recipients: number;
+    noPhone?: number;
     sent: number;
     failed: number;
     failures: { employeeName: string; recipientTo?: string; error?: string }[];
   } | null>(null);
   const [saving, setSaving] = useState(false);
+
+  // Delivery modes from the shared settings cache (email SMTP vs simulated,
+  // SMS gateway vs simulated) — surfaced honestly inside the blast dialog.
+  const settingsQ = useQuery({
+    queryKey: ["settings"],
+    queryFn: () => fetch("/api/settings").then((r) => r.json()),
+    enabled: !!blasting,
+    staleTime: 120_000,
+  });
+  const emailMode = settingsQ.data?.emailMode?.mode ?? "simulated";
+  const smsMode = settingsQ.data?.smsMode?.mode ?? "simulated";
 
   const includeExpired = tab === "expired";
 
@@ -280,21 +298,29 @@ export function AnnouncementsModule() {
     }
   }
 
-  async function runEmailBlast() {
+  async function runBlast() {
     if (!blasting) return;
     setBlastRunning(true);
     setBlastResult(null);
     try {
-      const res = await fetch(`/api/announcements/${blasting.id}/email-blast`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({}),
-      });
+      const isEmail = blastChannel === "EMAIL";
+      const res = await fetch(
+        isEmail
+          ? `/api/announcements/${blasting.id}/email-blast`
+          : `/api/announcements/${blasting.id}/sms-blast`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(isEmail ? {} : { channel: blastChannel }),
+        }
+      );
       const data = await res.json();
-      if (!res.ok) throw new Error(data?.error || "Email blast failed");
+      if (!res.ok) throw new Error(data?.error || "Send failed");
       setBlastResult({
         mode: data.mode,
+        channel: blastChannel,
         recipients: data.recipients,
+        noPhone: data.noPhone,
         sent: data.sent,
         failed: data.failed,
         failures: (data.results ?? [])
@@ -305,14 +331,23 @@ export function AnnouncementsModule() {
             error: r.error,
           })),
       });
-      toast.success(
-        data.mode === "smtp"
-          ? `Announcement delivered to ${data.sent} recipient(s), ${data.failed} failed.`
-          : `Announcement emails logged (simulated) for ${data.sent} recipient(s).`
-      );
-      qc.invalidateQueries({ queryKey: ["email-logs"] });
+      if (isEmail) {
+        toast.success(
+          data.mode === "smtp"
+            ? `Announcement delivered to ${data.sent} recipient(s), ${data.failed} failed.`
+            : `Announcement emails logged (simulated) for ${data.sent} recipient(s).`
+        );
+        qc.invalidateQueries({ queryKey: ["email-logs"] });
+      } else {
+        toast.success(
+          data.mode === "gateway"
+            ? `Announcement ${blastChannel === "WHATSAPP" ? "WhatsApp" : "SMS"} delivered to ${data.sent} recipient(s), ${data.failed} failed.`
+            : `Announcement ${blastChannel === "WHATSAPP" ? "WhatsApp" : "SMS"} logged (simulated) for ${data.sent} recipient(s).`
+        );
+        qc.invalidateQueries({ queryKey: ["message-logs"] });
+      }
     } catch (e: unknown) {
-      toast.error(e instanceof Error ? e.message : "Email blast failed");
+      toast.error(e instanceof Error ? e.message : "Send failed");
     } finally {
       setBlastRunning(false);
     }
@@ -543,12 +578,27 @@ export function AnnouncementsModule() {
                       className="size-8 cursor-pointer"
                       onClick={() => {
                         setBlastResult(null);
+                        setBlastChannel("EMAIL");
                         setBlasting(a);
                       }}
                       aria-label={`Email this announcement to ${a.audience === "DEPARTMENT" && a.department ? a.department.name : "all employees"}`}
                       title={`Email to ${a.audience === "DEPARTMENT" && a.department ? a.department.name : "all employees"}`}
                     >
                       <Mail className="size-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="size-8 cursor-pointer"
+                      onClick={() => {
+                        setBlastResult(null);
+                        setBlastChannel("SMS");
+                        setBlasting(a);
+                      }}
+                      aria-label={`Send SMS or WhatsApp for this announcement`}
+                      title={`SMS / WhatsApp to employees with a phone on file`}
+                    >
+                      <MessageSquare className="size-4" />
                     </Button>
                     <Button
                       variant="ghost"
@@ -736,7 +786,7 @@ export function AnnouncementsModule() {
         </DialogContent>
       </Dialog>
 
-      {/* Email blast dialog */}
+      {/* Comms blast dialog (Email / SMS / WhatsApp) */}
       <Dialog
         open={!!blasting}
         onOpenChange={(o) => {
@@ -749,26 +799,100 @@ export function AnnouncementsModule() {
         <DialogContent className="max-w-lg max-h-[90vh] flex flex-col">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <Mail className="size-5 text-primary" />
-              Email Announcement
+              {blastChannel === "EMAIL" ? (
+                <Mail className="size-5 text-primary" />
+              ) : blastChannel === "WHATSAPP" ? (
+                <MessageSquare className="size-5 text-emerald-600" />
+              ) : (
+                <Smartphone className="size-5 text-primary" />
+              )}
+              Send Announcement
             </DialogTitle>
             <DialogDescription>
               Sends "{blasting?.title}" to every active employee
               {blasting?.audience === "DEPARTMENT" && blasting?.department
                 ? ` in ${blasting.department.name}`
                 : " (company-wide)"}{" "}
-              with an email address on file. Each send is recorded in the Email
-              History.
+              with{" "}
+              {blastChannel === "EMAIL"
+                ? "an email address on file"
+                : "a phone number on file"}
+              . Each send is recorded in{" "}
+              {blastChannel === "EMAIL"
+                ? "the Email History"
+                : "the Messages history"}
+              .
             </DialogDescription>
           </DialogHeader>
 
           {!blastResult ? (
             <>
-              <div className="rounded-lg border border-amber-500/25 bg-amber-500/5 px-3.5 py-3 text-xs text-muted-foreground">
-                One email per recipient — 20 employees means 20 emails. Real
-                delivery requires SMTP credentials in Settings → Email Settings;
-                otherwise the sends are recorded as simulated.
+              {/* Channel picker */}
+              <div className="grid grid-cols-3 gap-1.5 rounded-lg bg-muted/60 p-1">
+                {(
+                  [
+                    ["EMAIL", "Email", Mail],
+                    ["SMS", "SMS", Smartphone],
+                    ["WHATSAPP", "WhatsApp", MessageSquare],
+                  ] as const
+                ).map(([key, label, Icon]) => (
+                  <button
+                    key={key}
+                    onClick={() => setBlastChannel(key)}
+                    className={cn(
+                      "flex items-center justify-center gap-1.5 px-2 py-2 rounded-md text-xs font-medium transition-all cursor-pointer",
+                      blastChannel === key
+                        ? "bg-accent text-accent-foreground shadow-sm"
+                        : "text-muted-foreground hover:text-foreground"
+                    )}
+                  >
+                    <Icon className="size-3.5" /> {label}
+                  </button>
+                ))}
               </div>
+
+              {/* Channel-specific delivery mode + copy */}
+              {blastChannel === "EMAIL" ? (
+                <div className="rounded-lg border border-amber-500/25 bg-amber-500/5 px-3.5 py-3 text-xs text-muted-foreground">
+                  <div className="flex items-center gap-1.5 mb-1 font-medium">
+                    <span
+                      className={cn(
+                        "inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide",
+                        emailMode === "smtp"
+                          ? "bg-primary/10 text-primary"
+                          : "bg-amber-500/10 text-amber-700 dark:text-amber-400"
+                      )}
+                    >
+                      {emailMode === "smtp" ? "Live SMTP" : "Simulated"}
+                    </span>
+                    one email per recipient
+                  </div>
+                  Real delivery requires SMTP credentials in Settings → Email
+                  Settings; otherwise the sends are recorded as simulated.
+                </div>
+              ) : (
+                <div className="rounded-lg border border-amber-500/25 bg-amber-500/5 px-3.5 py-3 text-xs text-muted-foreground">
+                  <div className="flex items-center gap-1.5 mb-1 font-medium">
+                    <span
+                      className={cn(
+                        "inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide",
+                        smsMode === "gateway"
+                          ? "bg-primary/10 text-primary"
+                          : "bg-amber-500/10 text-amber-700 dark:text-amber-400"
+                      )}
+                    >
+                      {smsMode === "gateway" ? "Live gateway" : "Simulated"}
+                    </span>
+                    {blastChannel === "WHATSAPP"
+                      ? "full message text"
+                      : "SMS is capped at ~480 characters"}
+                  </div>
+                  Phone numbers are normalized to +880 format. Real delivery
+                  requires an SMS gateway in Settings → SMS & WhatsApp;
+                  otherwise the sends are recorded as simulated.
+                </div>
+              )}
+
               <DialogFooter>
                 <Button
                   variant="outline"
@@ -780,7 +904,7 @@ export function AnnouncementsModule() {
                 >
                   Cancel
                 </Button>
-                <Button onClick={runEmailBlast} disabled={blastRunning}>
+                <Button onClick={runBlast} disabled={blastRunning}>
                   {blastRunning ? (
                     <>
                       <Loader2 className="size-4 mr-2 animate-spin" />
@@ -799,9 +923,18 @@ export function AnnouncementsModule() {
             <>
               <div className="flex flex-wrap items-center gap-3 rounded-lg border border-border/60 bg-muted/30 px-3.5 py-3 text-xs">
                 <span className="flex items-center gap-1.5 font-medium">
-                  <MailCheck className="size-4 text-primary" />
-                  {blastResult.mode === "smtp" ? "Delivered" : "Logged (simulated)"}:{" "}
-                  <span className="text-primary font-semibold">{blastResult.sent}</span>
+                  {blastResult.channel === "EMAIL" ? (
+                    <MailCheck className="size-4 text-primary" />
+                  ) : (
+                    <MessageSquare className="size-4 text-primary" />
+                  )}
+                  {blastResult.mode === "simulated"
+                    ? "Logged (simulated)"
+                    : "Delivered"}
+                  :{" "}
+                  <span className="text-primary font-semibold">
+                    {blastResult.sent}
+                  </span>
                 </span>
                 {blastResult.failed > 0 && (
                   <span className="flex items-center gap-1.5 font-medium text-rose-600 dark:text-rose-400">
@@ -812,6 +945,12 @@ export function AnnouncementsModule() {
                 <span className="text-muted-foreground">
                   of {blastResult.recipients} recipient(s)
                 </span>
+                {blastResult.noPhone ? (
+                  <span className="text-muted-foreground">
+                    · {blastResult.noPhone} employee(s) had no usable phone
+                    number
+                  </span>
+                ) : null}
               </div>
               {blastResult.failures.length > 0 && (
                 <div className="rounded-lg border border-rose-500/25 bg-rose-500/5 px-3.5 py-2.5 text-xs space-y-1 max-h-40 overflow-y-auto">

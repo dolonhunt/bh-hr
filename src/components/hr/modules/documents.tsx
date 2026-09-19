@@ -82,6 +82,8 @@ import {
   FileSpreadsheet,
   FlaskConical,
   Settings2,
+  MessageSquare,
+  Smartphone,
 } from "lucide-react";
 import { formatDate, relativeTime, cn } from "@/lib/utils";
 import { printDocument } from "@/lib/print";
@@ -175,7 +177,7 @@ export function DocumentsModule() {
         value={documentsTab}
         onValueChange={(v) => setDocumentsTab(v as any)}
       >
-        <TabsList className="grid w-full grid-cols-2 md:grid-cols-5 h-auto">
+        <TabsList className="grid w-full grid-cols-2 md:grid-cols-6 h-auto">
           <TabsTrigger value="all" className="py-1.5 text-xs sm:text-sm">
             All Documents
           </TabsTrigger>
@@ -187,6 +189,9 @@ export function DocumentsModule() {
           </TabsTrigger>
           <TabsTrigger value="email-history" className="py-1.5 text-xs sm:text-sm">
             Email History
+          </TabsTrigger>
+          <TabsTrigger value="message-history" className="py-1.5 text-xs sm:text-sm">
+            Messages
           </TabsTrigger>
           <TabsTrigger value="approval-queue" className="py-1.5 text-xs sm:text-sm col-span-2 md:col-span-1">
             Approval Queue
@@ -228,6 +233,7 @@ export function DocumentsModule() {
         />
       )}
       {documentsTab === "email-history" && <EmailHistoryTab />}
+      {documentsTab === "message-history" && <MessageHistoryTab />}
       {documentsTab === "approval-queue" && (
         <ApprovalQueue onPreview={setPreviewDoc} />
       )}
@@ -987,6 +993,237 @@ function EmailHistoryTab() {
                           <RefreshCw className="size-3.5 mr-1" /> Resend
                         </Button>
                       )}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        </Card>
+      )}
+
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between">
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={page === 1}
+            onClick={() => setPage((p) => Math.max(1, p - 1))}
+          >
+            Previous
+          </Button>
+          <div className="text-sm text-muted-foreground">
+            Page {page} of {totalPages}
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={page >= totalPages}
+            onClick={() => setPage((p) => p + 1)}
+          >
+            Next
+          </Button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// =============================================================
+// Message History tab (SMS / WhatsApp)
+// =============================================================
+
+function MessageHistoryTab() {
+  const [search, setSearch] = useState("");
+  const [status, setStatus] = useState("");
+  const [channel, setChannel] = useState("");
+  const [page, setPage] = useState(1);
+
+  const { data, isLoading } = useQuery({
+    queryKey: ["message-logs", "history-tab", search, status, channel, page],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (search) params.set("search", search);
+      if (status) params.set("status", status);
+      if (channel) params.set("channel", channel);
+      params.set("page", String(page));
+      params.set("pageSize", "20");
+      const r = await fetch(`/api/message-logs?${params.toString()}`);
+      return r.json();
+    },
+    placeholderData: (prev) => prev,
+  });
+  const logs = data?.items ?? [];
+  const total = data?.total ?? 0;
+  const totalPages = data?.totalPages ?? 1;
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-col md:flex-row gap-3">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+          <Input
+            placeholder="Search by phone number, message…"
+            value={search}
+            onChange={(e) => {
+              setSearch(e.target.value);
+              setPage(1);
+            }}
+            className="pl-9"
+          />
+        </div>
+        <Select
+          value={channel || "ALL"}
+          onValueChange={(v) => {
+            setChannel(v === "ALL" ? "" : v);
+            setPage(1);
+          }}
+        >
+          <SelectTrigger className="md:w-44">
+            <SelectValue placeholder="All channels" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="ALL">All channels</SelectItem>
+            <SelectItem value="SMS">
+              <span className="flex items-center gap-1.5">
+                <Smartphone className="size-3.5" /> SMS
+              </span>
+            </SelectItem>
+            <SelectItem value="WHATSAPP">
+              <span className="flex items-center gap-1.5">
+                <MessageSquare className="size-3.5" /> WhatsApp
+              </span>
+            </SelectItem>
+          </SelectContent>
+        </Select>
+        <Select
+          value={status || "ALL"}
+          onValueChange={(v) => {
+            setStatus(v === "ALL" ? "" : v);
+            setPage(1);
+          }}
+        >
+          <SelectTrigger className="md:w-40">
+            <SelectValue placeholder="All statuses" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="ALL">All statuses</SelectItem>
+            <SelectItem value="SENT">Sent</SelectItem>
+            <SelectItem value="FAILED">Failed</SelectItem>
+          </SelectContent>
+        </Select>
+        <ExportButton
+          module="message-logs"
+          filters={{ search, status, channel }}
+        />
+      </div>
+
+      <div className="text-sm text-muted-foreground">
+        Showing <span className="font-medium text-foreground">{logs.length}</span>{" "}
+        of <span className="font-medium text-foreground">{total}</span> messages
+      </div>
+
+      {!isLoading && logs.length === 0 && (
+        <EmptyState
+          icon={MessageSquare}
+          title="No messages yet"
+          description="Send an announcement via SMS or WhatsApp to see the delivery history here."
+        />
+      )}
+
+      {!isLoading && logs.length > 0 && (
+        <Card className="border-border/60 shadow-soft overflow-hidden">
+          <div className="overflow-x-auto">
+            <Table className="table-sticky-right">
+              <TableHeader>
+                <TableRow className="bg-muted/40 hover:bg-muted/40">
+                  <TableHead className="min-w-[110px]">Channel</TableHead>
+                  <TableHead>Employee</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Recipient</TableHead>
+                  <TableHead className="min-w-[220px]">Message</TableHead>
+                  <TableHead>Sent By</TableHead>
+                  <TableHead>Sent At</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {logs.map((log: any) => (
+                  <TableRow key={log.id}>
+                    <TableCell>
+                      {log.channel === "WHATSAPP" ? (
+                        <span className="inline-flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide px-1.5 py-1 rounded-md bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 cursor-default">
+                          <MessageSquare className="size-3" /> WhatsApp
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide px-1.5 py-1 rounded-md bg-primary/10 text-primary cursor-default">
+                          <Smartphone className="size-3" /> SMS
+                        </span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {log.employee ? (
+                        <div className="flex items-center gap-2">
+                          <AvatarBadge
+                            name={log.employee?.fullName}
+                            size="sm"
+                          />
+                          <div className="min-w-0">
+                            <div className="text-xs font-medium truncate max-w-[140px]">
+                              {log.employee?.fullName}
+                            </div>
+                            <div className="text-[10px] text-muted-foreground">
+                              {log.employee?.employeeId ?? ""}
+                            </div>
+                          </div>
+                        </div>
+                      ) : (
+                        // Employee-less sends (test messages) are
+                        // system-generated — label them instead of an empty avatar.
+                        <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+                          <span className="size-6 rounded-full bg-muted flex items-center justify-center flex-shrink-0">
+                            <Settings2 className="size-3 text-muted-foreground" />
+                          </span>
+                          System
+                        </span>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-xs">
+                      <StatusBadge status={log.status} />
+                      {log.status === "FAILED" && log.errorMessage ? (
+                        <div
+                          className="text-[10px] text-rose-600 dark:text-rose-400 max-w-[180px] truncate mt-1 cursor-help"
+                          title={log.errorMessage}
+                        >
+                          {log.errorMessage}
+                        </div>
+                      ) : null}
+                    </TableCell>
+                    <TableCell className="text-xs font-mono">
+                      {log.recipientTo}
+                    </TableCell>
+                    <TableCell>
+                      <div
+                        className="text-xs line-clamp-3 max-w-[260px] cursor-help whitespace-pre-line"
+                        title={log.body}
+                      >
+                        {log.body}
+                      </div>
+                      {log.announcement?.title ? (
+                        <div className="flex items-center gap-1 mt-1">
+                          <span className="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded-md bg-amber-500/10 text-amber-700 dark:text-amber-400 cursor-default">
+                            <Megaphone className="size-2.5" /> Announcement
+                          </span>
+                          <span className="text-[10px] text-muted-foreground truncate max-w-[140px]">
+                            {log.announcement.title}
+                          </span>
+                        </div>
+                      ) : null}
+                    </TableCell>
+                    <TableCell className="text-xs">
+                      {log.sentBy?.name ?? "—"}
+                    </TableCell>
+                    <TableCell className="text-xs">
+                      {log.sentAt ? formatDate(log.sentAt, "datetime") : "—"}
                     </TableCell>
                   </TableRow>
                 ))}

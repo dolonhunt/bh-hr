@@ -5,9 +5,14 @@ import { getReportRecipients, previousMonth, sendMonthlyReport } from "@/lib/mon
 // =============================================================
 // GET /api/cron/monthly-report
 //
-// Vercel Cron target (vercel.json → crons, schedule "0 6 1 * *"):
-// on the 1st of each month it emails the previous month's HR
+// Vercel Cron target (vercel.json → crons, schedule "0 6 * * *"):
+// the schedule is DAILY (Vercel Hobby plans only allow daily cron
+// granularity), and the route internally guards on the day of month:
+// it only sends on the 1st, when it emails the previous month's HR
 // summary to the configured recipients (Settings → Automation).
+// Any other day it answers skipped: true. A `?force=1` query param
+// (still bearer-authenticated when CRON_SECRET is set) bypasses the
+// day-of-month guard for manual/testing runs.
 //
 // Auth: Vercel Cron sends "Authorization: Bearer $CRON_SECRET".
 //   * If CRON_SECRET is set on the deployment, requests must present
@@ -17,7 +22,8 @@ import { getReportRecipients, previousMonth, sendMonthlyReport } from "@/lib/mon
 //     are visible in the response.
 //
 // Skips gracefully (200 + skipped: true) when the automation is
-// disabled or no recipients are configured — never throws to cron.
+// disabled, no recipients are configured, or it's not the 1st —
+// never throws to cron.
 // =============================================================
 
 export async function GET(req: NextRequest) {
@@ -27,12 +33,24 @@ export async function GET(req: NextRequest) {
     ? authHeader.slice("Bearer ".length)
     : "";
   const authMode = secret ? "bearer" : "open";
+  const force = req.nextUrl.searchParams.get("force") === "1";
 
   if (secret && presented !== secret) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   try {
+    // Day-of-month guard for the daily schedule (1-indexed).
+    if (!force && new Date().getDate() !== 1) {
+      return NextResponse.json({
+        ok: true,
+        skipped: true,
+        reason:
+          "not the 1st of the month (daily cron schedule; the report sends on the 1st) — use ?force=1 to override",
+        authMode,
+      });
+    }
+
     const enabledSetting = await db.setting.findUnique({
       where: { key: "monthlyReportEnabled" },
     });
