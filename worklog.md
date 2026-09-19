@@ -2535,3 +2535,38 @@ Stage Summary:
 - Table UX: 8 wide tables keep their action columns reachable at 1280px without horizontal scrolling.
 - Remaining recommendations: one-click document approval from notifications (approval-queue context), real SMTP delivery, leave-approval affects payroll automatically only via unpaid types (paid-leave balance enforcement could warn on over-allocation), employee directory print/PDF polish, WhatsApp/SMS announcements.
 - Prod demo data state: Tanvir EMP005 has a realistic unpaid-leave record + LOP-deducted Sept payslip (good demo); Sajid leave rejected / Arif expense approved during QA are consistent states.
+---
+Task ID: QA-FINAL-6
+Agent: orchestrator (main, cron webDevReview round 6)
+Task: Status assessment + agent-browser QA sweep + new features (Document sign-off from notifications, Leave balance awareness chips) + audit filter styling fix.
+
+Work Log (status assessment first):
+- Read worklog; QA-FINAL-5 state confirmed live (commit 94d81fd). Local sqlite provider active, dev server healthy at round start.
+- QA sweep: agent-browser across all 19 nav modules at 1280px; measured table overflow (all remaining overflows have sticky right action columns from round 5 — by design), checked error text on every page (only false positives: "Finance" contains "nan", "FAILED EMAILS" is a KPI label). No runtime errors; dark mode fine. Phase judged STABLE → chose new-feature focus per round mandate.
+
+QA finding fixed (styling):
+1. Audit Log date-range inputs were squeezed to 75px inside a 1/5 grid cell — clipped "mm/dd/" text. Filter grid changed lg:grid-cols-5 → lg:grid-cols-6 with date range spanning 2 cols and flex-1 min-w-0 inputs + aria-labels. Post-fix: 138px per input, full "mm/dd/yyyy" visible, nothing clipped (verified by measurement + screenshot).
+
+Feature 1: Document Review & Sign-off dialog from Notification Center:
+- DOCUMENT_PENDING_APPROVAL rows now actionable: "Review & sign" (FileSignature icon) opens a compact sign-off dialog instead of instant action (documents carry sign-off weight). Dialog shows document number / type (human label map incl. PAYSLIP, NOC, OFFER_LETTER...) / employee + optional 140-char approval note; "Approve & sign" → POST /api/documents/{id}/approve; "Send back to draft" → POST /api/documents/{id}/reject (PENDING_APPROVAL → GENERATED per workflow). Success → toast, notification marked read, invalidates notifications/documents/document-pending-approval/dashboard queries (feed regenerates from DB, row disappears).
+- Reject button label per-type: "Send back" for documents vs "Reject" for leave/expense.
+- E2E verified in browser: pushed payslip BH/PAYSLIP/202609/0002 to PENDING_APPROVAL via API, opened dialog, filled note "QA round: verified payslip figures", approved → toast "Document ... approved & signed", row gone from feed, API confirms status APPROVED, audit log shows DOCUMENT_STATUS_CHANGE entries.
+
+Feature 2: Leave balance awareness chips on leave approval notifications:
+- NotificationRow fetches GET /api/leave/balances?employeeId=… (react-query, staleTime 60s, key ["leave-balances", employeeId], enabled only for LEAVE_PENDING rows) and matches the request's leaveType name.
+- Chip under each pending leave row: emerald "N/M d left" (remaining/allocated) or amber "⚠ Over by X d" when remaining < 0 (remaining = allocated − used − all pending incl. this request, so negative = approving over-allocates the pool). Tooltip spells out allocated/used/pending breakdown.
+- Over-allocation ALSO tints the Approve button amber with an "override" tooltip — HR sees the conflict before clicking; approval still allowed (policy: warn, don't block).
+- decideLeave now invalidates ["leave-balances"] so chips update immediately after any decision.
+- E2E verified: seeded an 8-day Casual Leave request for Arif Hossain (10 allocated, 0 used, 13 pending → remaining −3): both his pending rows showed amber "Over by 3 d"; then rejected the test request via the notification Reject flow with note — toast "Leave rejected for Arif Hossain.", row gone, chips back to emerald "5/10 d left". Math hand-verified.
+
+Verification:
+- bun run lint: 0 errors, 0 warnings.
+- Browser E2E: all flows above verified light + dark; notification center verified at 390px mobile (sheet fits, chips + 44px touch targets render correctly).
+- Dev server note (ENVIRONMENT, not code): this sandbox OOM-kills / reaps the dev server between tool calls (next-server RSS ~1.6-2GB; cgroup memory.events oom_kill=3; dmesg shows "Out of memory: Killed process (next-server)"). Restarting is fast with warm .next cache. All verification was batched into single tool calls (restart → wait-ready → test → screenshot). Next agent: expect "server dead between calls", just restart with `setsid nohup ./node_modules/.bin/next dev -p 3000 </dev/null >dev.log 2>&1 &` in /home/z/bh-hr.
+- DB workflow honored: schema flipped to postgresql before push; .env and db/custom.db NOT committed; sqlite restored after push.
+
+Stage Summary:
+- Notification center is now a full decision hub: leave, expense, AND document approvals resolved without leaving the feed — documents with explicit review context, leaves with entitlement visibility.
+- Over-allocation is surfaced at decision time (chip + amber override button), reducing payroll/balance surprises; server remains authoritative.
+- Audit filter usability fixed (date inputs fully visible at 1280px).
+- Remaining recommendations: leave-balance hard-block option behind a Setting (currently warn-only); real SMTP delivery; employee directory print/PDF polish; WhatsApp/SMS announcements; consider regenerating Tanvir's Sept payslip after approved unpaid-leave changes (LOP math from round 5 unaffected).

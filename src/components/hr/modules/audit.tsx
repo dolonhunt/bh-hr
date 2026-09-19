@@ -137,7 +137,7 @@ export function AuditModule() {
       />
 
       {/* Filters */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-3">
         <div className="relative lg:col-span-2">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
           <Input
@@ -193,7 +193,7 @@ export function AuditModule() {
             <SelectItem value="EmailLog">Email Log</SelectItem>
           </SelectContent>
         </Select>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 lg:col-span-2">
           <Input
             type="date"
             value={from}
@@ -201,9 +201,10 @@ export function AuditModule() {
               setFrom(e.target.value);
               setPage(1);
             }}
-            className="text-xs"
+            className="text-xs min-w-0 flex-1"
+            aria-label="From date"
           />
-          <span className="text-muted-foreground text-xs">→</span>
+          <span className="text-muted-foreground text-xs flex-shrink-0">→</span>
           <Input
             type="date"
             value={to}
@@ -211,7 +212,8 @@ export function AuditModule() {
               setTo(e.target.value);
               setPage(1);
             }}
-            className="text-xs"
+            className="text-xs min-w-0 flex-1"
+            aria-label="To date"
           />
         </div>
       </div>

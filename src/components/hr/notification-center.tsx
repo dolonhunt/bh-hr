@@ -45,6 +45,7 @@ import {
 } from "@/components/ui/dialog";
 import { cn, relativeTime } from "@/lib/utils";
 import { useApp, type ModuleKey } from "@/lib/store";
+import { FileSignature, TriangleAlert } from "lucide-react";
 
 // ----- Types -----
 
@@ -83,6 +84,19 @@ interface NotificationResponse {
 
 interface PreferencesResponse {
   types: Record<NotificationType, boolean>;
+}
+
+interface LeaveBalanceItem {
+  employeeId: string;
+  leaveTypeName: string;
+  allocated: number;
+  used: number;
+  pending: number;
+  remaining: number;
+}
+
+interface LeaveBalancesResponse {
+  items: LeaveBalanceItem[];
 }
 
 // ----- Static type metadata -----
@@ -187,6 +201,9 @@ export function NotificationCenter({
     null
   );
   const [rejectNote, setRejectNote] = useState("");
+  // Document sign-off dialog (documents need explicit review context).
+  const [docTarget, setDocTarget] = useState<NotificationItem | null>(null);
+  const [docNote, setDocNote] = useState("");
 
   // ----- Fetch notifications -----
   const queryKey = useMemo(
@@ -285,6 +302,7 @@ export function NotificationCenter({
       await qc.invalidateQueries({ queryKey: ["notifications"] });
       qc.invalidateQueries({ queryKey: ["leave"] });
       qc.invalidateQueries({ queryKey: ["leave-calendar"] });
+      qc.invalidateQueries({ queryKey: ["leave-balances"] });
       qc.invalidateQueries({ queryKey: ["dashboard"] });
     } catch (e: any) {
       toast.error(e?.message || "Action failed");
@@ -327,9 +345,50 @@ export function NotificationCenter({
     }
   }
 
+  async function decideDocument(
+    n: NotificationItem,
+    action: "APPROVED" | "REJECTED",
+    note?: string
+  ) {
+    const documentId = n.metadata?.documentId as string | undefined;
+    if (!documentId) return;
+    setActingId(n.id);
+    try {
+      const r = await fetch(`/api/documents/${documentId}/${action === "APPROVED" ? "approve" : "reject"}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ note: note || undefined }),
+      });
+      if (!r.ok) {
+        const err = await r.json().catch(() => ({}));
+        throw new Error(err.error || "Failed to update document");
+      }
+      toast.success(
+        action === "APPROVED"
+          ? `Document ${n.metadata?.documentNumber ?? ""} approved & signed.`.trim()
+          : `Document ${n.metadata?.documentNumber ?? ""} sent back to draft.`.trim()
+      );
+      await markNotificationRead(n);
+      await qc.invalidateQueries({ queryKey: ["notifications"] });
+      qc.invalidateQueries({ queryKey: ["documents"] });
+      qc.invalidateQueries({ queryKey: ["document-pending-approval"] });
+      qc.invalidateQueries({ queryKey: ["dashboard"] });
+    } catch (e: any) {
+      toast.error(e?.message || "Action failed");
+    } finally {
+      setActingId(null);
+    }
+  }
+
   function quickApprove(n: NotificationItem) {
     if (n.type === "LEAVE_PENDING") void decideLeave(n, "APPROVED");
     else if (n.type === "EXPENSE_PENDING") void decideExpense(n, "approve");
+    else if (n.type === "DOCUMENT_PENDING_APPROVAL") {
+      // Documents carry sign-off weight — open a review dialog instead of
+      // acting instantly.
+      setDocNote("");
+      setDocTarget(n);
+    }
   }
 
   function beginReject(n: NotificationItem) {
@@ -353,6 +412,7 @@ export function NotificationCenter({
     if (actingId && actingId !== n.id) return false; // one decision at a time
     if (n.type === "LEAVE_PENDING") return !!n.metadata?.leaveRequestId;
     if (n.type === "EXPENSE_PENDING") return !!n.metadata?.expenseId;
+    if (n.type === "DOCUMENT_PENDING_APPROVAL") return !!n.metadata?.documentId;
     return false;
   }
 
@@ -511,6 +571,30 @@ export function NotificationCenter({
       </Sheet>
 
       <PreferencesDialog open={prefsOpen} onOpenChange={setPrefsOpen} />
+
+      {/* Document review & sign-off dialog */}
+      <DocumentReviewDialog
+        target={docTarget}
+        note={docNote}
+        onNoteChange={setDocNote}
+        acting={!!actingId && docTarget?.id === actingId}
+        onApprove={() => {
+          if (docTarget) void decideDocument(docTarget, "APPROVED", docNote);
+          setDocTarget(null);
+          setDocNote("");
+        }}
+        onReject={() => {
+          if (docTarget) void decideDocument(docTarget, "REJECTED", docNote);
+          setDocTarget(null);
+          setDocNote("");
+        }}
+        onOpenChange={(v) => {
+          if (!v) {
+            setDocTarget(null);
+            setDocNote("");
+          }
+        }}
+      />
     </>
   );
 }
@@ -550,6 +634,30 @@ function NotificationRow({
   const Icon = meta.icon;
   const sev = SEVERITY_STYLE[n.severity] ?? SEVERITY_STYLE.info;
   const showActions = canDecide && !rejecting;
+
+  // ----- Leave balance awareness (approver sees entitlement vs request) -----
+  const isLeave = n.type === "LEAVE_PENDING";
+  const leaveEmployeeId = n.metadata?.employeeId as string | undefined;
+  const balancesQuery = useQuery({
+    queryKey: ["leave-balances", leaveEmployeeId],
+    queryFn: async () => {
+      const r = await fetch(
+        `/api/leave/balances?employeeId=${leaveEmployeeId}`
+      );
+      if (!r.ok) throw new Error("Failed to load leave balances");
+      return r.json() as Promise<LeaveBalancesResponse>;
+    },
+    enabled: isLeave && !!leaveEmployeeId,
+    staleTime: 60_000,
+  });
+  const balanceRow = isLeave
+    ? balancesQuery.data?.items?.find(
+        (b) => b.leaveTypeName === (n.metadata?.leaveType as string | undefined)
+      )
+    : undefined;
+  // `remaining` = allocated − used − all pending (incl. this request), so a
+  // negative value means approving (any pending) over-allocates the pool.
+  const overAllocated = isLeave && !!balanceRow && balanceRow.remaining < 0;
 
   return (
     <motion.li
@@ -646,6 +754,36 @@ function NotificationRow({
             </span>
           </div>
 
+          {/* Leave balance awareness chip — projected entitlement so the
+              approver spots over-allocation at a glance. */}
+          {isLeave && balanceRow && (
+            <div
+              className={cn(
+                "inline-flex items-center gap-1 mt-2 px-1.5 py-0.5 rounded-full text-[10px] font-medium",
+                overAllocated
+                  ? "bg-amber-500/15 text-amber-700 dark:text-amber-300"
+                  : "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
+              )}
+              title={
+                overAllocated
+                  ? `Allocated ${balanceRow.allocated} d · used ${balanceRow.used} d · approving over-allocates by ${Math.abs(balanceRow.remaining)} d`
+                  : `Allocated ${balanceRow.allocated} d · used ${balanceRow.used} d · ${balanceRow.pending} d pending`
+              }
+            >
+              {overAllocated ? (
+                <>
+                  <TriangleAlert className="size-3" />
+                  Over by {Math.abs(balanceRow.remaining)} d
+                </>
+              ) : (
+                <>
+                  <CalendarClock className="size-3" />
+                  {balanceRow.remaining}/{balanceRow.allocated} d left
+                </>
+              )}
+            </div>
+          )}
+
           {/* Quick decision actions */}
           {showActions && (
             <div
@@ -655,13 +793,27 @@ function NotificationRow({
             >
               <Button
                 size="sm"
-                className="h-7 px-2.5 text-xs gap-1 cursor-pointer"
+                className={cn(
+                  "h-7 px-2.5 text-xs gap-1 cursor-pointer",
+                  overAllocated &&
+                    "bg-amber-600 hover:bg-amber-700 text-white focus-visible:ring-amber-600/40"
+                )}
                 onClick={onApprove}
                 disabled={acting}
-                title="Approve without leaving the feed"
+                title={
+                  n.type === "DOCUMENT_PENDING_APPROVAL"
+                    ? "Open review & sign-off dialog"
+                    : overAllocated
+                      ? "Requested days exceed remaining balance — approve as override"
+                      : "Approve without leaving the feed"
+                }
               >
-                <Check className="size-3.5" />
-                Approve
+                {n.type === "DOCUMENT_PENDING_APPROVAL" ? (
+                  <FileSignature className="size-3.5" />
+                ) : (
+                  <Check className="size-3.5" />
+                )}
+                {n.type === "DOCUMENT_PENDING_APPROVAL" ? "Review & sign" : "Approve"}
               </Button>
               <Button
                 size="sm"
@@ -672,7 +824,7 @@ function NotificationRow({
                 title="Reject with an optional note"
               >
                 <X className="size-3.5" />
-                Reject
+                {n.type === "DOCUMENT_PENDING_APPROVAL" ? "Send back" : "Reject"}
               </Button>
             </div>
           )}
@@ -960,6 +1112,123 @@ function PreferencesDialog({
             ) : (
               "Save preferences"
             )}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ----- Document Review & Sign-off Dialog -----
+
+const DOC_TYPE_LABELS: Record<string, string> = {
+  PAYSLIP: "Payslip",
+  EMPLOYMENT_CERTIFICATE: "Employment Certificate",
+  EXPERIENCE_LETTER: "Experience Letter",
+  OFFER_LETTER: "Offer Letter",
+  APPOINTMENT_LETTER: "Appointment Letter",
+  CONTRACT: "Contract",
+  WARNING_LETTER: "Warning Letter",
+  TERMINATION_LETTER: "Termination Letter",
+  NOC: "No Objection Certificate",
+  OTHER: "Other",
+};
+
+function DocumentReviewDialog({
+  target,
+  note,
+  onNoteChange,
+  acting,
+  onApprove,
+  onReject,
+  onOpenChange,
+}: {
+  target: NotificationItem | null;
+  note: string;
+  onNoteChange: (v: string) => void;
+  acting: boolean;
+  onApprove: () => void;
+  onReject: () => void;
+  onOpenChange: (v: boolean) => void;
+}) {
+  const meta = target?.metadata;
+  const docNumber = (meta?.documentNumber as string) ?? "—";
+  const docType = (meta?.type as string) ?? "";
+  const employeeName = (meta?.employeeName as string) ?? "—";
+
+  return (
+    <Dialog open={!!target} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <span className="size-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center flex-shrink-0">
+              <FileSignature className="size-4" />
+            </span>
+            Review &amp; sign document
+          </DialogTitle>
+          <DialogDescription>
+            Approving applies your HR sign-off and moves the document to
+            Approved. Rejecting sends it back to draft.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-2.5">
+          <dl className="rounded-lg border border-border bg-muted/30 divide-y divide-border/60 text-sm overflow-hidden">
+            <div className="flex items-center justify-between gap-3 px-3 py-2">
+              <dt className="text-xs text-muted-foreground">Document</dt>
+              <dd className="font-medium font-mono text-xs">{docNumber}</dd>
+            </div>
+            <div className="flex items-center justify-between gap-3 px-3 py-2">
+              <dt className="text-xs text-muted-foreground">Type</dt>
+              <dd className="font-medium">
+                {DOC_TYPE_LABELS[docType] ?? docType.replace(/_/g, " ")}
+              </dd>
+            </div>
+            <div className="flex items-center justify-between gap-3 px-3 py-2">
+              <dt className="text-xs text-muted-foreground">Employee</dt>
+              <dd className="font-medium">{employeeName}</dd>
+            </div>
+          </dl>
+
+          <div>
+            <label
+              htmlFor="doc-review-note"
+              className="text-xs font-medium text-muted-foreground"
+            >
+              Approval note (optional)
+            </label>
+            <input
+              id="doc-review-note"
+              value={note}
+              onChange={(e) => onNoteChange(e.target.value)}
+              maxLength={140}
+              placeholder="e.g. Verified against contract terms"
+              className="mt-1 w-full h-9 rounded-md border border-border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring/50 placeholder:text-muted-foreground/80"
+            />
+          </div>
+        </div>
+
+        <DialogFooter className="gap-2">
+          <Button
+            variant="outline"
+            className="text-rose-700 border-rose-500/30 hover:bg-rose-500/10 cursor-pointer"
+            onClick={onReject}
+            disabled={acting}
+          >
+            {acting ? (
+              <Loader2 className="size-4 mr-1.5 animate-spin" />
+            ) : (
+              <X className="size-4 mr-1.5" />
+            )}
+            Send back to draft
+          </Button>
+          <Button onClick={onApprove} disabled={acting}>
+            {acting ? (
+              <Loader2 className="size-4 mr-1.5 animate-spin" />
+            ) : (
+              <FileSignature className="size-4 mr-1.5" />
+            )}
+            Approve &amp; sign
           </Button>
         </DialogFooter>
       </DialogContent>
