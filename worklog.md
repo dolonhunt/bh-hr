@@ -2656,3 +2656,37 @@ Stage Summary:
 - Email delivery is now production-ready: an admin enters SMTP credentials in Settings (or sets SMTP_* env vars on Vercel) and every document email — single, bulk, payslip — goes out with the real PDF attached; failures are visible (Failed badge + real server error) instead of silently "sent".
 - Demo/sandbox behavior unchanged when no credentials exist (simulated + clearly labelled).
 - Next-round recommendations: nodemailer pooled transport + rate limiting for large bulk sends; email open/click tracking (DELIVERED/BOUNCED webhooks where provider supports); employee directory print/PDF polish; WhatsApp/SMS announcements; consider queueing emails (QUEUED status exists) with retry for resilience on Vercel timeouts.
+---
+Task ID: QA-FINAL-9
+Agent: orchestrator (main, cron webDevReview round 9)
+Task: Status assessment + agent-browser QA sweep + new features (bulk payslip email for a month, announcement email blast) built on round 8's SMTP foundation.
+
+Work Log (status assessment first):
+- Read worklog; QA-FINAL-8 state confirmed live (commit 90f73eb). sqlite restored, dev server healthy, prod deployed.
+- QA sweep: all 19 modules render at 1280px with correct viewport set first (round 8's viewport lesson applied); zero console/runtime errors; no new bugs found. Phase judged STABLE → new-feature focus.
+
+Feature 1: Bulk payslip email for a month:
+- NEW src/lib/payslip-email.ts — extracted the shared payslip-email pipeline from the single-send route into sendPayslipEmail({employeeId, month, to?, cc?, bcc?, subject?, body?, createPayrollIfMissing, writeActivity}): ensures payroll row, computes advanced breakdown, renders payslip PDF, resolves recipient/subject/body, delivers via SMTP (PDF attached) or simulated fallback, persists EmailLog + AuditLog (Activity optional so batch doesn't flood the feed).
+- POST /api/payroll/email-payslip rewritten as a thin wrapper over the helper (behavior unchanged, verified).
+- NEW POST /api/payroll/email-payslips-batch {month, employeeIds?}: emails every payroll row for the month (skips employees without an address — reported as skippedNoEmail), sequential sends with 250ms pause when SMTP live (serverless-friendly), per-employee results collected (batch continues on error), audit PAYSLIP_BATCH_EMAILED with totals.
+- NEW payroll-email-batch-dialog.tsx: month picker (defaults to the module's active month filter), live "Simulated/Live SMTP" badge from shared settings cache, scrollable preview of recipients (avatar, email, net pay, status), progress button "Send N emails", results view "Logged (simulated)/Delivered: N" with per-employee ok/error rows; invalidates email-logs on close.
+- Payroll header: new "Email Payslips" button (Mail icon) between Batch Create and Create Payroll.
+- Fixed during E2E: preview AvatarBadge showed "?" — mapped wrong field (employeeName vs employee.fullName).
+- E2E verified: Sep 2026 → 18 employees previewed → send → "Logged (simulated): 18", 18 EmailLogs + audit "Batch payslip email for 2026-09: 18 simulated, 0 failed."
+
+Feature 2: Announcement email blast:
+- NEW POST /api/announcements/[id]/email-blast: emails the announcement to ACTIVE employees with an address on file (DEPARTMENT-audience announcements respect their department; body may override departmentId); URGENT announcements get "[URGENT]" prefix + red dot in HTML heading; per-recipient EmailLog (auditable in Email History); audit ANNOUNCEMENT_EMAIL_BLAST; SMTP live or simulated.
+- announcements.tsx: new Mail icon action on every card (hover actions, before Pin) with audience-aware title/aria; "Email Announcement" dialog shows audience summary + honest "one email per recipient" notice + Send now → results summary ("Delivered/Logged (simulated): N of M") + failure list with error tooltips.
+- E2E verified: "Office closed — Eid holidays" (company-wide) → "Logged (simulated): 20 of 20 recipient(s)", 20 EmailLogs + audit entry.
+- Email History tab renders the new volume cleanly (40 total; avatars, teal Sent badges, sticky Actions).
+
+Verification:
+- bun run lint: 0 errors, 0 warnings (run twice). dev.log clean.
+- Browser E2E: both flows verified at 1280px dark mode; email history pagination/filtering holds with 40 records.
+- DB workflow honored: postgresql provider before push (diff empty), .env/db not committed, sqlite restored after push.
+
+Stage Summary:
+- Prod: commit 7714ef4 pushed (90f73eb..7714ef4), deployed; marker ("Email Payslips"/"payslips-batch") found in served chunk /_next/static/chunks/7266afdffce506bc.js on bh-hr.vercel.app; site 200.
+- The HR workflow is now closed-loop: create payroll → generate payslips → email all with PDFs → announcement blasts — all real-delivery-capable, all fully logged/audited, all demo-safe in simulated mode.
+- Demo data note: local DB now has 40 email logs (18 batch + 20 blast + 2 single/test) — makes Email History look genuinely used; harmless on prod (prod starts empty until user runs a blast).
+- Next-round recommendations: email open/click tracking; pooled SMTP transport for very large blasts; scheduled reports (monthly email of headcount/attendance PDF); employee directory print/PDF polish; WhatsApp/SMS channel.
