@@ -2485,3 +2485,53 @@ QA-FINAL-4 prod verification (final):
 - Local git clean; sqlite provider active; .env untracked.
 
 Round complete. Next-round recommendations: leave-approval one-click actions from notification center; payroll holiday-aware working-day proration; real SMTP delivery; employee directory print/PDF polish.
+---
+Task ID: QA-FINAL-5
+Agent: orchestrator (main, cron webDevReview round 5)
+Task: Status assessment + agent-browser QA sweep + new features (Notification Action Hub, Payroll LOP proration) + table overflow UX fixes.
+
+Work Log (status assessment first):
+- Read worklog; QA-FINAL-4 state confirmed live (commit c19f684). Git clean except expected local-only files. Dev server healthy after `bash scripts/local-dev-db.sh sqlite`.
+- QA sweep: agent-browser across all 19 nav modules at 1280px + automated table-overflow measurement (scrollWidth vs containerWidth per module).
+
+QA findings this round:
+1. [MEASURED] 8 modules had tables wider than the 930px content area at 1280px viewport (last column hidden behind horizontal scroll): Employees 1083, Leave 1081, Payroll 1120, Documents 1042, Expenses 1203, Timesheets 1123, Assets 1194, Audit Log 1756px. Worst offender: Audit Log "Description" column rendered at 939px (no max-width); Expenses/Timesheets/Assets actions columns 231-261px (md/xl-visible text labels).
+
+Fixes (styling details):
+- NEW utility `.table-sticky-right` (globals.css): pins the LAST table column (Actions/IP/Status) with `position: sticky; right: 0`, solid bg via `var(--card)`, row-hover consistency via `color-mix`, and a soft left-edge shadow as scroll affordance. thead cell gets z-20 + muted tint to layer above the sticky header row.
+- Applied to all 8 overflow tables (employees, leave, payroll, documents, expenses, timesheets, assets, audit).
+- Audit Log: Description capped `max-w-[360px]` + truncate + title tooltip (1756 -> 1201px; IP address now always visible via sticky col).
+- Expenses: description `max-w-[180px] 2xl:max-w-[280px]`; action labels (Submit/Approve/Reject/Reimburse) `hidden 2xl:inline` + native `title` tooltips on icon-only buttons (1203 -> 963px, Actions always reachable).
+- Timesheets: Task column capped (250 -> 240 max); action labels 2xl-only (1123 -> 978px).
+- Assets: table action labels xl -> 2xl (1194 -> 1065px).
+- Post-fix measurement: no table clips its actionable column; all have pinned last column.
+
+Feature 1: Notification Action Hub (one-click decisions from the feed):
+- NEW notification type EXPENSE_PENDING (lib union + ALL_NOTIFICATION_TYPES + DEFAULT_PREFERENCES true + TYPE_META Receipt icon "Expense approvals"). Generator surfaces PENDING expense Activity rows (meta JSON parsed in JS, same pattern as TASK_OVERDUE; cap 50; warning severity; link ?module=expenses; metadata {expenseId, employeeId, employeeName, amount, currency, expenseType, expenseDescription}).
+- notification-center.tsx: inline Approve/Reject buttons on LEAVE_PENDING + EXPENSE_PENDING rows (rendered when metadata carries leaveRequestId/expenseId). Approve -> one call (PATCH /api/leave/{id} {status, approverId:"hr-user"} or POST /api/expenses/{id}/approve|reject) -> toast -> mark notification read -> invalidate notifications + module queries (leave, leave-calendar, expenses, dashboard) -> notification disappears (feed regenerates from DB). Reject -> inline expanding note input (placeholder-aware, maxLength 140) + Confirm/Cancel. Single-decision lock (actingId) + row disabled state while acting. stopPropagation on action areas so row navigation isn't triggered; buttons keyboard accessible.
+- Verified end-to-end in browser: expense approval (Arif Hossain BDT 1,250) -> toast -> notification removed -> Expenses module shows "approved" + KPI pending 4->3, approved amount 16,700->17,950; leave rejection with note (Sajid Hossain) -> toast -> Leave module shows "rejected" + approver note persisted. Dark mode + 390px mobile verified for the new UI.
+
+Feature 2: Payroll LOP (loss-of-pay) proration — holiday/weekend-aware unpaid-leave deduction:
+- NEW src/lib/lop.ts: computeLop(employeeId, month) — month bounds from "YYYY-MM"; working days exclude Fri/Sat (BD weekend, WEEKEND_DAYS=[5,6]) + Holiday table dates; counts APPROVED leave days whose LeaveType.paid === false overlapping the month (weekends/holidays inside a span not counted); perDayRate = basic / workingDaysInMonth (round2); suggestedDeduction = perDayRate * lopDays; returns contributions breakdown (request id, type name, daysInMonth, dates, reason). lopNoteSuffix() builds "LOP: N unpaid working day(s) deducted (৳X)".
+- NEW GET /api/payroll/unpaid-leave?employeeId&month — preview endpoint (auto-protected by src/proxy.ts matcher).
+- applyLop wired into all three creation paths, SERVER-COMPUTED (client value never trusted), only at creation time (existing records never silently mutated): POST /api/payroll (adds to deductions + appends note + echoes {lop} in response + activity description mentions LOP), POST /api/payroll/batch-create ({applyLop} per employee; returns lopApplied/lopTotal; audit log metadata + description extended), POST /api/payroll/generate-payslip (only when it creates the Payroll record; echoes {lop}).
+- payslip-dialog.tsx: auto-query preview when employee+month selected; amber info card "Unpaid leave: N working day(s) in YYYY-MM — X working days · per-day rate ৳R · deduction ৳D" with "Apply LOP" checkbox (default on, auto-hidden when 0 days); "No unpaid leave this month" neutral state; passes applyLop: applyLop && lopDays > 0.
+- payroll-batch-dialog.tsx: "Auto-deduct unpaid leave (LOP)" checkbox in month step + success toast reports "LOP applied on N record(s) (৳total)".
+- Verified end-to-end in browser: seeded approved unpaid leave Sep 7-11 2026 (Fri 11 excluded by BD weekend) for EMP005 (basic 49,000): GET preview -> {workingDaysInMonth: 22, lopDays: 4, perDayRate: 2227.27, suggestedDeduction: 8909.08} (math hand-verified); UI payslip dialog rendered the amber card + checkbox; Generate Payslip -> payroll deductions 1470+8909.08=10,379.08, net 53,320.92, note "LOP: 4 unpaid working days deducted (৳8,909)"; generated payslip document content contains the LOP-inclusive deduction. Batch-create smoke: created 2 Oct-2026 records lopApplied=0 (no unpaid leave) then deleted test rows.
+
+Bugs fixed this round:
+- [REGRESSION CAUGHT BY QA] notifications.ts: initial EXPENSE_PENDING edit had destructure order misaligned with Promise.all order (expense query inserted 2nd but destructured last) -> recentAnnouncements received GeneratedDocument rows -> `a.body.length` TypeError 500 on /api/notifications + full app notification failures. Fixed by moving the expense query to the END of Promise.all to match destructure order. Verified 200 with 14 items after fix.
+- Dev server had died (port 3000 not listening at round start after edits); restarted `bun run dev` in background.
+
+Verification:
+- bun run lint: 0 errors, 0 warnings (run twice: after features and before push).
+- Dev log: no new errors after fix (remaining error lines are pre-fix history).
+- DB workflow honored: schema flipped to postgresql before push; .env and db/custom.db NOT committed (unstaged); sqlite restored after push. Prod provider confirmed postgresql (schema diff empty vs HEAD).
+- Prod verification (bh-hr.vercel.app, commit 04b814e deployed): login 200 (hr@beyondheadlines.io); /api/notifications returns EXPENSE_PENDING:4 + LEAVE_PENDING:3 + PAYROLL_PENDING:4 (new type live); /api/payroll/unpaid-leave returns valid computation on prod data (22 working days, perDayRate correct, lopDays 0).
+
+Stage Summary:
+- Notification center is now an action hub: leave + expense approvals resolved without leaving the feed (documents approval remains deep-link — its approval flow needs sign-off context; candidate for next round).
+- Payroll is holiday/weekend-aware: unpaid leave now automatically prorates pay across single create, payslip generation, and batch creation with transparent preview + opt-out + audit trail.
+- Table UX: 8 wide tables keep their action columns reachable at 1280px without horizontal scrolling.
+- Remaining recommendations: one-click document approval from notifications (approval-queue context), real SMTP delivery, leave-approval affects payroll automatically only via unpaid types (paid-leave balance enforcement could warn on over-allocation), employee directory print/PDF polish, WhatsApp/SMS announcements.
+- Prod demo data state: Tanvir EMP005 has a realistic unpaid-leave record + LOP-deducted Sept payslip (good demo); Sajid leave rejected / Arif expense approved during QA are consistent states.
