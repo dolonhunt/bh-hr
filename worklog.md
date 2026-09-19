@@ -2570,3 +2570,52 @@ Stage Summary:
 - Over-allocation is surfaced at decision time (chip + amber override button), reducing payroll/balance surprises; server remains authoritative.
 - Audit filter usability fixed (date inputs fully visible at 1280px).
 - Remaining recommendations: leave-balance hard-block option behind a Setting (currently warn-only); real SMTP delivery; employee directory print/PDF polish; WhatsApp/SMS announcements; consider regenerating Tanvir's Sept payslip after approved unpaid-leave changes (LOP math from round 5 unaffected).
+
+QA-FINAL-6 prod verification (final):
+- Commit f42dc8b pushed (94d81fd..f42dc8b) and deployed to Vercel. New-feature marker found in served chunk /_next/static/chunks/bbb4cb87d6d6c018.js — build confirmed live.
+- Browser check on prod (bh-hr.vercel.app): login 200 → notification center renders leave balance chips on prod data ("6/10 d left", "4/7 d left", "18/20 d left", no over-allocation — consistent state), expense approvals with inline Approve/Reject working, 11 total notifications. No PENDING_APPROVAL docs on prod right now, so "Review & sign" rows absent by design (feature code verified in chunk).
+- Local git clean; sqlite provider active; .env and db/custom.db untracked.
+
+Round complete. Next-round recommendations: leave-balance hard-block option behind a Setting (currently warn-only); real SMTP delivery; employee directory print/PDF polish; WhatsApp/SMS announcements.
+---
+Task ID: QA-FINAL-7
+Agent: orchestrator (main, cron webDevReview round 7)
+Task: Status assessment + agent-browser QA sweep + new features (deep-linkable navigation, leave over-allocation hard-block, weekend-aware dashboard) + QA data cleanup.
+
+Work Log (status assessment first):
+- Read worklog; QA-FINAL-6 state confirmed live (commit f42dc8b). Local sqlite restored, dev server healthy, prod deployed.
+- QA sweep: all 19 sidebar modules render at 1280px; zero console errors, zero runtime errors, no clipped tables (sticky columns from round 5 hold); dark mode clean. Dev log clean (one stale EADDRINUSE from duplicate auto-start, harmless).
+- Findings: (1) Dashboard "PRESENT TODAY 0 / 0%" on Sat Sept 19 (BD weekend) with zero context — looked broken; (2) "Test QA Employee" EMP021 polluting the employee directory from earlier QA rounds; (3) module navigation is store-only — pasting/bookmarking URLs lands on Dashboard, no browser back/forward (notification ?module= links only worked because NC parses them at click time); (4) leave over-allocation remains warn-only (recommended in rounds 5+6).
+- Phase judged STABLE → new-feature focus per round mandate.
+
+Feature 1: Deep-linkable navigation (app-shell.tsx useUrlSync):
+- On first AppShell mount, consumes ?module= & ?employee= & ?tab= (documents tab) from the URL → openEmployee/setModule/setDocumentsTab, then history.replaceState normalizes the URL.
+- Every subsequent navigation pushState's the equivalent URL (?module=payroll, ?module=employees&employee=<cuid>, ?module=documents&tab=approval-queue) — browser Back/Forward now navigate modules (popstate consumes params).
+- Bookmarks/paste/reload keep your place; notification links unchanged (they already parse URLs; now ALSO history-correct).
+- E2E verified: reload persisted state → URL normalized to ?module=payroll; open ?module=leave → Leave Management; sidebar click → ?module=employees pushed; Back → ?module=leave renders Leave Management; ?module=documents&tab=approval-queue → Approval Queue tab selected; ?module=employees&employee=<EMP005 cuid> → Tanvir profile.
+
+Feature 2: Leave over-allocation hard-block (server-enforced, opt-in):
+- PATCH /api/leave/[id]: when approving AND Setting KV leaveApprovalHardBlock === "true", computes committed = APPROVED + PENDING (other) + this request's days vs LeaveType.defaultDays; if over → 409 { error with full math (allocated/used/pending/over-by), code: OVER_ALLOCATION }.
+- Settings → Leave Types: new "Leave policy" card (ShieldCheck icon) at top — Switch toggles the setting via PATCH /api/settings; chip shows "ENFORCED" (teal) vs "WARN ONLY" (amber); description explains both modes. Default remains warn-only (no behavior change for existing users).
+- Notification center: rows fetch shared ["settings"] cache (single network fetch across all rows); over-allocated Approve button tooltip now says "approval will be blocked (see Settings → Leave Types)" when enforced; balance chip tooltip appends "· approval will be blocked". Both leave.tsx and NC approve flows already surface server err.error in toasts — blocked approvals show the full math message.
+- E2E verified: seeded test leave (Arif Casual +8d, 5 pending + 8 = 13 > 10 allocated) → chip "Over by 3 d" on both his rows; toggle ON → toast + ENFORCED chip; Approve → error toast "Blocked: approving this Casual Leave request exceeds Casual Leave balance by 3 day(s) (allocated 10, used 0, pending 13)..." and row stays in feed; toggle OFF → WARN ONLY restored; test row deleted. (Math hand-verified.)
+
+Feature 3: Weekend-aware dashboard (Fri/Sat BD weekend):
+- Hero banner: amber "🌙 Weekend · office closed" chip next to the date; subtitle appends "· office reopens Sunday."; attendance ring shows "– WEEKEND" instead of a meaningless "0% PRESENT" (with explanatory tooltip); KPI "Present Today" drops the misleading "+5% · wk" delta and shows "Weekly off — Fri & Sat" footer instead.
+- isWeekendDay threaded: DashboardModule → DashboardGrid → WidgetRenderer (all 3 explicit call sites) → HeroBannerWidget/KpiRowWidget. Regression caught during verify: initially only the two interface definitions got the prop → runtime "isWeekendDay is not defined" on KpiRowWidget; fixed by adding to all call sites. WidgetRendererProps spread paths (chart/list groups) also covered.
+
+Cleanup:
+- Deleted QA leftover "Test QA Employee" EMP021 (+3 activity rows +1 generated document; attendance/payroll/leave were 0); audit log entry EMPLOYEE_DELETE recorded. Dashboard total now 20.
+
+Verification:
+- bun run lint: 0 errors, 0 warnings.
+- Browser: weekend dashboard verified dark + 390px mobile (chip wraps under date, ring + KPI footer fit); all modules re-swept; fresh console clean; dev log clean.
+- ENVIRONMENT note (recurring): dev server dies between tool calls (OOM); old server also served stale Turbopack chunks after edits — fix: pkill next + restart, verify in same bash call. Batch verification into single calls.
+- DB workflow honored: schema flipped to postgresql before push (diff vs HEAD empty — provider already postgresql at HEAD), .env and db/custom.db not committed; sqlite restored after push.
+
+Stage Summary:
+- Prod verification: commit 98675d2 pushed (f42dc8b..98675d2), deployed; feature marker ("leaveApprovalHardBlock"/"office reopens Sunday") found in served chunk /_next/static/chunks/399e4144bdf5939f.js on bh-hr.vercel.app; site 200; API auth-gating intact.
+- Navigation is now fully addressable: every module/tab/profile has a shareable URL with working back/forward.
+- Leave policy is configurable: warn-only (default) or hard server-side block, with transparent math in the rejection.
+- Dashboard no longer looks broken on weekends; demo data is clean (no QA artifacts).
+- Next-round recommendations: real SMTP delivery (send-email still simulated); employee directory print/PDF polish; WhatsApp/SMS announcements; consider holiday-aware present-today ring label on working days with zero seed data; document approval from Leave module side (parity with NC sign-off dialog).
