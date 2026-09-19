@@ -53,8 +53,9 @@ import {
   ChevronRight,
   List as ListIcon,
   Scale,
+  Loader2,
 } from "lucide-react";
-import { formatDate, relativeTime, cn } from "@/lib/utils";
+import { formatDate, relativeTime, cn, downloadBlob } from "@/lib/utils";
 import { toast } from "sonner";
 import {
   Dialog,
@@ -103,6 +104,7 @@ export function LeaveModule() {
   >(null);
   const [decisionNote, setDecisionNote] = useState("");
   const [deciding, setDeciding] = useState(false);
+  const [balancesPdfLoading, setBalancesPdfLoading] = useState(false);
 
   // Calendar state
   const [calMonth, setCalMonth] = useState(() => {
@@ -254,6 +256,37 @@ export function LeaveModule() {
         icon={<CalendarDays className="size-5" />}
         actions={
           <>
+            <Button
+              size="sm"
+              variant="outline"
+              className="cursor-pointer"
+              disabled={balancesPdfLoading}
+              onClick={async () => {
+                setBalancesPdfLoading(true);
+                try {
+                  const r = await fetch("/api/leave/balances-pdf");
+                  if (!r.ok) throw new Error("Failed to generate PDF");
+                  downloadBlob(
+                    await r.blob(),
+                    `leave-balances-${new Date().toISOString().split("T")[0]}.pdf`
+                  );
+                  toast.success("Leave balances PDF downloaded.");
+                } catch (e: any) {
+                  toast.error(e?.message || "Failed to generate PDF");
+                } finally {
+                  setBalancesPdfLoading(false);
+                }
+              }}
+              aria-label="Download leave balances PDF"
+            >
+              {balancesPdfLoading ? (
+                <Loader2 className="size-4 mr-1.5 animate-spin" />
+              ) : (
+                <Scale className="size-4 mr-1.5" />
+              )}
+              <span className="hidden sm:inline">Balances PDF</span>
+              <span className="sm:hidden">PDF</span>
+            </Button>
             <ExportButton
               module="leave"
               filters={{

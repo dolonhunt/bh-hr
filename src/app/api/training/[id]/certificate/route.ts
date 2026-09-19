@@ -75,14 +75,14 @@ interface CertificateData {
 
 // ---- Color palette (emerald primary, no indigo/blue) ----
 const C = {
-  primary: "10b981", // emerald-500
-  primaryDark: "047857", // emerald-700
-  primaryLight: "a7f3d0", // emerald-200
-  gold: "b8860b", // dark goldenrod — for "seal" ring
-  goldLight: "f5d76e",
-  text: "1f2937", // gray-800
-  textMuted: "6b7280", // gray-500
-  border: "d1d5db", // gray-300
+  primary: "#10b981", // emerald-500
+  primaryDark: "#047857", // emerald-700
+  primaryLight: "#a7f3d0", // emerald-200
+  gold: "#b8860b", // dark goldenrod — for "seal" ring
+  goldLight: "#f5d76e",
+  text: "#1f2937", // gray-800
+  textMuted: "#6b7280", // gray-500
+  border: "#d1d5db", // gray-300
 };
 
 function fmtDate(d: Date | string | null | undefined): string {
@@ -308,7 +308,7 @@ async function buildCertificatePdf(data: CertificateData): Promise<Buffer> {
             ? C.primaryDark
             : data.score >= 50
               ? C.gold
-              : "b91c1c";
+              : "#b91c1c";
         doc
           .font("Helvetica-Bold")
           .fontSize(13)

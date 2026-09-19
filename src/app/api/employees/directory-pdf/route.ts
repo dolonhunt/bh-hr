@@ -51,14 +51,14 @@ function fmtDate(d: Date | null | undefined): string {
 
 // ---- Color helpers (hex without #) ----
 const C = {
-  primary: "10b981", // emerald-500
-  primaryDark: "047857", // emerald-700
-  text: "1f2937", // gray-800
-  textMuted: "6b7280", // gray-500
-  border: "d1d5db", // gray-300
-  borderLight: "e5e7eb", // gray-200
-  headerBg: "f3f4f6", // gray-100
-  rowAlt: "f9fafb", // gray-50
+  primary: "#10b981", // emerald-500
+  primaryDark: "#047857", // emerald-700
+  text: "#1f2937", // gray-800
+  textMuted: "#6b7280", // gray-500
+  border: "#d1d5db", // gray-300
+  borderLight: "#e5e7eb", // gray-200
+  headerBg: "#f3f4f6", // gray-100
+  rowAlt: "#f9fafb", // gray-50
 };
 
 // =============================================================
@@ -80,7 +80,9 @@ async function buildDirectoryPdf(
     try {
       const doc = new PDFDocument({
         size: "A4",
-        margins: { top: 56, bottom: 64, left: 48, right: 48 },
+        // bottom margin small enough that footer text at pageHeight-30 fits
+        // above page.maxY() — otherwise pdfkit adds a blank page per footer.
+        margins: { top: 56, bottom: 16, left: 48, right: 48 },
         bufferPages: true, // required for switchToPage() to reach earlier pages
         info: {
           Title: "Employee Directory",
@@ -248,14 +250,14 @@ async function buildDirectoryPdf(
         doc
           .font("Helvetica-Bold")
           .fontSize(16)
-          .fillColor("ffffff")
+          .fillColor("#ffffff")
           .text(section.name, margin + 12, headerY + 9, {
             width: contentWidth - 24,
           });
         doc
           .font("Helvetica")
           .fontSize(9)
-          .fillColor("ffffff")
+          .fillColor("#ffffff")
           .opacity(0.85)
           .text(
             `${section.employees.length} employee${section.employees.length === 1 ? "" : "s"}`,
@@ -334,7 +336,7 @@ async function buildDirectoryPdf(
             doc
               .font("Helvetica-Bold")
               .fontSize(10)
-              .fillColor("ffffff")
+              .fillColor("#ffffff")
               .text(continuedLabel, margin + 10, topY - 24, {
                 width: contentWidth - 20,
               });
@@ -429,7 +431,7 @@ async function buildDirectoryPdf(
           doc
             .font("Helvetica-Bold")
             .fontSize(7)
-            .fillColor("ffffff")
+            .fillColor("#ffffff")
             .text(initials, x, rowY + rowHeight / 2 - 4, {
               width: scaledCols.photo,
               align: "center",

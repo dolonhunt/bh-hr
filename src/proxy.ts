@@ -4,6 +4,9 @@ import { NextRequest, NextResponse } from "next/server";
 const PUBLIC_API_ROUTES = [
   "/api/auth/login",
   "/api/setup",
+  // Cron endpoints authenticate via "Authorization: Bearer $CRON_SECRET"
+  // inside the route handler (Vercel Cron cannot send session cookies).
+  "/api/cron",
 ];
 
 export default function proxy(req: NextRequest) {

@@ -78,6 +78,10 @@ import {
   CopyCheck,
   Type,
   Loader2,
+  Megaphone,
+  FileSpreadsheet,
+  FlaskConical,
+  Settings2,
 } from "lucide-react";
 import { formatDate, relativeTime, cn } from "@/lib/utils";
 import { printDocument } from "@/lib/print";
@@ -874,28 +878,80 @@ function EmailHistoryTab() {
                 {logs.map((log: any) => (
                   <TableRow key={log.id}>
                     <TableCell>
-                      <div className="font-mono text-[11px]">
-                        {log.document?.documentNumber ?? "—"}
-                      </div>
-                      <div className="text-[11px] text-muted-foreground truncate max-w-[160px]">
-                        {log.document?.title ?? "—"}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <AvatarBadge
-                          name={log.employee?.fullName}
-                          size="sm"
-                        />
-                        <div className="min-w-0">
-                          <div className="text-xs font-medium truncate max-w-[140px]">
-                            {log.employee?.fullName ?? "—"}
-                          </div>
-                          <div className="text-[10px] text-muted-foreground">
-                            {log.employee?.employeeId ?? ""}
+                      {log.document ? (
+                        <div className="font-mono text-[11px]">
+                          {log.document?.documentNumber ?? "—"}
+                          <div className="text-[11px] text-muted-foreground truncate max-w-[160px] font-sans">
+                            {log.document?.title ?? "—"}
                           </div>
                         </div>
-                      </div>
+                      ) : (
+                        (() => {
+                          // No linked document → classify the email so the
+                          // column reads meaningfully (announcement blasts,
+                          // payslip sends, test emails, generic notices).
+                          const subject = String(log.subject ?? "").toLowerCase();
+                          const attach = String(log.attachmentName ?? "").toLowerCase();
+                          const isPayslip =
+                            attach.includes("payslip") || subject.includes("payslip");
+                          const isTest =
+                            subject.startsWith("test") || subject.includes("test email");
+                          const isAnnouncement = Boolean(log.employeeId) && !isPayslip;
+                          if (isPayslip) {
+                            return (
+                              <span className="inline-flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide px-1.5 py-1 rounded-md bg-primary/10 text-primary cursor-default">
+                                <FileSpreadsheet className="size-3" /> Payslip
+                              </span>
+                            );
+                          }
+                          if (isAnnouncement) {
+                            return (
+                              <span className="inline-flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide px-1.5 py-1 rounded-md bg-amber-500/10 text-amber-700 dark:text-amber-400 cursor-default">
+                                <Megaphone className="size-3" /> Announcement
+                              </span>
+                            );
+                          }
+                          if (isTest) {
+                            return (
+                              <span className="inline-flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide px-1.5 py-1 rounded-md bg-muted text-muted-foreground cursor-default">
+                                <FlaskConical className="size-3" /> Test email
+                              </span>
+                            );
+                          }
+                          return (
+                            <span className="inline-flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide px-1.5 py-1 rounded-md bg-muted text-muted-foreground cursor-default">
+                              <Mail className="size-3" /> Notice
+                            </span>
+                          );
+                        })()
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {log.employee ? (
+                        <div className="flex items-center gap-2">
+                          <AvatarBadge
+                            name={log.employee?.fullName}
+                            size="sm"
+                          />
+                          <div className="min-w-0">
+                            <div className="text-xs font-medium truncate max-w-[140px]">
+                              {log.employee?.fullName}
+                            </div>
+                            <div className="text-[10px] text-muted-foreground">
+                              {log.employee?.employeeId ?? ""}
+                            </div>
+                          </div>
+                        </div>
+                      ) : (
+                        // Employee-less sends (report runs, test emails) are
+                        // system-generated — label them instead of an empty avatar.
+                        <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+                          <span className="size-6 rounded-full bg-muted flex items-center justify-center flex-shrink-0">
+                            <Settings2 className="size-3 text-muted-foreground" />
+                          </span>
+                          System
+                        </span>
+                      )}
                     </TableCell>
                     <TableCell className="text-xs">
                       <StatusBadge status={log.status} />

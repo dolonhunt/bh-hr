@@ -77,8 +77,10 @@ function fmtDate(d: Date | string | null | undefined): string {
 }
 
 function fmtMoney(n: number | null | undefined): string {
+  // "BDT " instead of "৳": pdfkit's Helvetica (WinAnsi) cannot encode the
+  // taka sign — it renders as garbage in generated PDFs.
   if (n === null || n === undefined || isNaN(n)) return "—";
-  return `৳${new Intl.NumberFormat("en-US", {
+  return `BDT ${new Intl.NumberFormat("en-US", {
     minimumFractionDigits: 0,
     maximumFractionDigits: 0,
   }).format(n)}`;

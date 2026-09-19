@@ -30,19 +30,19 @@ import {
 
 // ---- Color palette (emerald primary, no indigo/blue) ----
 const C = {
-  primary: "10b981", // emerald-500
-  primaryDark: "047857", // emerald-700
-  primaryLight: "a7f3d0", // emerald-200
-  primaryBg: "ecfdf5", // emerald-50
-  text: "1f2937", // gray-800
-  textMuted: "6b7280", // gray-500
-  textSubtle: "9ca3af", // gray-400
-  border: "d1d5db", // gray-300
-  borderLight: "e5e7eb", // gray-200
-  rowAlt: "f9fafb", // gray-50
-  rose: "be123c", // rose-700
-  roseLight: "fff1f2", // rose-50
-  amber: "92400e", // amber-800
+  primary: "#10b981", // emerald-500
+  primaryDark: "#047857", // emerald-700
+  primaryLight: "#a7f3d0", // emerald-200
+  primaryBg: "#ecfdf5", // emerald-50
+  text: "#1f2937", // gray-800
+  textMuted: "#6b7280", // gray-500
+  textSubtle: "#9ca3af", // gray-400
+  border: "#d1d5db", // gray-300
+  borderLight: "#e5e7eb", // gray-200
+  rowAlt: "#f9fafb", // gray-50
+  rose: "#be123c", // rose-700
+  roseLight: "#fff1f2", // rose-50
+  amber: "#92400e", // amber-800
 };
 
 export function fmtDate(d: Date | string | null | undefined): string {
@@ -57,8 +57,10 @@ export function fmtDate(d: Date | string | null | undefined): string {
 }
 
 export function fmtMoney(n: number | null | undefined): string {
-  if (n === null || n === undefined || isNaN(n)) return "৳0";
-  return `৳${new Intl.NumberFormat("en-US", {
+  // "৳" (U+09F3) is not in Helvetica's WinAnsi encoding — pdfkit renders it
+  // as garbage glyphs. Use the ASCII "BDT" prefix instead.
+  if (n === null || n === undefined || isNaN(n)) return "BDT 0";
+  return `BDT ${new Intl.NumberFormat("en-US", {
     minimumFractionDigits: 0,
     maximumFractionDigits: 0,
   }).format(n)}`;

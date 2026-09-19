@@ -57,6 +57,7 @@ import {
   Briefcase,
   Award,
   CalendarDays,
+  CalendarClock,
   Mail,
   Hash,
   Plus,
@@ -88,6 +89,7 @@ import { StatusBadge } from "../shared/status-badge";
 import { EmptyState } from "../shared/empty-state";
 import { EmailTemplateEditor } from "./email-template-editor";
 import { HolidaysTab } from "./settings-holidays-tab";
+import { AutomationTab } from "./settings-automation-tab";
 
 const TABS = [
   { key: "organization", label: "Organization", icon: Building2 },
@@ -96,6 +98,7 @@ const TABS = [
   { key: "designations", label: "Designations", icon: Award },
   { key: "leave-types", label: "Leave Types", icon: CalendarDays },
   { key: "holidays", label: "Holidays", icon: Sun },
+  { key: "automation", label: "Automation", icon: CalendarClock },
   { key: "email", label: "Email Settings", icon: Mail },
   { key: "email-templates", label: "Email Templates", icon: FileText },
   { key: "numbering", label: "Document Numbering", icon: Hash },
@@ -148,6 +151,7 @@ export function SettingsModule() {
           {tab === "designations" && <DesignationsTab />}
           {tab === "leave-types" && <LeaveTypesTab />}
           {tab === "email" && <EmailSettingsTab />}
+          {tab === "automation" && <AutomationTab />}
           {tab === "email-templates" && <EmailTemplatesTab />}
           {tab === "numbering" && <DocumentNumberingTab />}
           {tab === "backup" && <DataBackupTab />}
