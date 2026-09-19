@@ -2734,3 +2734,49 @@ Stage Summary:
 - Prod notes: to activate real scheduled sending on Vercel: set CRON_SECRET env + SMTP credentials (Settings → Email Settings or SMTP_* envs); enable in Settings → Automation (Settings are DB rows, NOT committed — prod Supabase starts with the automation OFF and no recipients; enable + add recipients there after configuring SMTP).
 - The single biggest win: every PDF the system produces (payslips, certificates, directory, balances, summaries) is now visually correct — payslips were blank below the header in production since the payslip PDF was introduced, and nobody could see it from status/size checks alone.
 - Next-round recommendations: email open/click tracking (needs provider webhooks); pooled SMTP transport for large blasts; WhatsApp/SMS announcement channel (simulated provider); holiday-aware present-today ring label on working days with zero seed data; consider front-running the Vercel cron schedule to daily granularity with an internal day-of-month guard if Hobby plan blocks monthly crons.
+---
+Task ID: QA-FINAL-11
+Agent: orchestrator (main, cron webDevReview round 11)
+Task: Status assessment + agent-browser QA sweep + new feature (SMS/WhatsApp announcement channel with simulated gateway + real HTTP provider support) + cron hardening (daily schedule + day-of-month guard) + holiday-aware dashboard polish.
+
+Work Log (status assessment first):
+- Read worklog; QA-FINAL-10 state confirmed live (commit 8044d27 + worklog commits + .env housekeeping 7778af7/1c3b226). sqlite restored, dev server restarted (recurring OOM death between rounds), prod deployed.
+- QA sweep: all 19 modules navigated at 1280px, zero console/runtime errors. Dashboard weekend state verified live (today = Saturday 19 Sep 2026). Phase judged STABLE → new-feature focus.
+
+Feature: SMS/WhatsApp announcement channel (round-9/10 recommendation closed):
+- Prisma: NEW MessageLog model (channel SMS|WHATSAPP, employeeId/announcementId/sentById relations, recipientTo, body, status QUEUED|SENT|FAILED, errorMessage) + reverse relations on Employee ("MessageEmployee"), Announcement ("MessageAnnouncement"), User ("MessageSender"). db:push on sqlite.
+- NEW src/lib/sms.ts: getSmsConfig() resolves Setting KV "smsGatewayConfig" (JSON {endpoint, apiKey, senderId}) with SMS_ENDPOINT/SMS_API_KEY/SMS_SENDER_ID env fallback; null when unconfigured (endpoint is the minimum bar — endpoint-without-key would be a doomed session, mirrors mailer's incomplete-auth honesty). sendMessageViaGateway() POSTs JSON {to, from, message, channel} with Bearer key, 15s abort timeout, any 2xx = accepted, non-2xx body (300 chars) surfaces as the error. normalizeBdPhone() maps "+880 1710…" / "01…" / "880…" → +8801XXXXXXXXX (all 20 seed employees normalize cleanly); formatBdPhone() pretty-prints.
+- NEW POST /api/announcements/[id]/sms-blast {channel?, departmentId?}: same audience logic as email-blast (ALL or DEPARTMENT, override wins), but keyed on normalized phones; employees without a usable number are excluded and reported as noPhone (transparent); URGENT → "[URGENT] " prefix; SMS bodies capped ~480 chars (WhatsApp full text); footer "— {company} HR"; per-recipient MessageLog (SENT/FAILED + gateway note/error) + audit ANNOUNCEMENT_SMS_BLAST with totals + mode. 200ms pause between live sends.
+- NEW GET /api/message-logs (pagination, status/channel/announcementId/employeeId/search filters, includes employee+announcement+sentBy).
+- Export: "message-logs" added to /api/export (CSV/Excel) with Channel/Employee/Recipient/Announcement/Status/Sent At/Sent By columns; ExportButton wired in the new tab.
+- NEW POST /api/settings/test-sms {to, channel}: BD normalization, simulated when unconfigured, real send otherwise; live failures → MessageLog FAILED + audit SMS_TEST_FAILED + 502 with exact error. GET/PATCH /api/settings now return smsMode {mode, source, senderId} alongside emailMode (shared ["settings"] cache drives UI badges).
+- announcements.tsx: the email-blast dialog is now a multi-channel "Send Announcement" dialog — segmented channel picker (Email | SMS | WhatsApp; active = bg-accent text-accent-foreground per design law), channel-aware copy (phone/email on file, Messages/Email History destination, SMS cap note, +880 normalization note), per-channel Live/Simulated chip from smsMode/emailMode, MessageSquare hover action on every card (preselects SMS; Mail preselects EMAIL); results panel shows Delivered/Logged (simulated) + failures + "N employee(s) had no usable phone number"; toasts mode- and channel-aware; invalidates ["message-logs"] or ["email-logs"].
+- documents.tsx: NEW "Messages" tab (grid 2→6 cols) — MessageHistoryTab with search (phone/body), channel filter (All/SMS/WhatsApp), status filter, export; table: CHANNEL chip (teal SMS w/ Smartphone icon, emerald WHATSAPP w/ MessageSquare), EMPLOYEE (avatar or System label), STATUS (Failed rows show truncated rose error w/ tooltip), RECIPIENT (mono phone), MESSAGE (line-clamp-3, full text on hover) with amber ANNOUNCEMENT chip + title beneath, SENT BY, SENT AT.
+- settings.tsx + NEW settings-messaging-tab.tsx: "SMS & WhatsApp" tab (MessageSquare icon, placed after Email Settings) — gateway card (endpoint URL w/ format validation, API key with eye toggle, Sender ID, Save → smsGatewayConfig KV; empty endpoint = stay simulated), delivery-mode banner (teal "Live gateway mode — via Settings/env · sender …" vs amber "Simulated mode — no SMS gateway configured" with honest explanation), test-message card (SMS/WhatsApp segmented toggle + phone input + Send test), "Everything is audited" note pointing at Documents → Messages.
+
+Cron hardening (Vercel Hobby risk closed):
+- vercel.json: "0 6 1 * *" → "0 6 * * *" (daily). Hobby plans only allow daily granularity — previously the monthly expression risked deploy rejection.
+- /api/cron/monthly-report: internal day-of-month guard — answers {skipped:true, reason:"not the 1st of the month … use ?force=1 to override"} on any day ≠ 1; ?force=1 bypasses (still bearer-checked when CRON_SECRET set). E2E: Sep 19 without force → skipped; with force → full run (August 2026 report, 2 simulated emails via previously saved recipients).
+
+Dashboard holiday awareness:
+- DashboardModule fetches /api/holidays?year=<current> (non-blocking, staleTime 10min) and computes todayHoliday (name|null); hooks declared BEFORE early returns (Rules of Hooks — first attempt placed them after the loading return and was restructured).
+- Hero: holiday chip (teal, PartyPopper, "Holiday · {name}") takes precedence over the weekend chip; subtitle "· office closed for {name}."; ring center "–" with label HOLIDAY and tooltip "Public holiday — {name}. Attendance resumes next working day."; KPI Present Today footer shows "Holiday — {name}".
+- Working days with zero check-ins: Present Today footer "No check-ins recorded yet" (amber, honest) instead of a fake +5% delta.
+- E2E: temporary "QA Test Holiday" row for today flipped all four surfaces instantly (screenshot verified), then row deleted — weekend chip/ring/KPI restored.
+
+Other fixes/polish:
+- app-shell useUrlSync: "message-history" added to the ?tab= whitelist (deep link ?module=documents&tab=message-history now lands on the tab; verified).
+- Email-channel regression after the dialog refactor: email blast re-run E2E (Logged (simulated), 20 recipients) — runBlast() routes EMAIL→email-blast, SMS/WHATSAPP→sms-blast.
+
+Verification:
+- bun run lint: 0 errors, 0 warnings. Console clean across all touched modules (desktop + 390px).
+- E2E at 1280px dark mode: Settings → SMS & WhatsApp full flow (config save → LIVE GATEWAY banner w/ sender readout → test send against an unresolvable endpoint → MessageLog FAILED "fetch failed" + audit SMS_TEST_FAILED → config cleared via API → simulated banner restored); announcements WhatsApp blast "Office closed — Eid holidays" → "Logged (simulated): 20 of 20"; Documents → Messages tab renders all 22 logs with chips/System/announcement tags; CSV export returns proper headers+rows; deep link selects the tab; dashboard holiday + weekend + cron force flows all verified.
+- Mobile 390px: Messages tab (2-col tabs, stacked filters, horizontally scrollable table), SMS & WhatsApp tab (banner wraps, fields stack), both clean.
+- DB demo state after E2E: 66 email logs, 22 message logs (20 WHATSAPP blast + 1 simulated WhatsApp test + 1 FAILED real-gateway test), 1 ANNOUNCEMENT_SMS_BLAST audit — makes the new history tabs look genuinely used; harmless on prod.
+- DB workflow honored: provider flipped to postgresql before commit (verified line 9), db/custom.db NOT staged, no .env; sqlite to be restored after push.
+
+Stage Summary:
+- Prod: commit 39a4ff6 pushed (1c3b226..39a4ff6), deployed — verify with served-chunk marker check ("sms-blast"/"SMS & WhatsApp") and /api/cron/monthly-report answering the new day-of-month skip JSON.
+- The announcement module is now a full omni-channel broadcaster: Email (SMTP), SMS, and WhatsApp — all three audited per-recipient, all three demo-safe in simulated mode, all three production-capable the moment credentials are added (SMTP in Settings → Email Settings; SMS gateway in Settings → SMS & WhatsApp with the generic JSON contract, or SMS_* envs).
+- The monthly report cron can no longer fail on Vercel Hobby plan scheduling.
+- Next-round recommendations: pooled/rate-limited gateway client for large blasts + queued retry (MessageLog QUEUED status exists); SMS/WhatsApp for payslip-ready and leave-approval notifications (reuse the same pipeline beyond announcements); employee phone editing UX (bulk import has phone column already); email open/click tracking still needs provider webhooks; employee directory print/PDF polish remains open.
