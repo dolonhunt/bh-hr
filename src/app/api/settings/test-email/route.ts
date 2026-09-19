@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
+import { getSmtpConfig, sendViaSmtp, textToEmailHtml } from "@/lib/mailer";
 
 export async function POST(req: NextRequest) {
   const body = await req.json();
@@ -21,38 +22,70 @@ export async function POST(req: NextRequest) {
       ? body.body
       : "This is a test email from BH HR system. SMTP is configured correctly.";
 
-  // Simulate sending a test email by creating an EmailLog entry
+  // Real SMTP when configured; simulated fallback otherwise.
+  const smtp = await getSmtpConfig();
+  let status: "SENT" | "FAILED" = "SENT";
+  let note: string;
+
+  if (smtp) {
+    const result = await sendViaSmtp(smtp, {
+      to,
+      subject,
+      text: emailBody,
+      html: textToEmailHtml(emailBody, {
+        heading: "BH HR — SMTP Test",
+        footer: `Delivery test · ${smtp.source === "db" ? "Settings config" : "Environment config"}`,
+      }),
+    });
+    if (result.delivered) {
+      note = `Delivered via SMTP (${smtp.host}:${smtp.port})${result.messageId ? ` · id ${result.messageId}` : ""}`;
+    } else {
+      status = "FAILED";
+      note = result.error ?? "SMTP delivery failed";
+    }
+  } else {
+    note = "Simulated send (no SMTP configured — add credentials in Settings → Email Settings, or set SMTP_* environment variables).";
+  }
+
   const log = await db.emailLog.create({
     data: {
       recipientTo: to,
       subject,
       body: emailBody,
-      status: "SENT",
-      errorMessage: null,
+      status,
+      errorMessage: status === "SENT" ? null : note,
       sentAt: new Date(),
     },
   });
 
-  // Add a note via metadata using a separate audit log entry
   await db.auditLog.create({
     data: {
       action: "EMAIL_TEST",
       entityType: "EmailLog",
       entityId: log.id,
-      description: `Test email simulated to ${to}`,
+      description: status === "SENT" ? `Test email to ${to} (${smtp ? "SMTP" : "simulated"})` : `Test email FAILED for ${to}: ${note}`,
       metadata: JSON.stringify({
-        note: "Test email simulated",
+        note,
         to,
         subjectLength: subject.length,
         bodyLength: emailBody.length,
+        mode: smtp ? "smtp" : "simulated",
       }),
     },
   });
 
+  if (status === "FAILED") {
+    return NextResponse.json(
+      { ok: false, error: note, logId: log.id, mode: "smtp" },
+      { status: 502 }
+    );
+  }
+
   return NextResponse.json({
     ok: true,
-    message: "Test email simulated",
+    message: smtp ? "Test email delivered via SMTP" : "Test email simulated",
     logId: log.id,
-    note: "Test email simulated",
+    note,
+    mode: smtp ? "smtp" : "simulated",
   });
 }

@@ -99,6 +99,16 @@ export function EmailPayslipDialog({
     ? companyData[0]
     : companyData;
 
+  // Delivery mode — shared ["settings"] cache (single fetch app-wide).
+  const { data: settingsData } = useQuery({
+    queryKey: ["settings"],
+    queryFn: () => fetch("/api/settings").then((r) => r.json()),
+    enabled: open,
+    staleTime: 120_000,
+  });
+  const smtpMode = settingsData?.emailMode?.mode ?? "simulated";
+  const smtpHost = settingsData?.emailMode?.host as string | undefined;
+
   // Reset state when the dialog closes.
   useEffect(() => {
     if (!open) {
@@ -195,7 +205,11 @@ export function EmailPayslipDialog({
         throw new Error(err.error || "Failed to send email");
       }
       const data = await r.json();
-      toast.success(`Payslip emailed to ${employeeName}`);
+      toast.success(
+        data?.mode === "smtp"
+          ? `Payslip emailed to ${employeeName} (PDF attached).`
+          : `Payslip email logged for ${employeeName} (simulated — no SMTP configured).`
+      );
       onSent?.();
       onOpenChange(false);
     } catch (err: any) {
@@ -327,9 +341,26 @@ export function EmailPayslipDialog({
           <div className="rounded-md bg-muted/30 p-2.5 text-[11px] text-muted-foreground flex items-start gap-2">
             <RefreshCw className="size-3 flex-shrink-0 mt-0.5" />
             <span>
-              The send is simulated in this sandbox (no SMTP configured) but
-              every send is recorded in the Email Log and Audit Log with the
-              PDF attachment reference.
+              {smtpMode === "smtp" ? (
+                <>
+                  <span className="font-medium text-foreground">Live SMTP mode</span>
+                  {smtpHost ? (
+                    <> — this email is delivered for real via{" "}
+                      <span className="font-mono">{smtpHost}</span> with the payslip PDF
+                      attached.
+                    </>
+                  ) : (
+                    " — this email is delivered for real with the payslip PDF attached."
+                  )}
+                </>
+              ) : (
+                <>
+                  <span className="font-medium text-foreground">Simulated mode</span> — no
+                  SMTP is configured yet, so the send is recorded (Email Log + Audit Log
+                  with PDF attachment reference) but not delivered. Configure credentials in
+                  Settings → Email Settings to enable real delivery.
+                </>
+              )}
             </span>
           </div>
         </div>

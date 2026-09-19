@@ -862,11 +862,11 @@ function EmailHistoryTab() {
                 <TableRow className="bg-muted/40 hover:bg-muted/40">
                   <TableHead className="min-w-[180px]">Document</TableHead>
                   <TableHead>Employee</TableHead>
+                  <TableHead>Status</TableHead>
                   <TableHead>Recipient</TableHead>
                   <TableHead className="min-w-[200px]">Subject</TableHead>
                   <TableHead>Sent By</TableHead>
                   <TableHead>Sent At</TableHead>
-                  <TableHead>Status</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -897,6 +897,17 @@ function EmailHistoryTab() {
                         </div>
                       </div>
                     </TableCell>
+                    <TableCell className="text-xs">
+                      <StatusBadge status={log.status} />
+                      {log.status === "FAILED" && log.errorMessage ? (
+                        <div
+                          className="text-[10px] text-rose-600 dark:text-rose-400 max-w-[180px] truncate mt-1 cursor-help"
+                          title={log.errorMessage}
+                        >
+                          {log.errorMessage}
+                        </div>
+                      ) : null}
+                    </TableCell>
                     <TableCell className="text-xs">{log.recipientTo}</TableCell>
                     <TableCell>
                       <div className="text-xs truncate max-w-[220px]">
@@ -908,9 +919,6 @@ function EmailHistoryTab() {
                     </TableCell>
                     <TableCell className="text-xs">
                       {log.sentAt ? formatDate(log.sentAt, "datetime") : "—"}
-                    </TableCell>
-                    <TableCell>
-                      <StatusBadge status={log.status} />
                     </TableCell>
                     <TableCell className="text-right">
                       {["SENT", "FAILED", "QUEUED"].includes(log.status) && (

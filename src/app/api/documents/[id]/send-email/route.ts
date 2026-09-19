@@ -1,10 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
+import { renderPdfBuffer } from "@/lib/document-renderers";
+import { getSmtpConfig, sendViaSmtp, textToEmailHtml } from "@/lib/mailer";
+
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 // POST /api/documents/[id]/send-email
 // Body: { to, cc?, bcc?, subject, body }
 // Recipient validation: must match employee's official email OR be an explicit
 // HR override (in which case we log the override).
+//
+// Delivery: when SMTP is configured (Settings → Email Settings, or SMTP_*
+// environment variables) the message is delivered for real — with the
+// document's PDF attached. Otherwise the send is simulated and the EmailLog
+// records a "Simulated send" note so the UI can explain itself.
 export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -31,7 +41,7 @@ export async function POST(
   // Recipient validation.
   const officialEmail = doc.employee?.officialEmail ?? "";
   const recipientLower = String(to).toLowerCase().trim();
-  const isOfficial = officialEmail.toLowerCase() === recipientLower;
+  const isOfficial = officialEmail === recipientLower;
   const overrideNote =
     !isOfficial && officialEmail
       ? `Recipient overridden by HR from ${officialEmail} to ${to}.`
@@ -47,8 +57,64 @@ export async function POST(
     ? `${emailBody}\n\n[Internal note: ${overrideNote}]`
     : emailBody;
 
-  // Simulate sending. We don't have real SMTP credentials in this sandbox, so
-  // mark as SENT but include a note in errorMessage explaining the simulation.
+  // ----- Real SMTP delivery (with PDF attachment), or simulated fallback -----
+  const smtp = await getSmtpConfig();
+  let attachmentName: string | null = null;
+  let delivered = false;
+  let deliveryError: string | null = null;
+  let messageId: string | undefined;
+
+  if (smtp) {
+    // Render the same PDF the download endpoint serves, so the recipient
+    // gets the authoritative document.
+    try {
+      const { buffer } = await renderPdfBuffer({
+        title: doc.title,
+        html: doc.content,
+      });
+      attachmentName = `${(doc.documentNumber || doc.title || "document").replace(/[^a-zA-Z0-9-_]/g, "_")}.pdf`;
+      const result = await sendViaSmtp(smtp, {
+        to,
+        cc,
+        bcc,
+        subject,
+        text: finalBody,
+        html: textToEmailHtml(finalBody, {
+          heading: doc.template?.name ?? doc.title ?? "HR Document",
+          footer: `Sent via BH HR · Beyond Headlines${overrideNote ? " · Internal recipient note applies" : ""}`,
+        }),
+        attachments: [
+          {
+            filename: attachmentName,
+            content: Buffer.from(buffer),
+            contentType: "application/pdf",
+          },
+        ],
+      });
+      delivered = result.delivered;
+      deliveryError = result.error ?? null;
+      messageId = result.messageId;
+    } catch (e: unknown) {
+      // PDF rendering failure should not lose the email entirely — send
+      // without the attachment instead.
+      const result = await sendViaSmtp(smtp, {
+        to,
+        cc,
+        bcc,
+        subject,
+        text: finalBody,
+        html: textToEmailHtml(finalBody, {
+          heading: doc.template?.name ?? doc.title ?? "HR Document",
+          footer: "Sent via BH HR · Beyond Headlines",
+        }),
+      });
+      delivered = result.delivered;
+      deliveryError = result.error ?? (e instanceof Error ? `PDF attach failed: ${e.message}` : "PDF attach failed");
+      messageId = result.messageId;
+      if (delivered) attachmentName = null;
+    }
+  }
+
   const log = await db.emailLog.create({
     data: {
       documentId: doc.id,
@@ -58,34 +124,50 @@ export async function POST(
       recipientBcc: bcc ?? null,
       subject,
       body: finalBody,
-      attachmentName: `${doc.documentNumber}.pdf`,
-      status: "SENT",
-      errorMessage: overrideNote
-        ? `Simulated send. ${overrideNote}`
-        : "Simulated send (no SMTP configured).",
+      attachmentName,
+      status: smtp && !delivered ? "FAILED" : "SENT",
+      errorMessage: smtp
+        ? delivered
+          ? overrideNote
+            ? `Delivered via SMTP (${smtp.fromEmail})${messageId ? ` · id ${messageId}` : ""}. ${overrideNote}`
+            : null
+          : deliveryError
+        : overrideNote
+          ? `Simulated send. ${overrideNote}`
+          : "Simulated send (no SMTP configured — add credentials in Settings → Email Settings).",
       sentById: user?.id ?? null,
       sentAt: new Date(),
     },
   });
 
-  // Update the document status to SENT.
-  await db.generatedDocument.update({
-    where: { id: doc.id },
-    data: { status: "SENT" },
-  });
+  // Only flip the document to SENT when the email actually went out
+  // (delivered via SMTP, or simulated in the no-SMTP demo mode).
+  const shouldMarkSent = !smtp || delivered;
+  if (shouldMarkSent) {
+    await db.generatedDocument.update({
+      where: { id: doc.id },
+      data: { status: "SENT" },
+    });
+  }
 
   // Activity + audit logs.
   await db.activity.create({
     data: {
       employeeId: doc.employeeId,
-      type: "EMAIL_SENT",
-      title: `Document emailed: ${doc.template?.name ?? doc.title}`,
-      description: `${doc.documentNumber} sent to ${to}.`,
+      type: shouldMarkSent ? "EMAIL_SENT" : "EMAIL_FAILED",
+      title: shouldMarkSent
+        ? `Document emailed: ${doc.template?.name ?? doc.title}`
+        : `Email failed: ${doc.template?.name ?? doc.title}`,
+      description: shouldMarkSent
+        ? `${doc.documentNumber} sent to ${to}${smtp ? " via SMTP" : " (simulated)"}.`
+        : `${doc.documentNumber} could not be delivered to ${to}: ${deliveryError ?? "unknown error"}.`,
       metadata: JSON.stringify({
         documentId: doc.id,
         emailLogId: log.id,
         recipient: to,
         override: !!overrideNote,
+        mode: smtp ? "smtp" : "simulated",
+        delivered,
       }),
     },
   });
@@ -93,14 +175,31 @@ export async function POST(
   await db.auditLog.create({
     data: {
       userId: user?.id,
-      action: "DOCUMENT_SEND",
+      action: shouldMarkSent ? "DOCUMENT_SEND" : "EMAIL_FAILED",
       entityType: "GeneratedDocument",
       entityId: doc.id,
-      description: `Sent document ${doc.documentNumber} to ${to}${
-        overrideNote ? ` (override: ${overrideNote})` : ""
-      }`,
+      description: shouldMarkSent
+        ? `Sent document ${doc.documentNumber} to ${to} (${smtp ? "SMTP" : "simulated"})${
+            overrideNote ? ` (override: ${overrideNote})` : ""
+          }`
+        : `Failed to send ${doc.documentNumber} to ${to}: ${deliveryError ?? "unknown error"}`,
     },
   });
 
-  return NextResponse.json({ ok: true, log }, { status: 201 });
+  if (smtp && !delivered) {
+    return NextResponse.json(
+      {
+        error: `SMTP delivery failed: ${deliveryError ?? "unknown error"}`,
+        log,
+        mode: "smtp",
+        delivered: false,
+      },
+      { status: 502 }
+    );
+  }
+
+  return NextResponse.json(
+    { ok: true, log, mode: smtp ? "smtp" : "simulated", delivered },
+    { status: 201 }
+  );
 }

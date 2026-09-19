@@ -298,9 +298,9 @@ export function PayslipDialog({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          recipientTo: emailTo,
-          recipientCc: emailCc || null,
-          recipientBcc: emailBcc || null,
+          to: emailTo,
+          cc: emailCc || null,
+          bcc: emailBcc || null,
           subject: emailSubject,
           body: emailBody,
         }),
@@ -309,7 +309,12 @@ export function PayslipDialog({
         const err = await r.json().catch(() => ({}));
         throw new Error(err.error || "Failed to send email");
       }
-      toast.success("Email queued for delivery.");
+      const payload = await r.json().catch(() => ({}));
+      toast.success(
+        payload?.mode === "smtp"
+          ? `Payslip emailed to ${emailTo} (PDF attached).`
+          : `Email logged for ${emailTo} (simulated — no SMTP configured).`
+      );
       setEmailOpen(false);
     } catch (err: any) {
       toast.error(err.message || "Send failed");

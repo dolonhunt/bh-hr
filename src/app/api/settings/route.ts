@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
+import { getSmtpConfig } from "@/lib/mailer";
 
 export async function GET() {
-  const [emailSetting, documentNumbering, company, settingsArr] =
+  const [emailSetting, documentNumbering, company, settingsArr, smtp] =
     await Promise.all([
       db.emailSetting.findFirst({
         orderBy: [{ isDefault: "desc" }, { createdAt: "asc" }],
@@ -14,6 +15,7 @@ export async function GET() {
         orderBy: { createdAt: "asc" },
       }),
       db.setting.findMany(),
+      getSmtpConfig(),
     ]);
 
   const settings: Record<string, string> = {};
@@ -21,11 +23,28 @@ export async function GET() {
     settings[s.key] = s.value;
   });
 
+  // Why is email in simulated mode? (surfaced in Settings → Email Settings)
+  const emailHint =
+    !smtp && emailSetting?.smtpHost && emailSetting?.senderEmail
+      ? emailSetting.username && !emailSetting.password
+        ? "incomplete-auth"
+        : "invalid"
+      : null;
+
   return NextResponse.json({
     emailSetting,
     documentNumbering,
     company,
     settings,
+    emailMode: smtp
+      ? {
+          mode: "smtp",
+          source: smtp.source,
+          host: smtp.host,
+          port: smtp.port,
+          from: `${smtp.fromName} <${smtp.fromEmail}>`,
+        }
+      : { mode: "simulated", source: null, host: null, port: null, from: null, hint: emailHint },
   });
 }
 
@@ -131,7 +150,7 @@ export async function PATCH(req: NextRequest) {
   });
 
   // Return updated snapshot
-  const [emailSetting, documentNumbering, company, settingsArr] =
+  const [emailSetting, documentNumbering, company, settingsArr, smtp] =
     await Promise.all([
       db.emailSetting.findFirst({
         orderBy: [{ isDefault: "desc" }, { createdAt: "asc" }],
@@ -139,16 +158,34 @@ export async function PATCH(req: NextRequest) {
       db.documentNumbering.findFirst({ orderBy: { createdAt: "asc" } }),
       db.company.findFirst({ orderBy: { createdAt: "asc" } }),
       db.setting.findMany(),
+      getSmtpConfig(),
     ]);
   const settings: Record<string, string> = {};
   settingsArr.forEach((s) => {
     settings[s.key] = s.value;
   });
 
+  // Why is email in simulated mode? (surfaced in Settings → Email Settings)
+  const emailHint =
+    !smtp && emailSetting?.smtpHost && emailSetting?.senderEmail
+      ? emailSetting.username && !emailSetting.password
+        ? "incomplete-auth"
+        : "invalid"
+      : null;
+
   return NextResponse.json({
     emailSetting,
     documentNumbering,
     company,
     settings,
+    emailMode: smtp
+      ? {
+          mode: "smtp",
+          source: smtp.source,
+          host: smtp.host,
+          port: smtp.port,
+          from: `${smtp.fromName} <${smtp.fromEmail}>`,
+        }
+      : { mode: "simulated", source: null, host: null, port: null, from: null, hint: emailHint },
   });
 }

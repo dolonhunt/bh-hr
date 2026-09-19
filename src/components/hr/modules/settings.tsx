@@ -79,6 +79,8 @@ import {
   Clock,
   Sun,
   Sparkles,
+  MailCheck,
+  MailX,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn, formatDate, downloadBlob } from "@/lib/utils";
@@ -1013,6 +1015,65 @@ function EmailSettingsTab() {
           </Button>
         </div>
 
+        {/* Live delivery mode banner */}
+        {(() => {
+          const em = data?.emailMode;
+          if (!em) return null;
+          const live = em.mode === "smtp";
+          return (
+            <div
+              className={cn(
+                "flex items-start gap-2.5 rounded-lg border px-3.5 py-3 text-xs",
+                live
+                  ? "border-primary/25 bg-primary/5 text-foreground"
+                  : "border-amber-500/25 bg-amber-500/5 text-foreground"
+              )}
+            >
+              {live ? (
+                <MailCheck className="size-4 mt-0.5 flex-shrink-0 text-primary" />
+              ) : (
+                <MailX className="size-4 mt-0.5 flex-shrink-0 text-amber-600 dark:text-amber-400" />
+              )}
+              <div className="min-w-0">
+                <span className="font-semibold">
+                  {live ? "Live SMTP mode" : "Simulated mode"}
+                </span>
+                {" — "}
+                {live ? (
+                  <span className="text-muted-foreground">
+                    Documents are emailed with the PDF attached via{" "}
+                    <span className="font-mono text-[11px]">{em.host}:{em.port}</span> as{" "}
+                    <span className="font-medium text-foreground">{em.from}</span>
+                    {em.source === "env" ? " (from environment variables)" : ""}.
+                  </span>
+                ) : (
+                  <span className="text-muted-foreground">
+                    {em.hint === "incomplete-auth" ? (
+                      <>
+                        SMTP configuration is <span className="font-medium text-foreground">incomplete</span>{" "}
+                        — a username is set but the password is empty, so real delivery is
+                        disabled to avoid rejected sends. Add the password below to enable it.
+                      </>
+                    ) : em.hint === "invalid" ? (
+                      <>
+                        SMTP configuration is <span className="font-medium text-foreground">incomplete</span>{" "}
+                        — check the required fields below (host, sender email, and
+                        credentials) to enable real delivery.
+                      </>
+                    ) : (
+                      <>
+                        No SMTP server configured — emails are recorded as sent but not
+                        delivered. Fill in the fields below (or set SMTP_HOST / SMTP_FROM
+                        environment variables) to enable real delivery.
+                      </>
+                    )}
+                  </span>
+                )}
+              </div>
+            </div>
+          );
+        })()}
+
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="space-y-1.5">
             <Label>Sender Name</Label>
@@ -1102,6 +1163,7 @@ function EmailSettingsTab() {
           open={testEmailOpen}
           defaultTo={form.senderEmail}
           sending={sendingTest}
+          emailMode={data?.emailMode}
           onOpenChange={setTestEmailOpen}
           onSend={async (to) => {
             setSendingTest(true);
@@ -1111,11 +1173,21 @@ function EmailSettingsTab() {
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ to }),
               });
-              if (!res.ok) throw new Error();
-              toast.success("Test email simulated");
+              const payload = await res.json().catch(() => ({}));
+              if (!res.ok) {
+                throw new Error(
+                  payload?.error || payload?.note || "Failed to send test email"
+                );
+              }
+              toast.success(
+                payload?.mode === "smtp"
+                  ? `Test email delivered via SMTP to ${to}`
+                  : `Test email simulated (no SMTP configured) — logged for ${to}`
+              );
               setTestEmailOpen(false);
-            } catch {
-              toast.error("Failed to send test email");
+            } catch (e: unknown) {
+              const msg = e instanceof Error ? e.message : "Failed to send test email";
+              toast.error(msg);
             } finally {
               setSendingTest(false);
             }
@@ -1135,12 +1207,14 @@ function TestEmailDialog({
   open,
   defaultTo,
   sending,
+  emailMode,
   onOpenChange,
   onSend,
 }: {
   open: boolean;
   defaultTo: string;
   sending: boolean;
+  emailMode?: { mode: string; host?: string | null; port?: number | null; from?: string | null };
   onOpenChange: (v: boolean) => void;
   onSend: (to: string) => void;
 }) {
@@ -1152,7 +1226,12 @@ function TestEmailDialog({
         <DialogHeader>
           <DialogTitle>Send Test Email</DialogTitle>
           <DialogDescription>
-            This will simulate sending a test email and create an EmailLog entry.
+            {(() => {
+              const em = emailMode;
+              return em?.mode === "smtp"
+                ? `A real test message will be delivered via ${em.host}:${em.port}. If the server rejects it, the exact SMTP error is shown and logged.`
+                : "No SMTP is configured yet, so the test send is recorded in the Email Log but not delivered. Fill in the server fields below to test real delivery.";
+            })()}
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-2">

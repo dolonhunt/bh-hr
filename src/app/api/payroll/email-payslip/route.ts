@@ -11,6 +11,7 @@ import {
   slugify,
   type PayslipData,
 } from "../payslip-pdf/route";
+import { getSmtpConfig, sendViaSmtp, textToEmailHtml } from "@/lib/mailer";
 
 // =============================================================
 // POST /api/payroll/email-payslip
@@ -202,7 +203,41 @@ export async function POST(req: NextRequest) {
     orderBy: { createdAt: "desc" },
   });
 
-  // 9. Persist the EmailLog with status="SENT" (simulated send).
+  // 9. Persist the EmailLog — real SMTP delivery (PDF attached) when
+  //    configured, simulated fallback otherwise.
+  const smtp = await getSmtpConfig();
+  let emailStatus: "SENT" | "FAILED" = "SENT";
+  let deliveryNote: string;
+
+  if (smtp) {
+    const result = await sendViaSmtp(smtp, {
+      to: recipientTo,
+      cc: cc?.trim() || null,
+      bcc: bcc?.trim() || null,
+      subject: finalSubject,
+      text: finalBody,
+      html: textToEmailHtml(finalBody, {
+        heading: `Payslip · ${monthLabel}`,
+        footer: `Sent via BH HR · ${companyName}`,
+      }),
+      attachments: [
+        {
+          filename: attachmentName,
+          content: Buffer.from(pdfBuffer),
+          contentType: "application/pdf",
+        },
+      ],
+    });
+    if (result.delivered) {
+      deliveryNote = `Delivered via SMTP (${smtp.host}:${smtp.port})${result.messageId ? ` · id ${result.messageId}` : ""}`;
+    } else {
+      emailStatus = "FAILED";
+      deliveryNote = result.error ?? "SMTP delivery failed";
+    }
+  } else {
+    deliveryNote = `Simulated send (no SMTP configured). ${pdfBuffer.length} byte PDF attachment generated.`;
+  }
+
   const log = await db.emailLog.create({
     data: {
       documentId: payslipDoc?.id ?? null,
@@ -213,8 +248,8 @@ export async function POST(req: NextRequest) {
       subject: finalSubject,
       body: finalBody,
       attachmentName,
-      status: "SENT",
-      errorMessage: `Simulated send (no SMTP configured). ${pdfBuffer.length} byte PDF attachment generated.`,
+      status: emailStatus,
+      errorMessage: emailStatus === "SENT" ? null : deliveryNote,
       sentById: user?.id ?? null,
       sentAt: new Date(),
     },
@@ -246,10 +281,13 @@ export async function POST(req: NextRequest) {
   await db.auditLog.create({
     data: {
       userId: user?.id ?? null,
-      action: "PAYSLIP_EMAILED",
+      action: emailStatus === "SENT" ? "PAYSLIP_EMAILED" : "EMAIL_FAILED",
       entityType: "Payroll",
       entityId: payroll.id,
-      description: `Emailed payslip for ${monthLabel} to ${employee.fullName} (${recipientTo}).`,
+      description:
+        emailStatus === "SENT"
+          ? `Emailed payslip for ${monthLabel} to ${employee.fullName} (${recipientTo}) — ${smtp ? "SMTP" : "simulated"}.`
+          : `Failed to email payslip for ${monthLabel} to ${employee.fullName} (${recipientTo}): ${deliveryNote}`,
       metadata: JSON.stringify({
         employeeId,
         month,
@@ -262,9 +300,17 @@ export async function POST(req: NextRequest) {
         documentId: payslipDoc?.id ?? null,
         docNumber,
         pdfSizeBytes: pdfBuffer.length,
+        mode: smtp ? "smtp" : "simulated",
       }),
     },
   });
+
+  if (emailStatus === "FAILED") {
+    return NextResponse.json(
+      { ok: false, error: `SMTP delivery failed: ${deliveryNote}`, emailLogId: log.id, mode: "smtp" },
+      { status: 502 }
+    );
+  }
 
   return NextResponse.json(
     {
@@ -275,6 +321,7 @@ export async function POST(req: NextRequest) {
       subject: finalSubject,
       attachmentName,
       pdfSizeBytes: pdfBuffer.length,
+      mode: smtp ? "smtp" : "simulated",
     },
     { status: 201 }
   );

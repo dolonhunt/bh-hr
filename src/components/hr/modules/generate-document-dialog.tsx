@@ -945,7 +945,12 @@ function SendEmailDialog({
         const err = await res.json().catch(() => ({}));
         throw new Error(err.error || "Failed to send email");
       }
-      toast.success(`Email sent to ${to}`);
+      const payload = await res.json().catch(() => ({}));
+      toast.success(
+        payload?.mode === "smtp"
+          ? `Email sent to ${to} (PDF attached).`
+          : `Email logged for ${to} (simulated — no SMTP configured).`
+      );
       onSent?.();
       onOpenChange(false);
     } catch (err: any) {
