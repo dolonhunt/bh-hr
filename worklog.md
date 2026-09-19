@@ -2619,3 +2619,40 @@ Stage Summary:
 - Leave policy is configurable: warn-only (default) or hard server-side block, with transparent math in the rejection.
 - Dashboard no longer looks broken on weekends; demo data is clean (no QA artifacts).
 - Next-round recommendations: real SMTP delivery (send-email still simulated); employee directory print/PDF polish; WhatsApp/SMS announcements; consider holiday-aware present-today ring label on working days with zero seed data; document approval from Leave module side (parity with NC sign-off dialog).
+---
+Task ID: QA-FINAL-8
+Agent: orchestrator (main, cron webDevReview round 8)
+Task: Status assessment + agent-browser QA sweep + new feature (Real SMTP delivery with simulated fallback) + bug fix (payslip dialog send payload) + email history status visibility.
+
+Work Log (status assessment first):
+- Read worklog; QA-FINAL-7 state confirmed live (commit 1746c93). sqlite restored, dev server healthy, prod deployed.
+- QA sweep: all 19 modules render at 1280px (via real-mouse nav clicks), zero console/runtime errors. Reports module verified functionally: /api/reports/generate returns valid PDF (5.4KB attachment headers) and CSV (19 rows).
+- QA tooling note (not app bugs): (1) viewport persisted at 390px from round 7's mobile test made sidebar buttons off-screen — first nav "sweep" silently clicked the hidden mobile drawer; fixed with `agent-browser set viewport 1280 800`. (2) Radix tabs ignore synthetic el.click() (they activate on pointerdown) — use agent-browser ref clicks for tab interactions. (3) Two dev-server deaths between tool calls (recurring OOM); batch verify in single calls.
+
+Feature: Real SMTP delivery (nodemailer) with graceful simulated fallback:
+- NEW src/lib/mailer.ts: getSmtpConfig() resolves config from EmailSetting row (Settings → Email Settings) with SMTP_HOST/SMTP_PORT/SMTP_USER/SMTP_PASS/SMTP_FROM env fallback; returns null when not configured. Encryption mapping: SSL → implicit TLS (465), TLS/NONE → STARTTLS. sendViaSmtp() sends with 15s connect/greeting timeouts; returns {delivered, messageId, error}. textToEmailHtml() wraps plain-text bodies in a minimal email-safe HTML shell (teal heading + footer).
+- POST /api/documents/[id]/send-email: when SMTP configured → renders the document's real PDF via renderPdfBuffer and attaches it; on SMTP failure → EmailLog status FAILED with exact server error + Activity/Audit EMAIL_FAILED, document status NOT flipped to SENT, API returns 502 with the error (UI toasts it). Without SMTP → previous simulated behavior preserved (SENT + "Simulated send" note). Override-note handling unchanged.
+- POST /api/settings/test-email: real send when configured (FAILED → 502 with error), simulated otherwise; response now includes mode ("smtp"|"simulated").
+- POST /api/payroll/email-payslip: same treatment — builds payslip PDF, attaches, real/fails/simulates; FAILED → 502 + EMAIL_FAILED audit.
+- Incomplete-config guard: username set but password empty → treated as NOT configured (honest simulated mode) instead of attempting a doomed SMTP session. Verified why: the seeded EmailSetting has smtp.gmail.com:587 + username but empty password.
+- E2E proof of the live path: test email with the seeded (incomplete) config reached smtp.gmail.com:587 over STARTTLS and was rejected by Gmail with "530-5.7.0 Authentication Required" — EmailLog recorded FAILED with the exact server response. With valid credentials the same path delivers; with none it simulates.
+
+BUG FIX (pre-existing, masked until now):
+- payslip-dialog.tsx "Send Email" sent {recipientTo, recipientCc, recipientBcc} but POST /api/documents/[id]/send-email expects {to, cc, bcc} → every payslip-dialog send 400'd ("to, subject and body are required") since the dialog was written. Fixed keys; E2E verified: Payroll → Tanvir Sep 2026 → Generate Payslip (BH/PAYSLIP/202609/0003) → Send Email → 201, EmailLog SENT "Simulated send (no SMTP configured...)".
+
+Styling/UI details:
+- Settings → Email Settings: new delivery-mode banner — teal "Live SMTP mode" (shows host:port + from + env/db source) vs amber "Simulated mode"; simulated copy is precise about WHY: "incomplete — a username is set but the password is empty..." (incomplete-auth) vs plain "No SMTP configured" vs generic invalid hint. Test-email dialog description now mode-aware.
+- Email History tab: Status column moved from hidden-behind-scroll (after Sent At) to position 3 (after Employee) so Sent/Failed is visible at 1280px without scrolling; FAILED rows show truncated rose error text with title tooltip exposing the full SMTP error.
+- Mode-aware success toasts in all four send callers (payslip-dialog, email-payslip-dialog, generate-document-dialog, documents.tsx): "(PDF attached)" vs "(simulated — no SMTP configured)".
+- Verified Email History renders both demo states: teal "Sent" payslip row + rose "Failed" test row.
+
+Verification:
+- bun run lint: 0 errors, 0 warnings. Console clean (one stale Fast-Refresh warning from dev-server restart cycle).
+- Mobile 390px: Email History wraps (grid tabs, sticky Actions), Email Settings banner readable.
+- DB workflow honored: postgresql provider before push (diff empty), .env/db not committed, sqlite restored after push.
+
+Stage Summary:
+- Prod: commit 64137e3 pushed (1746c93..64137e3), deployed; marker ("incomplete-auth"/"Live SMTP mode") found in served chunk /_next/static/chunks/52e0fb58769ab51e.js on bh-hr.vercel.app; site 200.
+- Email delivery is now production-ready: an admin enters SMTP credentials in Settings (or sets SMTP_* env vars on Vercel) and every document email — single, bulk, payslip — goes out with the real PDF attached; failures are visible (Failed badge + real server error) instead of silently "sent".
+- Demo/sandbox behavior unchanged when no credentials exist (simulated + clearly labelled).
+- Next-round recommendations: nodemailer pooled transport + rate limiting for large bulk sends; email open/click tracking (DELIVERED/BOUNCED webhooks where provider supports); employee directory print/PDF polish; WhatsApp/SMS announcements; consider queueing emails (QUEUED status exists) with retry for resilience on Vercel timeouts.
