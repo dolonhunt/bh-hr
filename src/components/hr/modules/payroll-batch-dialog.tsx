@@ -66,6 +66,8 @@ interface BatchPayrollResult {
   failed: { employeeId: string; name: string; error: string }[];
   count: number;
   totalRequested: number;
+  lopApplied?: number;
+  lopTotal?: number;
 }
 
 interface Props {
@@ -85,6 +87,7 @@ export function PayrollBatchDialog({ open, onOpenChange }: Props) {
   const [month, setMonth] = useState<string>(currentMonth);
   const [creating, setCreating] = useState(false);
   const [progress, setProgress] = useState(0);
+  const [applyLop, setApplyLop] = useState(true);
   const [result, setResult] = useState<BatchPayrollResult | null>(null);
 
   const queryClient = useQueryClient();
@@ -261,6 +264,7 @@ export function PayrollBatchDialog({ open, onOpenChange }: Props) {
         body: JSON.stringify({
           employeeIds: selectedToCreate.map((e) => e.id),
           month,
+          applyLop,
         }),
       });
       const data: BatchPayrollResult = await r.json();
@@ -280,6 +284,10 @@ export function PayrollBatchDialog({ open, onOpenChange }: Props) {
           data.created.length === 1 ? "" : "s"
         }, skipped ${data.skipped.length} existing${
           data.failed.length ? `, ${data.failed.length} failed` : ""
+        }${
+          applyLop && (data.lopApplied ?? 0) > 0
+            ? `. LOP applied on ${data.lopApplied} record${data.lopApplied === 1 ? "" : "s"} (৳${Number(data.lopTotal).toLocaleString()})`
+            : ""
         }.`
       );
       queryClient.invalidateQueries({ queryKey: ["payroll"] });
@@ -498,6 +506,19 @@ export function PayrollBatchDialog({ open, onOpenChange }: Props) {
                       {monthLabel} and will be skipped.
                     </div>
                   )}
+                  <label className="flex items-start gap-2 text-xs text-muted-foreground mt-2 cursor-pointer select-none">
+                    <Checkbox
+                      checked={applyLop}
+                      onCheckedChange={(v) => setApplyLop(v === true)}
+                      aria-label="Apply unpaid-leave deductions"
+                      className="mt-0.5"
+                    />
+                    <span>
+                      Auto-deduct unpaid leave (LOP) — approved unpaid-leave days
+                      prorated at basic ÷ working days (holidays & Fri/Sat weekend
+                      excluded).
+                    </span>
+                  </label>
                 </div>
 
                 {/* Skipped list */}

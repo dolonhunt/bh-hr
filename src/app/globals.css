@@ -253,4 +253,26 @@
   .shadow-soft { box-shadow: -3px -3px 8px var(--neu-light), 3px 3px 10px var(--neu-dark-subtle); }
   .shadow-card { box-shadow: -5px -5px 12px var(--neu-light), 5px 5px 14px var(--neu-dark); }
   .shadow-card-hover { box-shadow: -8px -8px 20px var(--neu-light), 8px 8px 20px var(--neu-dark); }
+
+  /* ── Data table: sticky right "Actions" column ──
+     Applied to a <Table> whose container is overflow-x-auto. The last
+     column stays pinned while wide tables scroll horizontally, so row
+     actions are always reachable. Matches row hover backgrounds. */
+  .table-sticky-right {
+    --sticky-col-bg: var(--card);
+  }
+  .table-sticky-right th:last-child,
+  .table-sticky-right td:last-child {
+    position: sticky;
+    right: 0;
+    background: var(--sticky-col-bg);
+    box-shadow: -10px 0 14px -12px rgba(15, 30, 28, 0.35);
+  }
+  .table-sticky-right thead th:last-child {
+    z-index: 20; /* above sticky header row + body cells */
+    background: color-mix(in oklab, var(--muted) 40%, var(--card));
+  }
+  .table-sticky-right tbody tr:hover td:last-child {
+    background: color-mix(in oklab, var(--muted) 30%, var(--card));
+  }
 }

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
+import { computeLop, lopNoteSuffix } from "@/lib/lop";
 
 // Resolve simple {{a.b.c}} variable paths against a data object
 function resolveVar(path: string, data: Record<string, any>): string {
@@ -36,7 +37,11 @@ function nextDocNumber(prefix: string | null, seq: number, padding: number) {
 
 export async function POST(req: NextRequest) {
   const body = await req.json();
-  const { employeeId, month } = body as { employeeId: string; month: string };
+  const { employeeId, month, applyLop } = body as {
+    employeeId: string;
+    month: string;
+    applyLop?: boolean;
+  };
 
   if (!employeeId || !month) {
     return NextResponse.json(
@@ -69,19 +74,36 @@ export async function POST(req: NextRequest) {
   let payroll = await db.payroll.findFirst({
     where: { employeeId, payrollMonth: month },
   });
+  let lopInfo: { lopDays: number; suggestedDeduction: number } | null = null;
   if (!payroll) {
+    // Optional LOP deduction — only applied at creation time. If the record
+    // already exists we never mutate it silently here.
+    let finalDeductions = employee.deductions;
+    let note: string | null = null;
+    if (applyLop) {
+      const lop = await computeLop(employeeId, month);
+      if (lop && lop.lopDays > 0) {
+        finalDeductions = employee.deductions + lop.suggestedDeduction;
+        note = lopNoteSuffix(lop);
+        lopInfo = {
+          lopDays: lop.lopDays,
+          suggestedDeduction: lop.suggestedDeduction,
+        };
+      }
+    }
     const net =
-      employee.basicSalary + employee.allowances - employee.deductions - employee.tax;
+      employee.basicSalary + employee.allowances - finalDeductions - employee.tax;
     payroll = await db.payroll.create({
       data: {
         employeeId,
         payrollMonth: month,
         basicSalary: employee.basicSalary,
         allowances: employee.allowances,
-        deductions: employee.deductions,
+        deductions: finalDeductions,
         tax: employee.tax,
         netSalary: net,
         status: "DRAFT",
+        note,
       },
     });
   }
@@ -194,5 +216,5 @@ export async function POST(req: NextRequest) {
     },
   });
 
-  return NextResponse.json(generatedDoc, { status: 201 });
+  return NextResponse.json({ ...generatedDoc, lop: lopInfo }, { status: 201 });
 }

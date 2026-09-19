@@ -487,7 +487,7 @@ export function PayrollModule() {
       {!isLoading && items.length > 0 && (
         <Card className="border-border/60 shadow-soft overflow-hidden">
           <div className="overflow-x-auto">
-            <Table>
+            <Table className="table-sticky-right">
               <TableHeader>
                 <TableRow className="bg-muted/40 hover:bg-muted/40">
                   <TableHead className="min-w-[200px]">Employee</TableHead>

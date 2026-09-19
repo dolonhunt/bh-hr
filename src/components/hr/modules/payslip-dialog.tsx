@@ -41,7 +41,7 @@ import {
 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { printDocument } from "@/lib/print";
-import { formatCurrency } from "@/lib/utils";
+import { cn, formatCurrency } from "@/lib/utils";
 import { EmailPayslipDialog } from "./email-payslip-dialog";
 
 // =========================================================
@@ -125,12 +125,30 @@ export function PayslipDialog({
 
   const selectedEmp = employees.find((e: any) => e.id === employeeId);
 
+  // Unpaid-leave (LOP) preview for the selected employee + month.
+  const [applyLop, setApplyLop] = useState(true);
+  const lopEnabled = open && !!employeeId && !!month && !generatedDoc;
+  const { data: lopData, isLoading: lopLoading } = useQuery({
+    queryKey: ["payroll-unpaid-leave", employeeId, month],
+    queryFn: () =>
+      fetch(
+        `/api/payroll/unpaid-leave?employeeId=${encodeURIComponent(employeeId)}&month=${encodeURIComponent(month)}`
+      ).then((r) => {
+        if (!r.ok) throw new Error("Failed to load unpaid leave");
+        return r.json();
+      }),
+    enabled: lopEnabled,
+    staleTime: 30_000,
+  });
+  const lopDays = lopData?.lopDays ?? 0;
+
   useEffect(() => {
     if (open) {
       setEmployeeId(presetEmployeeId || "");
       setMonth(currentMonth);
       setGeneratedDoc(null);
       setBreakdown(null);
+      setApplyLop(true);
     }
   }, [open, presetEmployeeId]);
 
@@ -188,7 +206,11 @@ export function PayslipDialog({
       const r = await fetch("/api/payroll/generate-payslip", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ employeeId, month }),
+        body: JSON.stringify({
+          employeeId,
+          month,
+          applyLop: applyLop && lopDays > 0,
+        }),
       });
       if (!r.ok) {
         const err = await r.json().catch(() => ({}));
@@ -396,6 +418,57 @@ export function PayslipDialog({
                       )}
                       Calculate
                     </Button>
+                  </div>
+                )}
+
+                {/* Unpaid leave (LOP) preview */}
+                {selectedEmp && (
+                  <div
+                    className={cn(
+                      "rounded-md border p-3",
+                      lopDays > 0 && applyLop
+                        ? "border-amber-500/35 bg-amber-500/5"
+                        : "border-border bg-muted/20"
+                    )}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-start gap-2 min-w-0">
+                        <TrendingDown
+                          className={cn(
+                            "size-4 mt-0.5 flex-shrink-0",
+                            lopDays > 0 ? "text-amber-600" : "text-muted-foreground"
+                          )}
+                        />
+                        <div className="min-w-0">
+                          <div className="text-xs font-medium">
+                            {lopLoading
+                              ? "Checking unpaid leave…"
+                              : lopDays > 0
+                                ? `Unpaid leave: ${lopDays} working ${lopDays === 1 ? "day" : "days"} in ${month}`
+                                : "No unpaid leave this month"}
+                          </div>
+                          {!lopLoading && lopDays > 0 && (
+                            <div className="text-[11px] text-muted-foreground mt-0.5">
+                              {lopData.workingDaysInMonth} working days · per-day rate ৳
+                              {lopData.perDayRate.toLocaleString()} · deduction ৳
+                              {lopData.suggestedDeduction.toLocaleString()}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                      {lopDays > 0 && (
+                        <label className="flex items-center gap-1.5 text-xs cursor-pointer flex-shrink-0 select-none">
+                          <input
+                            type="checkbox"
+                            checked={applyLop}
+                            onChange={(e) => setApplyLop(e.target.checked)}
+                            className="size-3.5 accent-[#2E7069] cursor-pointer"
+                            aria-label="Apply LOP deduction"
+                          />
+                          Apply LOP
+                        </label>
+                      )}
+                    </div>
                   </div>
                 )}
 

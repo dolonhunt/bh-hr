@@ -1,22 +1,29 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
+import { computeLop, lopNoteSuffix } from "@/lib/lop";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 // POST /api/payroll/batch-create
-// Body: { employeeIds: string[], month: string }  // month = "2025-08"
+// Body: { employeeIds: string[], month: string, applyLop?: boolean }  // month = "2025-08"
 //
 // For each employee:
 //   - Skip if a Payroll row already exists for (employeeId, payrollMonth)
 //   - Otherwise load the employee's salary structure (basicSalary, allowances,
 //     deductions, tax) and create a DRAFT Payroll record.
+//   - When applyLop is true, also compute holiday/weekend-aware unpaid-leave
+//     (LOP) days for the month from APPROVED leave requests whose leave type
+//     is unpaid, and add the per-working-day-rate deduction to the record.
 // Per-employee try/catch so one failure does not block the rest.
 // A single AuditLog entry summarising the whole batch action is written at the end.
-// Returns: { created, skipped, failed, count, totalRequested }
+// Returns: { created, skipped, failed, count, totalRequested, lopApplied, lopTotal }
 export async function POST(req: NextRequest) {
   const body = await req.json();
   const { employeeIds, month } = body ?? ({} as any);
+  const applyLop = body?.applyLop === true;
+  let lopApplied = 0;
+  let lopTotal = 0;
 
   if (!Array.isArray(employeeIds) || employeeIds.length === 0) {
     return NextResponse.json(
@@ -94,7 +101,21 @@ export async function POST(req: NextRequest) {
       const allowances = Number(employee.allowances) || 0;
       const deductions = Number(employee.deductions) || 0;
       const tax = Number(employee.tax) || 0;
-      const netSalary = basic + allowances - deductions - tax;
+
+      // Optional LOP deduction (server-computed, per employee + month).
+      let finalDeductions = deductions;
+      let note: string | null = null;
+      if (applyLop) {
+        const lop = await computeLop(employee.id, month);
+        if (lop && lop.lopDays > 0) {
+          finalDeductions = deductions + lop.suggestedDeduction;
+          note = lopNoteSuffix(lop);
+          lopApplied++;
+          lopTotal += lop.suggestedDeduction;
+        }
+      }
+
+      const netSalary = basic + allowances - finalDeductions - tax;
 
       const payroll = await db.payroll.create({
         data: {
@@ -102,12 +123,12 @@ export async function POST(req: NextRequest) {
           payrollMonth: month,
           basicSalary: basic,
           allowances,
-          deductions,
+          deductions: finalDeductions,
           tax,
           netSalary,
           paymentDate: null,
           status: "DRAFT",
-          note: null,
+          note,
         },
         include: {
           employee: { include: { department: true, designation: true } },
@@ -144,13 +165,16 @@ export async function POST(req: NextRequest) {
       userId: user?.id ?? null,
       action: "PAYROLL_BATCH_CREATE",
       entityType: "Payroll",
-      description: `Batch created ${created.length} payroll record(s) for ${month}. ${skipped.length} skipped, ${failed.length} failed.`,
+      description: `Batch created ${created.length} payroll record(s) for ${month}. ${skipped.length} skipped, ${failed.length} failed.${applyLop && lopApplied > 0 ? ` LOP deductions applied on ${lopApplied} record(s) (৳${lopTotal.toFixed(0)}).` : ""}`,
       metadata: JSON.stringify({
         month,
         requestedCount: employeeIds.length,
         createdCount: created.length,
         skippedCount: skipped.length,
         failedCount: failed.length,
+        applyLop,
+        lopApplied,
+        lopTotal: Math.round(lopTotal * 100) / 100,
         createdEmployeeIds: created.map((c) => c.employeeId),
         skippedEmployeeIds: skipped.map((s) => s.employeeId),
         failedEmployeeIds: failed.map((f) => f.employeeId),
@@ -165,6 +189,8 @@ export async function POST(req: NextRequest) {
       failed,
       count: created.length,
       totalRequested: employeeIds.length,
+      lopApplied,
+      lopTotal: Math.round(lopTotal * 100) / 100,
     },
     { status: 201 }
   );

@@ -14,6 +14,9 @@ import {
   CalendarX,
   Info,
   Megaphone,
+  Receipt,
+  Check,
+  X,
   CheckCheck,
   Settings2,
   Loader2,
@@ -47,6 +50,7 @@ import { useApp, type ModuleKey } from "@/lib/store";
 
 type NotificationType =
   | "LEAVE_PENDING"
+  | "EXPENSE_PENDING"
   | "DOCUMENT_PENDING_APPROVAL"
   | "BIRTHDAY_UPCOMING"
   | "TASK_OVERDUE"
@@ -91,6 +95,11 @@ const TYPE_META: Record<
     icon: CalendarClock,
     label: "Leave requests",
     description: "Pending leave applications awaiting approval",
+  },
+  EXPENSE_PENDING: {
+    icon: Receipt,
+    label: "Expense approvals",
+    description: "Submitted expenses awaiting your decision",
   },
   DOCUMENT_PENDING_APPROVAL: {
     icon: FileCheck,
@@ -173,6 +182,11 @@ export function NotificationCenter({
   const [filter, setFilter] = useState<"all" | "unread" | "mentions">("all");
   const [prefsOpen, setPrefsOpen] = useState(false);
   const [markingId, setMarkingId] = useState<string | null>(null);
+  const [actingId, setActingId] = useState<string | null>(null);
+  const [rejectTarget, setRejectTarget] = useState<NotificationItem | null>(
+    null
+  );
+  const [rejectNote, setRejectNote] = useState("");
 
   // ----- Fetch notifications -----
   const queryKey = useMemo(
@@ -225,6 +239,121 @@ export function NotificationCenter({
     } catch (e: any) {
       toast.error(e?.message || "Failed to mark all as read");
     }
+  }
+
+  // ----- Quick decisions (approve/reject without leaving the feed) -----
+
+  async function markNotificationRead(n: NotificationItem) {
+    if (n.read) return;
+    try {
+      await fetch(`/api/notifications/${n.id}/read`, { method: "POST" });
+    } catch {
+      /* read-state is best-effort */
+    }
+  }
+
+  async function decideLeave(
+    n: NotificationItem,
+    action: "APPROVED" | "REJECTED",
+    note?: string
+  ) {
+    const leaveRequestId = n.metadata?.leaveRequestId as string | undefined;
+    if (!leaveRequestId) return;
+    setActingId(n.id);
+    try {
+      const r = await fetch(`/api/leave/${leaveRequestId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          status: action,
+          approverNote: note || null,
+          approverId: "hr-user",
+        }),
+      });
+      if (!r.ok) {
+        const err = await r.json().catch(() => ({}));
+        throw new Error(err.error || "Failed to update leave request");
+      }
+      toast.success(
+        action === "APPROVED"
+          ? `Leave approved for ${n.metadata?.employeeName ?? "employee"}.`
+          : `Leave rejected for ${n.metadata?.employeeName ?? "employee"}.`
+      );
+      await markNotificationRead(n);
+      // The leave is no longer pending, so its notification disappears on
+      // refetch (the feed is generated from current DB state).
+      await qc.invalidateQueries({ queryKey: ["notifications"] });
+      qc.invalidateQueries({ queryKey: ["leave"] });
+      qc.invalidateQueries({ queryKey: ["leave-calendar"] });
+      qc.invalidateQueries({ queryKey: ["dashboard"] });
+    } catch (e: any) {
+      toast.error(e?.message || "Action failed");
+    } finally {
+      setActingId(null);
+    }
+  }
+
+  async function decideExpense(
+    n: NotificationItem,
+    action: "approve" | "reject",
+    note?: string
+  ) {
+    const expenseId = n.metadata?.expenseId as string | undefined;
+    if (!expenseId) return;
+    setActingId(n.id);
+    try {
+      const r = await fetch(`/api/expenses/${expenseId}/${action}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ notes: note || undefined }),
+      });
+      if (!r.ok) {
+        const err = await r.json().catch(() => ({}));
+        throw new Error(err.error || "Failed to update expense");
+      }
+      toast.success(
+        action === "approve"
+          ? `Expense approved for ${n.metadata?.employeeName ?? "employee"}.`
+          : `Expense rejected for ${n.metadata?.employeeName ?? "employee"}.`
+      );
+      await markNotificationRead(n);
+      await qc.invalidateQueries({ queryKey: ["notifications"] });
+      qc.invalidateQueries({ queryKey: ["expenses"] });
+      qc.invalidateQueries({ queryKey: ["dashboard"] });
+    } catch (e: any) {
+      toast.error(e?.message || "Action failed");
+    } finally {
+      setActingId(null);
+    }
+  }
+
+  function quickApprove(n: NotificationItem) {
+    if (n.type === "LEAVE_PENDING") void decideLeave(n, "APPROVED");
+    else if (n.type === "EXPENSE_PENDING") void decideExpense(n, "approve");
+  }
+
+  function beginReject(n: NotificationItem) {
+    setRejectTarget(n);
+    setRejectNote("");
+  }
+
+  async function confirmReject() {
+    if (!rejectTarget) return;
+    const n = rejectTarget;
+    if (n.type === "LEAVE_PENDING") {
+      await decideLeave(n, "REJECTED", rejectNote);
+    } else if (n.type === "EXPENSE_PENDING") {
+      await decideExpense(n, "reject", rejectNote);
+    }
+    setRejectTarget(null);
+    setRejectNote("");
+  }
+
+  function canDecide(n: NotificationItem): boolean {
+    if (actingId && actingId !== n.id) return false; // one decision at a time
+    if (n.type === "LEAVE_PENDING") return !!n.metadata?.leaveRequestId;
+    if (n.type === "EXPENSE_PENDING") return !!n.metadata?.expenseId;
+    return false;
   }
 
   // ----- Click handler — navigate based on link -----
@@ -341,6 +470,15 @@ export function NotificationCenter({
                         onClick={() => handleClick(n)}
                         onMarkRead={() => markRead(n.id)}
                         marking={markingId === n.id}
+                        canDecide={canDecide(n)}
+                        acting={actingId === n.id}
+                        rejecting={rejectTarget?.id === n.id}
+                        rejectNote={rejectNote}
+                        onRejectNoteChange={setRejectNote}
+                        onApprove={() => quickApprove(n)}
+                        onBeginReject={() => beginReject(n)}
+                        onConfirmReject={() => void confirmReject()}
+                        onCancelReject={() => setRejectTarget(null)}
                       />
                     ))}
                   </AnimatePresence>
@@ -384,15 +522,34 @@ function NotificationRow({
   onClick,
   onMarkRead,
   marking,
+  canDecide,
+  acting,
+  rejecting,
+  rejectNote,
+  onRejectNoteChange,
+  onApprove,
+  onBeginReject,
+  onConfirmReject,
+  onCancelReject,
 }: {
   n: NotificationItem;
   onClick: () => void;
   onMarkRead: () => void;
   marking: boolean;
+  canDecide: boolean;
+  acting: boolean;
+  rejecting: boolean;
+  rejectNote: string;
+  onRejectNoteChange: (v: string) => void;
+  onApprove: () => void;
+  onBeginReject: () => void;
+  onConfirmReject: () => void;
+  onCancelReject: () => void;
 }) {
   const meta = TYPE_META[n.type] ?? TYPE_META.SYSTEM;
   const Icon = meta.icon;
   const sev = SEVERITY_STYLE[n.severity] ?? SEVERITY_STYLE.info;
+  const showActions = canDecide && !rejecting;
 
   return (
     <motion.li
@@ -417,7 +574,8 @@ function NotificationRow({
           "hover:shadow-sm hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
           n.read
             ? "border-border/50 bg-transparent"
-            : "border-border bg-card"
+            : "border-border bg-card",
+          acting && "opacity-60 pointer-events-none"
         )}
       >
         {/* Icon */}
@@ -487,6 +645,85 @@ function NotificationRow({
               {relativeTime(n.createdAt)}
             </span>
           </div>
+
+          {/* Quick decision actions */}
+          {showActions && (
+            <div
+              className="flex items-center gap-1.5 mt-2.5 -mb-0.5"
+              onClick={(e) => e.stopPropagation()}
+              onKeyDown={(e) => e.stopPropagation()}
+            >
+              <Button
+                size="sm"
+                className="h-7 px-2.5 text-xs gap-1 cursor-pointer"
+                onClick={onApprove}
+                disabled={acting}
+                title="Approve without leaving the feed"
+              >
+                <Check className="size-3.5" />
+                Approve
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-7 px-2.5 text-xs gap-1 text-rose-700 border-rose-500/30 hover:bg-rose-500/10 cursor-pointer"
+                onClick={onBeginReject}
+                disabled={acting}
+                title="Reject with an optional note"
+              >
+                <X className="size-3.5" />
+                Reject
+              </Button>
+            </div>
+          )}
+
+          {/* Inline reject note */}
+          {rejecting && (
+            <div
+              className="mt-2.5 rounded-lg border border-rose-500/25 bg-rose-500/5 p-2 space-y-2"
+              onClick={(e) => e.stopPropagation()}
+              onKeyDown={(e) => e.stopPropagation()}
+            >
+              <input
+                autoFocus
+                value={rejectNote}
+                onChange={(e) => onRejectNoteChange(e.target.value)}
+                placeholder={
+                  n.type === "LEAVE_PENDING"
+                    ? "Reason (optional) — e.g. team is short-staffed that week"
+                    : "Reason (optional) — e.g. missing receipt"
+                }
+                maxLength={140}
+                className="w-full h-7 rounded-md border border-border bg-background px-2 text-xs outline-none focus:ring-2 focus:ring-ring/50 placeholder:text-muted-foreground/80"
+                aria-label="Rejection reason"
+              />
+              <div className="flex items-center justify-end gap-1.5">
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-7 px-2 text-xs cursor-pointer"
+                  onClick={onCancelReject}
+                  disabled={acting}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  size="sm"
+                  variant="destructive"
+                  className="h-7 px-2.5 text-xs gap-1 cursor-pointer"
+                  onClick={onConfirmReject}
+                  disabled={acting}
+                >
+                  {acting ? (
+                    <Loader2 className="size-3.5 animate-spin" />
+                  ) : (
+                    <X className="size-3.5" />
+                  )}
+                  Confirm reject
+                </Button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </motion.li>

@@ -685,7 +685,7 @@ function AssetsTable({
   return (
     <Card className="p-0 overflow-hidden border-border/60">
       <div className="overflow-x-auto max-h-[70vh] overflow-y-auto">
-        <Table>
+        <Table className="table-sticky-right">
           <TableHeader className="sticky top-0 bg-card z-10">
             <TableRow>
               <TableHead>Asset</TableHead>
@@ -784,7 +784,7 @@ function AssetsTable({
                         title="View maintenance history"
                       >
                         <Wrench className="size-3.5" />
-                        <span className="hidden xl:inline">Maintenance</span>
+                        <span className="hidden 2xl:inline">Maint.</span>
                       </Button>
                       {a.status === "AVAILABLE" && (
                         <Button
@@ -794,7 +794,7 @@ function AssetsTable({
                           onClick={() => onAssign(a)}
                         >
                           <UserPlus className="size-3.5" />
-                          <span className="hidden xl:inline">Assign</span>
+                          <span className="hidden 2xl:inline">Assign</span>
                         </Button>
                       )}
                       {a.status === "ASSIGNED" && (
@@ -805,7 +805,7 @@ function AssetsTable({
                           onClick={() => onReturn(a)}
                         >
                           <Undo2 className="size-3.5" />
-                          <span className="hidden xl:inline">Return</span>
+                          <span className="hidden 2xl:inline">Return</span>
                         </Button>
                       )}
                       <DropdownMenu>

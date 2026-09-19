@@ -914,12 +914,12 @@ function TimesheetsTable({
   return (
     <Card className="p-0 overflow-hidden border-border/60">
       <div className="overflow-x-auto max-h-[70vh] overflow-y-auto">
-        <Table>
+        <Table className="table-sticky-right">
           <TableHeader className="sticky top-0 bg-card z-10">
             <TableRow>
               <TableHead>Employee</TableHead>
               <TableHead>Project</TableHead>
-              <TableHead className="min-w-[200px]">Task</TableHead>
+              <TableHead className="min-w-[160px] max-w-[240px]">Task</TableHead>
               <TableHead>Date</TableHead>
               <TableHead className="text-right">Hours</TableHead>
               <TableHead>Status</TableHead>
@@ -952,7 +952,7 @@ function TimesheetsTable({
                   )}
                 </TableCell>
                 <TableCell>
-                  <div className="max-w-xs">
+                  <div className="max-w-[180px] 2xl:max-w-[280px]">
                     <p className="text-sm truncate" title={e.task}>
                       {e.task}
                     </p>
@@ -1051,7 +1051,7 @@ function EntryActions({
             ) : (
               <Send className="size-3.5" />
             )}
-            <span className="hidden md:inline">Submit</span>
+            <span className="hidden 2xl:inline">Submit</span>
           </Button>
           <Button
             size="sm"
@@ -1078,7 +1078,7 @@ function EntryActions({
             ) : (
               <Check className="size-3.5" />
             )}
-            <span className="hidden md:inline">Approve</span>
+            <span className="hidden 2xl:inline">Approve</span>
           </Button>
           <Button
             size="sm"
@@ -1087,7 +1087,7 @@ function EntryActions({
             onClick={() => onReject(entry)}
           >
             <X className="size-3.5" />
-            <span className="hidden md:inline">Reject</span>
+            <span className="hidden 2xl:inline">Reject</span>
           </Button>
           <Button
             size="sm"
@@ -1215,7 +1215,7 @@ function PendingTab({
                         onClick={() => onApprove(e)}
                       >
                         <Check className="size-3.5" />
-                        <span className="hidden md:inline">Approve</span>
+                        <span className="hidden 2xl:inline">Approve</span>
                       </Button>
                       <Button
                         size="sm"
@@ -1224,7 +1224,7 @@ function PendingTab({
                         onClick={() => onReject(e)}
                       >
                         <X className="size-3.5" />
-                        <span className="hidden md:inline">Reject</span>
+                        <span className="hidden 2xl:inline">Reject</span>
                       </Button>
                       <Button
                         size="sm"

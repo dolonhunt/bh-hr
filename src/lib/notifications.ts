@@ -10,6 +10,7 @@ import { db } from "@/lib/db";
 
 export type NotificationType =
   | "LEAVE_PENDING"
+  | "EXPENSE_PENDING"
   | "DOCUMENT_PENDING_APPROVAL"
   | "BIRTHDAY_UPCOMING"
   | "TASK_OVERDUE"
@@ -34,6 +35,7 @@ export interface NotificationDTO {
 
 export const ALL_NOTIFICATION_TYPES: NotificationType[] = [
   "LEAVE_PENDING",
+  "EXPENSE_PENDING",
   "DOCUMENT_PENDING_APPROVAL",
   "BIRTHDAY_UPCOMING",
   "TASK_OVERDUE",
@@ -45,6 +47,7 @@ export const ALL_NOTIFICATION_TYPES: NotificationType[] = [
 
 export const DEFAULT_PREFERENCES: Record<NotificationType, boolean> = {
   LEAVE_PENDING: true,
+  EXPENSE_PENDING: true,
   DOCUMENT_PENDING_APPROVAL: true,
   BIRTHDAY_UPCOMING: true,
   TASK_OVERDUE: true,
@@ -95,6 +98,7 @@ export async function generateNotifications(): Promise<NotificationDTO[]> {
     onboardingTasks,
     employees,
     recentAnnouncements,
+    recentExpenses,
   ] = await Promise.all([
     db.leaveRequest.findMany({
       where: { status: "PENDING" },
@@ -149,6 +153,16 @@ export async function generateNotifications(): Promise<NotificationDTO[]> {
       },
       orderBy: [{ pinned: "desc" }, { publishedAt: "desc" }],
       take: 10,
+    }),
+    // Expenses live on Activity rows (meta JSON in `description`); status
+    // filtering happens in JS after parse (same pattern as TASK_OVERDUE).
+    db.activity.findMany({
+      where: { type: "EXPENSE" },
+      include: {
+        employee: { select: { id: true, fullName: true, employeeId: true } },
+      },
+      orderBy: { createdAt: "desc" },
+      take: 200,
     }),
   ]);
 
@@ -327,6 +341,50 @@ export async function generateNotifications(): Promise<NotificationDTO[]> {
           employeeId: emp.id,
           employeeName: emp.fullName,
           dateOfBirth: emp.dateOfBirth.toISOString(),
+        },
+      });
+    }
+  }
+
+  // EXPENSE_PENDING (submitted expenses awaiting approval)
+  if (prefs.EXPENSE_PENDING) {
+    interface ExpenseMetaLite {
+      status?: string;
+      amount?: number;
+      currency?: string;
+      description?: string;
+      type?: string;
+      date?: string;
+    }
+    let shown = 0;
+    for (const a of recentExpenses) {
+      if (shown >= 50) break;
+      let meta: ExpenseMetaLite = {};
+      try {
+        meta = a.description ? JSON.parse(a.description) : {};
+      } catch {
+        continue;
+      }
+      if (String(meta.status ?? "").toUpperCase() !== "PENDING") continue;
+      shown++;
+      const id = nid("EXPENSE_PENDING", a.id);
+      out.push({
+        id,
+        type: "EXPENSE_PENDING",
+        title: `Expense approval needed: ${a.employee?.fullName ?? "—"}`,
+        message: `${meta.currency ?? "BDT"} ${Number(meta.amount ?? 0).toLocaleString()} · ${meta.description ?? ""}`,
+        severity: "warning",
+        link: "/?module=expenses",
+        read: readSet.has(id),
+        createdAt: meta.date ?? a.createdAt?.toISOString?.() ?? now.toISOString(),
+        metadata: {
+          expenseId: a.id,
+          employeeId: a.employee?.id,
+          employeeName: a.employee?.fullName,
+          amount: meta.amount,
+          currency: meta.currency,
+          expenseType: meta.type,
+          expenseDescription: meta.description,
         },
       });
     }

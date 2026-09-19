@@ -634,12 +634,14 @@ function ExpensesTable({
   return (
     <Card className="p-0 overflow-hidden border-border/60">
       <div className="overflow-x-auto max-h-[70vh] overflow-y-auto">
-        <Table>
+        <Table className="table-sticky-right">
           <TableHeader className="sticky top-0 bg-card z-10">
             <TableRow>
               <TableHead>Employee</TableHead>
               <TableHead>Type</TableHead>
-              <TableHead className="min-w-[200px]">Description</TableHead>
+              <TableHead className="min-w-[160px] max-w-[240px]">
+                Description
+              </TableHead>
               <TableHead className="text-right">Amount</TableHead>
               <TableHead>Date</TableHead>
               <TableHead>Status</TableHead>
@@ -690,12 +692,18 @@ function ExpensesTable({
                     </Badge>
                   </TableCell>
                   <TableCell>
-                    <div className="max-w-xs">
-                      <p className="text-sm truncate" title={e.description}>
+                    <div className="max-w-[180px] 2xl:max-w-[280px]">
+                      <p
+                        className="text-sm truncate"
+                        title={e.description}
+                      >
                         {e.description}
                       </p>
                       {e.notes && (
-                        <p className="text-xs text-muted-foreground truncate">
+                        <p
+                          className="text-xs text-muted-foreground truncate"
+                          title={e.notes}
+                        >
                           {e.notes}
                         </p>
                       )}
@@ -787,6 +795,7 @@ function ExpenseActions({
             size="sm"
             variant="outline"
             className="h-8 gap-1.5"
+            title="Submit for approval"
             disabled={busy === "submit"}
             onClick={() => run("submit", () => onSubmit(expense))}
           >
@@ -795,7 +804,7 @@ function ExpenseActions({
             ) : (
               <Send className="size-3.5" />
             )}
-            <span className="hidden md:inline">Submit</span>
+            <span className="hidden 2xl:inline">Submit</span>
           </Button>
           <Button
             size="sm"
@@ -814,6 +823,7 @@ function ExpenseActions({
             size="sm"
             variant="outline"
             className="h-8 gap-1.5 text-primary border-primary/30 hover:bg-primary/10"
+            title="Approve expense"
             disabled={busy === "approve"}
             onClick={() => run("approve", () => onApprove(expense))}
           >
@@ -822,16 +832,17 @@ function ExpenseActions({
             ) : (
               <Check className="size-3.5" />
             )}
-            <span className="hidden md:inline">Approve</span>
+            <span className="hidden 2xl:inline">Approve</span>
           </Button>
           <Button
             size="sm"
             variant="outline"
             className="h-8 gap-1.5 text-rose-700 border-rose-500/30 hover:bg-rose-500/10"
+            title="Reject expense"
             onClick={() => onReject(expense)}
           >
             <X className="size-3.5" />
-            <span className="hidden md:inline">Reject</span>
+            <span className="hidden 2xl:inline">Reject</span>
           </Button>
           <Button
             size="sm"
@@ -850,10 +861,11 @@ function ExpenseActions({
             size="sm"
             variant="outline"
             className="h-8 gap-1.5 text-teal-700 border-teal-500/30 hover:bg-teal-500/10"
+            title="Record reimbursement"
             onClick={() => onReimburse(expense)}
           >
             <Banknote className="size-3.5" />
-            <span className="hidden md:inline">Reimburse</span>
+            <span className="hidden 2xl:inline">Reimburse</span>
           </Button>
           <Button
             size="sm"

@@ -259,14 +259,16 @@ export function AuditModule() {
       {!isLoading && logs.length > 0 && (
         <Card className="border-border/60 shadow-soft overflow-hidden">
           <div className="overflow-x-auto">
-            <Table>
+            <Table className="table-sticky-right">
               <TableHeader>
                 <TableRow className="bg-muted/40 hover:bg-muted/40">
                   <TableHead className="min-w-[160px]">Timestamp</TableHead>
-                  <TableHead className="min-w-[200px]">User</TableHead>
+                  <TableHead className="min-w-[180px]">User</TableHead>
                   <TableHead>Action</TableHead>
                   <TableHead>Entity</TableHead>
-                  <TableHead className="min-w-[280px]">Description</TableHead>
+                  <TableHead className="min-w-[200px] max-w-[360px]">
+                    Description
+                  </TableHead>
                   <TableHead>IP Address</TableHead>
                 </TableRow>
               </TableHeader>
@@ -317,7 +319,12 @@ export function AuditModule() {
                         {log.entityType ?? "—"}
                       </TableCell>
                       <TableCell className="text-sm">
-                        {log.description ?? "—"}
+                        <div
+                          className="max-w-[360px] truncate"
+                          title={log.description ?? ""}
+                        >
+                          {log.description ?? "—"}
+                        </div>
                       </TableCell>
                       <TableCell className="text-xs font-mono text-muted-foreground">
                         {log.ipAddress ?? "—"}
