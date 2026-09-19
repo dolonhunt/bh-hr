@@ -59,12 +59,14 @@ import {
   Landmark,
   FileSpreadsheet,
   Send,
+  Mail,
 } from "lucide-react";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { toast } from "sonner";
 import { PayslipDialog } from "./payslip-dialog";
 import { EmailPayslipDialog } from "./email-payslip-dialog";
 import { PayrollBatchDialog } from "./payroll-batch-dialog";
+import { PayrollEmailBatchDialog } from "./payroll-email-batch-dialog";
 import { ExportButton } from "../shared/export-button";
 
 // =========================================================
@@ -101,6 +103,7 @@ export function PayrollModule() {
   const [payslipOpen, setPayslipOpen] = useState(false);
   const [presetEmployee, setPresetEmployee] = useState<string | null>(null);
   const [batchOpen, setBatchOpen] = useState(false);
+  const [emailBatchOpen, setEmailBatchOpen] = useState(false);
   const [taxConfigOpen, setTaxConfigOpen] = useState(false);
   const [bankFileLoading, setBankFileLoading] = useState<"" | "csv" | "nacha">("");
 
@@ -353,6 +356,16 @@ export function PayrollModule() {
               <Layers className="size-4 mr-1.5" />{" "}
               <span className="hidden sm:inline">Batch Create</span>
               <span className="sm:hidden">Batch</span>
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setEmailBatchOpen(true)}
+              title="Email payslip PDFs to every employee for the selected month"
+            >
+              <Mail className="size-4 mr-1.5" />{" "}
+              <span className="hidden sm:inline">Email Payslips</span>
+              <span className="sm:hidden">Email</span>
             </Button>
             <Button size="sm" onClick={() => generatePayslip()}>
               <Plus className="size-4 mr-1.5" /> <span className="hidden sm:inline">Create Payroll</span>
@@ -686,6 +699,17 @@ export function PayrollModule() {
           setBatchOpen(o);
           if (!o) qc.invalidateQueries({ queryKey: ["payroll"] });
         }}
+      />
+
+      <PayrollEmailBatchDialog
+        open={emailBatchOpen}
+        onOpenChange={(o) => {
+          setEmailBatchOpen(o);
+          if (!o) {
+            qc.invalidateQueries({ queryKey: ["email-logs"] });
+          }
+        }}
+        defaultMonth={month}
       />
 
       <TaxConfigDialog

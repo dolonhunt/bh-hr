@@ -18,6 +18,10 @@ import {
   CalendarDays,
   Loader2,
   Download,
+  Mail,
+  MailCheck,
+  MailX,
+  Send,
 } from "lucide-react";
 import { PageHeader } from "../shared/page-header";
 import { KpiCard } from "../shared/kpi-card";
@@ -138,6 +142,17 @@ export function AnnouncementsModule() {
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<Announcement | null>(null);
   const [deleting, setDeleting] = useState<Announcement | null>(null);
+
+  // ----- Email blast (announcement → all matching employees) -----
+  const [blasting, setBlasting] = useState<Announcement | null>(null);
+  const [blastRunning, setBlastRunning] = useState(false);
+  const [blastResult, setBlastResult] = useState<{
+    mode: "smtp" | "simulated";
+    recipients: number;
+    sent: number;
+    failed: number;
+    failures: { employeeName: string; recipientTo?: string; error?: string }[];
+  } | null>(null);
   const [saving, setSaving] = useState(false);
 
   const includeExpired = tab === "expired";
@@ -262,6 +277,44 @@ export function AnnouncementsModule() {
       qc.invalidateQueries({ queryKey: ["announcements"] });
     } catch (err: any) {
       toast.error(err.message || "Delete failed");
+    }
+  }
+
+  async function runEmailBlast() {
+    if (!blasting) return;
+    setBlastRunning(true);
+    setBlastResult(null);
+    try {
+      const res = await fetch(`/api/announcements/${blasting.id}/email-blast`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error || "Email blast failed");
+      setBlastResult({
+        mode: data.mode,
+        recipients: data.recipients,
+        sent: data.sent,
+        failed: data.failed,
+        failures: (data.results ?? [])
+          .filter((r: any) => !r.ok)
+          .map((r: any) => ({
+            employeeName: r.employeeName,
+            recipientTo: r.recipientTo,
+            error: r.error,
+          })),
+      });
+      toast.success(
+        data.mode === "smtp"
+          ? `Announcement delivered to ${data.sent} recipient(s), ${data.failed} failed.`
+          : `Announcement emails logged (simulated) for ${data.sent} recipient(s).`
+      );
+      qc.invalidateQueries({ queryKey: ["email-logs"] });
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : "Email blast failed");
+    } finally {
+      setBlastRunning(false);
     }
   }
 
@@ -488,6 +541,19 @@ export function AnnouncementsModule() {
                       variant="ghost"
                       size="icon"
                       className="size-8 cursor-pointer"
+                      onClick={() => {
+                        setBlastResult(null);
+                        setBlasting(a);
+                      }}
+                      aria-label={`Email this announcement to ${a.audience === "DEPARTMENT" && a.department ? a.department.name : "all employees"}`}
+                      title={`Email to ${a.audience === "DEPARTMENT" && a.department ? a.department.name : "all employees"}`}
+                    >
+                      <Mail className="size-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="size-8 cursor-pointer"
                       onClick={() => togglePin(a)}
                       aria-label={a.pinned ? "Unpin" : "Pin to top"}
                     >
@@ -667,6 +733,114 @@ export function AnnouncementsModule() {
               <Trash2 className="size-4 mr-1.5" /> Delete
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Email blast dialog */}
+      <Dialog
+        open={!!blasting}
+        onOpenChange={(o) => {
+          if (!o) {
+            setBlasting(null);
+            setTimeout(() => setBlastResult(null), 200);
+          }
+        }}
+      >
+        <DialogContent className="max-w-lg max-h-[90vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Mail className="size-5 text-primary" />
+              Email Announcement
+            </DialogTitle>
+            <DialogDescription>
+              Sends "{blasting?.title}" to every active employee
+              {blasting?.audience === "DEPARTMENT" && blasting?.department
+                ? ` in ${blasting.department.name}`
+                : " (company-wide)"}{" "}
+              with an email address on file. Each send is recorded in the Email
+              History.
+            </DialogDescription>
+          </DialogHeader>
+
+          {!blastResult ? (
+            <>
+              <div className="rounded-lg border border-amber-500/25 bg-amber-500/5 px-3.5 py-3 text-xs text-muted-foreground">
+                One email per recipient — 20 employees means 20 emails. Real
+                delivery requires SMTP credentials in Settings → Email Settings;
+                otherwise the sends are recorded as simulated.
+              </div>
+              <DialogFooter>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setBlasting(null);
+                    setTimeout(() => setBlastResult(null), 200);
+                  }}
+                  disabled={blastRunning}
+                >
+                  Cancel
+                </Button>
+                <Button onClick={runEmailBlast} disabled={blastRunning}>
+                  {blastRunning ? (
+                    <>
+                      <Loader2 className="size-4 mr-2 animate-spin" />
+                      Sending…
+                    </>
+                  ) : (
+                    <>
+                      <Send className="size-4 mr-2" />
+                      Send now
+                    </>
+                  )}
+                </Button>
+              </DialogFooter>
+            </>
+          ) : (
+            <>
+              <div className="flex flex-wrap items-center gap-3 rounded-lg border border-border/60 bg-muted/30 px-3.5 py-3 text-xs">
+                <span className="flex items-center gap-1.5 font-medium">
+                  <MailCheck className="size-4 text-primary" />
+                  {blastResult.mode === "smtp" ? "Delivered" : "Logged (simulated)"}:{" "}
+                  <span className="text-primary font-semibold">{blastResult.sent}</span>
+                </span>
+                {blastResult.failed > 0 && (
+                  <span className="flex items-center gap-1.5 font-medium text-rose-600 dark:text-rose-400">
+                    <MailX className="size-4" />
+                    Failed: {blastResult.failed}
+                  </span>
+                )}
+                <span className="text-muted-foreground">
+                  of {blastResult.recipients} recipient(s)
+                </span>
+              </div>
+              {blastResult.failures.length > 0 && (
+                <div className="rounded-lg border border-rose-500/25 bg-rose-500/5 px-3.5 py-2.5 text-xs space-y-1 max-h-40 overflow-y-auto">
+                  {blastResult.failures.map((f, i) => (
+                    <div key={i} className="min-w-0">
+                      <span className="font-medium text-foreground">{f.employeeName}</span>
+                      <span
+                        className="text-rose-600 dark:text-rose-400 truncate max-w-full inline-block cursor-help"
+                        title={f.error}
+                      >
+                        {" "}
+                        — {f.error}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <DialogFooter>
+                <Button
+                  onClick={() => {
+                    setBlasting(null);
+                    setTimeout(() => setBlastResult(null), 200);
+                  }}
+                >
+                  Done
+                </Button>
+              </DialogFooter>
+            </>
+          )}
         </DialogContent>
       </Dialog>
     </div>
