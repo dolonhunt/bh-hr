@@ -2477,3 +2477,11 @@ QA-FINAL-4 addendum (same round, hotfix after prod trigger):
   * seedAssets (12 asset Activity rows, same conventions as seed-assets-training) - runs BEFORE assetMaintenance.
 - GET /api/demo-data preview + Settings demo-data chips now include candidates + assets (7 chips).
 - Local idempotency re-verified: POST with all datasets present -> ok:true, createdCount 0.
+
+QA-FINAL-4 prod verification (final):
+- Vercel deployed both commits (b08182b + e5c68a2). POST /api/demo-data re-triggered on prod: {candidates:8, interviews:6, assets:12, assetMaintenance:5} created; surveys(3)/expenses(10)/timesheets(36) retained from first run. Total 91 demo records live on bh-hr.vercel.app.
+- GET /api/demo-data on prod: all 7 datasets existing, seedable:false (idempotent state reached).
+- Browser check on prod (mobile 390px): login -> Interviews (2 upcoming, avg rating 3.7, seeded candidate cards) -> Assets (maintenance summary ৳13,000) all rendering production data. Viewport restored to 1280x800 for next round.
+- Local git clean; sqlite provider active; .env untracked.
+
+Round complete. Next-round recommendations: leave-approval one-click actions from notification center; payroll holiday-aware working-day proration; real SMTP delivery; employee directory print/PDF polish.
