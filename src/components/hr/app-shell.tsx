@@ -2,7 +2,7 @@
 
 import { Sidebar } from "./sidebar";
 import { Topbar } from "./topbar";
-import { useApp } from "@/lib/store";
+import { useApp, type ModuleKey } from "@/lib/store";
 import { DashboardModule } from "./modules/dashboard";
 import { EmployeesModule } from "./modules/employees";
 import { AttendanceModule } from "./modules/attendance";
@@ -27,7 +27,7 @@ import { QuickActions } from "./quick-actions";
 import { useKeyboardShortcuts } from "@/hooks/use-keyboard-shortcuts";
 import { ShortcutsHelp } from "./shortcuts-help";
 import { motion, AnimatePresence } from "framer-motion";
-import { useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
 
 const MODULE_COMPONENTS: Record<string, React.ComponentType> = {
   dashboard: DashboardModule,
@@ -51,7 +51,94 @@ const MODULE_COMPONENTS: Record<string, React.ComponentType> = {
   myhr: MyHrModule,
 };
 
+// ============================================================
+// URL sync — makes module navigation deep-linkable:
+//   * On first load, consumes ?module= & ?employee= & ?tab=
+//     (so links from notifications / bookmarks / pasted URLs land
+//     on the right view).
+//   * Every subsequent navigation pushState's the equivalent URL,
+//     so browser Back/Forward and refresh keep your place.
+// ============================================================
+function useUrlSync() {
+  const activeModule = useApp((s) => s.activeModule);
+  const documentsTab = useApp((s) => s.documentsTab);
+  const employeeView = useApp((s) => s.employeeView);
+  const selectedEmployeeId = useApp((s) => s.selectedEmployeeId);
+  const hydrated = useRef(false);
+
+  function consumeParams(sp: URLSearchParams) {
+    const employee = sp.get("employee");
+    const moduleKey = sp.get("module") as ModuleKey | null;
+    const tab = sp.get("tab");
+    const st = useApp.getState();
+    if (employee) {
+      st.openEmployee(employee);
+    } else if (moduleKey && moduleKey in MODULE_COMPONENTS) {
+      st.setModule(moduleKey);
+    }
+    if (
+      tab &&
+      ["all", "templates", "generated", "email-history", "approval-queue"].includes(
+        tab
+      )
+    ) {
+      st.setDocumentsTab(tab as never);
+    }
+  }
+
+  // --- Initial hydration: apply URL params once ---
+  useEffect(() => {
+    if (hydrated.current) return;
+    hydrated.current = true;
+    const sp = new URLSearchParams(window.location.search);
+    if (sp.toString()) consumeParams(sp);
+    // Normalize the URL for the current state (replace, no history entry).
+    const url = buildUrl(
+      useApp.getState().activeModule,
+      useApp.getState().employeeView,
+      useApp.getState().selectedEmployeeId,
+      useApp.getState().documentsTab
+    );
+    window.history.replaceState(null, "", url);
+  }, []);
+
+  // --- Push URL on navigation state changes ---
+  useEffect(() => {
+    // Read fresh state: the hydration effect may have mutated the store
+    // just before this effect ran with stale closure values.
+    const st = useApp.getState();
+    const url = buildUrl(st.activeModule, st.employeeView, st.selectedEmployeeId, st.documentsTab);
+    if (`${window.location.pathname}${window.location.search}` === url) return;
+    window.history.pushState(null, "", url);
+  }, [activeModule, employeeView, selectedEmployeeId, documentsTab]);
+
+  // --- Back/Forward: consume the popped entry's params ---
+  useEffect(() => {
+    function onPop() {
+      consumeParams(new URLSearchParams(window.location.search));
+    }
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, []);
+}
+
+function buildUrl(
+  activeModule: string,
+  employeeView: string,
+  selectedEmployeeId: string | null,
+  documentsTab: string
+): string {
+  const sp = new URLSearchParams();
+  if (activeModule && activeModule !== "dashboard") sp.set("module", activeModule);
+  if (activeModule === "employees" && employeeView === "profile" && selectedEmployeeId)
+    sp.set("employee", selectedEmployeeId);
+  if (activeModule === "documents") sp.set("tab", documentsTab);
+  const qs = sp.toString();
+  return `${window.location.pathname}${qs ? `?${qs}` : ""}`;
+}
+
 export function AppShell() {
+  useUrlSync();
   const activeModule = useApp((s) => s.activeModule);
   const helpOpen = useApp((s) => s.shortcutsHelpOpen);
   const setHelpOpen = useApp((s) => s.setShortcutsHelpOpen);

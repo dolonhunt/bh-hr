@@ -30,6 +30,52 @@ export async function PATCH(
   const isDecision =
     body.status === "APPROVED" || body.status === "REJECTED" || body.status === "CANCELLED";
 
+  // ----- Hard-block over-allocation (optional, Settings → Leave Types) -----
+  // When the `leaveApprovalHardBlock` setting is "true", approving a request
+  // that would exceed the employee's allocated balance is rejected here,
+  // server-side. Committed days = APPROVED + PENDING (this request included).
+  if (body.status === "APPROVED") {
+    const hardBlock = await db.setting.findUnique({
+      where: { key: "leaveApprovalHardBlock" },
+    });
+    if (hardBlock?.value === "true") {
+      const request = await db.leaveRequest.findUnique({
+        where: { id },
+        include: { leaveType: true },
+      });
+      if (request) {
+        const siblings = await db.leaveRequest.groupBy({
+          by: ["status"],
+          _sum: { days: true },
+          where: {
+            employeeId: request.employeeId,
+            leaveTypeId: request.leaveTypeId,
+            id: { not: request.id },
+            status: { in: ["APPROVED", "PENDING"] },
+          },
+        });
+        const used = siblings.find((s) => s.status === "APPROVED")?._sum.days ?? 0;
+        const pendingOther = siblings.find((s) => s.status === "PENDING")?._sum.days ?? 0;
+        const allocated = request.leaveType.defaultDays ?? 0;
+        const committed = used + pendingOther + (request.days ?? 0);
+        const remainingAfter = allocated - committed;
+        if (remainingAfter < 0) {
+          return NextResponse.json(
+            {
+              error: `Blocked: approving this ${request.leaveType.name} request exceeds ${request.leaveType.name} balance by ${Math.abs(remainingAfter)} day(s) (allocated ${allocated}, used ${used}, pending ${pendingOther + (request.days ?? 0)}). Turn off "Block over-allocation" in Settings → Leave Types to allow override.`,
+              code: "OVER_ALLOCATION",
+              allocated,
+              used,
+              pending: pendingOther + (request.days ?? 0),
+              remainingAfter,
+            },
+            { status: 409 }
+          );
+        }
+      }
+    }
+  }
+
   const updated = await db.leaveRequest.update({
     where: { id },
     data: {

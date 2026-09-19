@@ -721,6 +721,79 @@ function isLoading(data: any) {
 }
 
 // ============================== LEAVE TYPES ==============================
+// ============================== LEAVE POLICY ==============================
+// Server-enforced approval guard: when enabled, the leave PATCH API refuses
+// approvals that would push the employee past their allocated balance.
+function LeavePolicyCard() {
+  const qc = useQueryClient();
+  const { data } = useQuery({
+    queryKey: ["settings"],
+    queryFn: () => fetch("/api/settings").then((r) => r.json()),
+  });
+  const enabled = data?.settings?.leaveApprovalHardBlock === "true";
+  const [saving, setSaving] = useState(false);
+
+  async function toggle(next: boolean) {
+    setSaving(true);
+    try {
+      const r = await fetch("/api/settings", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          settings: [{ key: "leaveApprovalHardBlock", value: String(next) }],
+        }),
+      });
+      if (!r.ok) throw new Error("Failed to save setting");
+      toast.success(
+        next
+          ? "Over-allocation blocking enabled — approvals exceeding balance are now blocked."
+          : "Over-allocation blocking disabled — warning-only mode restored."
+      );
+      qc.invalidateQueries({ queryKey: ["settings"] });
+    } catch (e: any) {
+      toast.error(e?.message || "Failed to save setting");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Card className="border-border/60 shadow-soft">
+      <CardContent className="p-5 flex items-start justify-between gap-4">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            <ShieldCheck className="size-4 text-primary" />
+            <h3 className="text-sm font-semibold">Block over-allocation approvals</h3>
+            <span
+              className={cn(
+                "text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded-md cursor-default",
+                enabled
+                  ? "bg-primary/10 text-primary"
+                  : "bg-amber-500/10 text-amber-700 dark:text-amber-400"
+              )}
+            >
+              {enabled ? "Enforced" : "Warn only"}
+            </span>
+          </div>
+          <p className="text-xs text-muted-foreground mt-1.5 max-w-xl leading-relaxed">
+            When enabled, approving a leave request that exceeds the employee's
+            allocated balance is <span className="font-medium text-foreground">blocked
+            server-side</span> — the API refuses the approval. When disabled (default),
+            the notification center shows an amber balance warning and HR may still
+            approve.
+          </p>
+        </div>
+        <Switch
+          checked={enabled}
+          disabled={saving}
+          onCheckedChange={toggle}
+          aria-label="Block over-allocation approvals"
+        />
+      </CardContent>
+    </Card>
+  );
+}
+
 function LeaveTypesTab() {
   const qc = useQueryClient();
   const [edit, setEdit] = useState<any>(null);
@@ -734,7 +807,9 @@ function LeaveTypesTab() {
   const items = data?.items ?? [];
 
   return (
-    <Card className="border-border/60 shadow-soft">
+    <div className="space-y-4">
+      <LeavePolicyCard />
+      <Card className="border-border/60 shadow-soft">
       <CardContent className="p-6">
         <SimpleTableHeader
           title="Leave Types"
@@ -864,6 +939,7 @@ function LeaveTypesTab() {
         />
       )}
     </Card>
+    </div>
   );
 }
 

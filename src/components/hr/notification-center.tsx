@@ -659,6 +659,17 @@ function NotificationRow({
   // negative value means approving (any pending) over-allocates the pool.
   const overAllocated = isLeave && !!balanceRow && balanceRow.remaining < 0;
 
+  // Server-side approval guard state (Settings → Leave Types). Shared
+  // ["settings"] cache — only one network fetch across all rows + Settings.
+  const settingsQuery = useQuery({
+    queryKey: ["settings"],
+    queryFn: () => fetch("/api/settings").then((r) => r.json()),
+    staleTime: 120_000,
+    enabled: isLeave,
+  });
+  const hardBlock =
+    settingsQuery.data?.settings?.leaveApprovalHardBlock === "true";
+
   return (
     <motion.li
       layout
@@ -766,7 +777,7 @@ function NotificationRow({
               )}
               title={
                 overAllocated
-                  ? `Allocated ${balanceRow.allocated} d · used ${balanceRow.used} d · approving over-allocates by ${Math.abs(balanceRow.remaining)} d`
+                  ? `Allocated ${balanceRow.allocated} d · used ${balanceRow.used} d · approving over-allocates by ${Math.abs(balanceRow.remaining)} d${hardBlock ? " · approval will be blocked" : ""}`
                   : `Allocated ${balanceRow.allocated} d · used ${balanceRow.used} d · ${balanceRow.pending} d pending`
               }
             >
@@ -804,7 +815,9 @@ function NotificationRow({
                   n.type === "DOCUMENT_PENDING_APPROVAL"
                     ? "Open review & sign-off dialog"
                     : overAllocated
-                      ? "Requested days exceed remaining balance — approve as override"
+                      ? hardBlock
+                        ? "Requested days exceed remaining balance — approval will be blocked (see Settings → Leave Types)"
+                        : "Requested days exceed remaining balance — approve as override"
                       : "Approve without leaving the feed"
                 }
               >

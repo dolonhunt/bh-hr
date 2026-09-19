@@ -44,6 +44,7 @@ import {
   Zap,
   Megaphone,
   Sun,
+  Moon,
   Pin,
   AlertTriangle,
   Info,
@@ -249,6 +250,8 @@ export function DashboardModule() {
   const hour = new Date().getHours();
   const greeting =
     hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
+  // BD weekend: Friday + Saturday are weekly off-days
+  const isWeekendDay = [5, 6].includes(new Date().getDay());
   const attendanceRate =
     kpis.totalEmployees > 0
       ? Math.round((kpis.presentToday / kpis.totalEmployees) * 100)
@@ -318,6 +321,7 @@ export function DashboardModule() {
           authUser={authUser}
           greeting={greeting}
           attendanceRate={attendanceRate}
+          isWeekendDay={isWeekendDay}
           setModule={setModule}
           openEmployee={openEmployee}
           setQuickAction={setQuickAction}
@@ -345,6 +349,7 @@ interface DashboardGridProps {
   authUser: { name?: string } | null;
   greeting: string;
   attendanceRate: number;
+  isWeekendDay: boolean;
   setModule: (m: any) => void;
   openEmployee: (id: string) => void;
   setQuickAction: (a: string) => void;
@@ -357,6 +362,7 @@ function DashboardGrid({
   authUser,
   greeting,
   attendanceRate,
+  isWeekendDay,
   setModule,
   openEmployee,
   setQuickAction,
@@ -424,6 +430,7 @@ function DashboardGrid({
                   authUser={authUser}
                   greeting={greeting}
                   attendanceRate={attendanceRate}
+                  isWeekendDay={isWeekendDay}
                   setModule={setModule}
                   openEmployee={openEmployee}
                   setQuickAction={setQuickAction}
@@ -457,6 +464,7 @@ function DashboardGrid({
                   authUser={authUser}
                   greeting={greeting}
                   attendanceRate={attendanceRate}
+                  isWeekendDay={isWeekendDay}
                   setModule={setModule}
                   openEmployee={openEmployee}
                   setQuickAction={setQuickAction}
@@ -477,6 +485,7 @@ function DashboardGrid({
                 authUser={authUser}
                 greeting={greeting}
                 attendanceRate={attendanceRate}
+                isWeekendDay={isWeekendDay}
                 setModule={setModule}
                 openEmployee={openEmployee}
                 setQuickAction={setQuickAction}
@@ -500,6 +509,7 @@ interface WidgetRendererProps {
   authUser: { name?: string } | null;
   greeting: string;
   attendanceRate: number;
+  isWeekendDay: boolean;
   setModule: (m: any) => void;
   openEmployee: (id: string) => void;
   setQuickAction: (a: string) => void;
@@ -559,19 +569,30 @@ function HeroBannerWidget({
   authUser,
   greeting,
   attendanceRate,
+  isWeekendDay,
 }: WidgetRendererProps) {
   return (
     <Card className="relative overflow-hidden border-border/60 shadow-soft bg-gradient-to-br from-primary/5 via-primary/3 to-transparent">
       <div className="absolute top-0 right-0 w-64 h-64 rounded-full bg-primary/8 blur-3xl -mr-20 -mt-20" />
       <CardContent className="relative p-5 sm:p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div className="min-w-0">
-          <div className="text-sm text-muted-foreground">
-            {new Date().toLocaleDateString("en-US", {
-              weekday: "long",
-              year: "numeric",
-              month: "long",
-              day: "numeric",
-            })}
+          <div className="flex items-center gap-2 flex-wrap text-sm text-muted-foreground">
+            <span>
+              {new Date().toLocaleDateString("en-US", {
+                weekday: "long",
+                year: "numeric",
+                month: "long",
+                day: "numeric",
+              })}
+            </span>
+            {isWeekendDay && (
+              <span
+                className="inline-flex items-center gap-1 rounded-full bg-amber-500/10 text-amber-700 dark:text-amber-400 px-2 py-0.5 text-[11px] font-medium cursor-default"
+                title="Friday & Saturday are weekly off-days (Bangladesh)"
+              >
+                <Moon className="size-3" /> Weekend · office closed
+              </span>
+            )}
           </div>
           <h2 className="text-xl sm:text-2xl font-bold tracking-tight mt-1">
             {greeting}, {authUser?.name?.split(" ")[0] ?? "HR"} 👋
@@ -587,11 +608,23 @@ function HeroBannerWidget({
               {kpis.docsGenerated} document
               {kpis.docsGenerated !== 1 ? "s" : ""} generated
             </span>
-            .
+            {isWeekendDay && (
+              <span className="text-muted-foreground/80">
+                {" "}· office reopens Sunday.
+              </span>
+            )}
+            {!isWeekendDay && "."}
           </p>
         </div>
         <div className="flex items-center gap-4 flex-shrink-0">
-          <div className="relative size-20 flex items-center justify-center">
+          <div
+            className="relative size-20 flex items-center justify-center"
+            title={
+              isWeekendDay
+                ? "Weekly off-day (Fri & Sat) — attendance resumes Sunday"
+                : undefined
+            }
+          >
             <svg className="size-20 -rotate-90" viewBox="0 0 80 80">
               <circle
                 cx="40"
@@ -617,10 +650,10 @@ function HeroBannerWidget({
             </svg>
             <div className="absolute text-center">
               <div className="text-lg font-bold tabular-nums">
-                {attendanceRate}%
+                {isWeekendDay ? "–" : `${attendanceRate}%`}
               </div>
               <div className="text-[9px] text-muted-foreground uppercase">
-                Present
+                {isWeekendDay ? "Weekend" : "Present"}
               </div>
             </div>
           </div>
@@ -655,6 +688,7 @@ function KpiRowWidget({
   data,
   kpis,
   setModule,
+  isWeekendDay,
 }: WidgetRendererProps) {
   return (
     <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
@@ -672,7 +706,17 @@ function KpiRowWidget({
         value={kpis.presentToday}
         icon={CalendarCheck}
         iconClass="bg-primary/10 text-primary"
-        delta={{ value: "+5%", trend: "up" }}
+        delta={isWeekendDay ? undefined : { value: "+5%", trend: "up" }}
+        footer={
+          isWeekendDay ? (
+            <span
+              className="text-muted-foreground cursor-default"
+              title="Friday & Saturday are weekly off-days (Bangladesh)"
+            >
+              Weekly off — Fri & Sat
+            </span>
+          ) : undefined
+        }
         onClick={() => setModule("attendance")}
         sparkline={data.attendanceTrend.map((d) => d.present)}
       />
