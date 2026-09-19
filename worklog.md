@@ -2461,3 +2461,19 @@ Stage Summary:
 - Module data completeness restored: 0 empty operational modules remain on dev; same data available on prod via one-click (or curl) POST /api/demo-data after deploy.
 - DB workflow honored: schema flipped to postgresql before push, then sqlite restored for local dev; .env not committed.
 - Next recommendations: trigger /api/demo-data on Vercel post-deploy; leave-approval one-click from notification center; real SMTP; payroll holiday-aware proration.
+
+QA-FINAL-4 addendum (same round, hotfix after prod trigger):
+- First POST /api/demo-data on Vercel revealed two things: (1) auditLog.create used a non-existent `details` field → replaced with correct `description` + userId/ipAddress (matches other routes); verified 200 locally.
+- (2) Prod DB has NO candidates and NO assets (only base HR data), so interviews + assetMaintenance were skipped on prod ("no candidates found" / "no assets found"). Extended ensureDemoData with two new idempotent seeders:
+  * seedCandidates (8 candidates across existing jobs, statuses APPLIED→OFFER/REJECTED, BD phones/salaries/skills) — runs BEFORE interviews.
+  * seedAssets (12 asset Activity rows, same conventions as seed-assets-training) — runs BEFORE assetMaintenance.
+- GET /api/demo-data preview + Settings demo-data chips now include candidates + assets (7 chips).
+- Local idempotency re-verified: POST with all datasets present → ok:true, createdCount 0.
+
+QA-FINAL-4 addendum (same round, hotfix after prod trigger):
+- First POST /api/demo-data on Vercel revealed two things: (1) auditLog.create used a non-existent `details` field -> replaced with correct `description` + userId/ipAddress (matches other routes); verified 200 locally.
+- (2) Prod DB has NO candidates and NO assets (only base HR data), so interviews + assetMaintenance were skipped on prod ("no candidates found" / "no assets found"). Extended ensureDemoData with two new idempotent seeders:
+  * seedCandidates (8 candidates across existing jobs, statuses APPLIED->OFFER/REJECTED, BD phones/salaries/skills) - runs BEFORE interviews.
+  * seedAssets (12 asset Activity rows, same conventions as seed-assets-training) - runs BEFORE assetMaintenance.
+- GET /api/demo-data preview + Settings demo-data chips now include candidates + assets (7 chips).
+- Local idempotency re-verified: POST with all datasets present -> ok:true, createdCount 0.

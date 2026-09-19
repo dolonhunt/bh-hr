@@ -22,16 +22,20 @@ export async function POST() {
       0
     );
 
+    const user = await db.user.findFirst({ where: { role: "HR_ADMIN" } });
+
     await db.auditLog.create({
       data: {
+        userId: user?.id,
         action: "DEMO_DATA_SEED",
         entityType: "System",
         entityId: "demo-data",
-        details: `Demo data seeding: ${createdCount} records created${
+        description: `Demo data seeding: ${createdCount} records created${
           Object.keys(result.skipped).length
             ? `, skipped: ${Object.keys(result.skipped).join(", ")}`
             : ""
         }`,
+        ipAddress: "system",
       },
     });
 
@@ -64,20 +68,24 @@ export async function POST() {
 
 export async function GET() {
   // Preview: what WOULD be seeded / skipped right now.
-  const [interviews, surveys, expenses, timesheets, maintenance] =
+  const [candidates, interviews, surveys, expenses, timesheets, assets, maintenance] =
     await Promise.all([
+      db.candidate.count(),
       db.activity.count({ where: { type: "INTERVIEW" } }),
       db.activity.count({ where: { type: "SURVEY" } }),
       db.activity.count({ where: { type: "EXPENSE" } }),
       db.activity.count({ where: { type: "TIMESHEET" } }),
+      db.activity.count({ where: { type: "ASSET" } }),
       db.activity.count({ where: { type: "ASSET_MAINTENANCE" } }),
     ]);
   return NextResponse.json({
     datasets: {
+      candidates: { existing: candidates, seedable: candidates === 0 },
       interviews: { existing: interviews, seedable: interviews === 0 },
       surveys: { existing: surveys, seedable: surveys === 0 },
       expenses: { existing: expenses, seedable: expenses === 0 },
       timesheets: { existing: timesheets, seedable: timesheets === 0 },
+      assets: { existing: assets, seedable: assets === 0 },
       assetMaintenance: {
         existing: maintenance,
         seedable: maintenance === 0,

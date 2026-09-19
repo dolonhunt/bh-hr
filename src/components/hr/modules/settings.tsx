@@ -1265,10 +1265,12 @@ function DemoDataCard() {
   });
 
   const datasets: { key: string; label: string }[] = [
+    { key: "candidates", label: "Candidates" },
     { key: "interviews", label: "Interviews" },
     { key: "surveys", label: "Surveys" },
     { key: "expenses", label: "Expenses" },
     { key: "timesheets", label: "Timesheets" },
+    { key: "assets", label: "Assets" },
     { key: "assetMaintenance", label: "Asset maintenance" },
   ];
   const seedableCount =

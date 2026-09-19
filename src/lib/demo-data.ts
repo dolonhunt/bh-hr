@@ -52,6 +52,58 @@ function nextWorkingDays(count: number): Date[] {
   return out;
 }
 
+async function seedCandidates(
+  created: Record<string, number>,
+  skipped: Record<string, string>
+) {
+  const existing = await db.candidate.count();
+  if (existing > 0) {
+    skipped.candidates = `${existing} already present`;
+    return;
+  }
+  const jobs = await db.job.findMany({ select: { id: true, title: true } });
+  if (jobs.length === 0) {
+    skipped.candidates = "no jobs found";
+    return;
+  }
+
+  const rows = [
+    { name: "Ayesha Siddiqua", job: 0, status: "INTERVIEW", exp: 5.5, salary: 155000, skills: "Node.js, PostgreSQL, AWS, Docker", phone: "+880 1711-010101" },
+    { name: "Tahsin Khan", job: 2, status: "INTERVIEW", exp: 3, salary: 62000, skills: "Sales strategy, CRM, Negotiation", phone: "+880 1711-020202" },
+    { name: "Rahim Uddin", job: 0, status: "SHORTLISTED", exp: 7, salary: 170000, skills: "Go, Kubernetes, gRPC, Redis", phone: "+880 1711-030303" },
+    { name: "Nabila Chowdhury", job: 1, status: "SCREENING", exp: 4, salary: 105000, skills: "Figma, Design systems, Prototyping", phone: "+880 1711-040404" },
+    { name: "Farhan Ahmed", job: 2, status: "APPLIED", exp: 2, salary: 52000, skills: "Lead generation, Cold outreach", phone: "+880 1711-050505" },
+    { name: "Sumaiya Islam", job: 1, status: "OFFER", exp: 6, salary: 118000, skills: "Product design, UX research, Motion", phone: "+880 1711-060606" },
+    { name: "Imran Hossain", job: 0, status: "REJECTED", exp: 2.5, salary: 90000, skills: "PHP, Laravel, MySQL", phone: "+880 1711-070707" },
+    { name: "Zara Rahman", job: 2, status: "APPLIED", exp: 4, salary: 70000, skills: "Key accounts, B2B pipelines", phone: "+880 1711-080808" },
+  ];
+
+  const now = Date.now();
+  for (let i = 0; i < rows.length; i++) {
+    const r = rows[i];
+    const job = jobs[r.job % jobs.length];
+    const slug = r.name.toLowerCase().replace(/[^a-z]+/g, ".");
+    await db.candidate.create({
+      data: {
+        name: r.name,
+        email: `${slug}@gmail.com`,
+        phone: r.phone,
+        jobId: job.id,
+        experience: r.exp,
+        skills: r.skills,
+        expectedSalary: r.salary,
+        status: r.status,
+        interviewNotes:
+          r.status === "INTERVIEW"
+            ? "Technical + culture rounds in progress."
+            : null,
+        appliedAt: new Date(now - (i + 2) * 3 * DAY),
+      },
+    });
+  }
+  created.candidates = rows.length;
+}
+
 async function seedInterviews(
   created: Record<string, number>,
   skipped: Record<string, string>
@@ -69,6 +121,7 @@ async function seedInterviews(
     skipped.interviews = "no candidates found";
     return;
   }
+
   const jobs = await db.job.findMany({ select: { id: true, title: true } });
 
   const upcoming = nextWorkingDays(2);
@@ -477,6 +530,64 @@ async function seedTimesheets(
   created.timesheets = count;
 }
 
+async function seedAssets(
+  created: Record<string, number>,
+  skipped: Record<string, string>
+) {
+  const existing = await db.activity.count({ where: { type: "ASSET" } });
+  if (existing > 0) {
+    skipped.assets = `${existing} already present`;
+    return;
+  }
+  const employees = await db.employee.findMany({ take: 6 });
+  if (employees.length === 0) {
+    skipped.assets = "no employees found";
+    return;
+  }
+
+  const assets = [
+    { name: "MacBook Pro 16\"", type: "LAPTOP", serial: "MBP16-001", condition: "NEW", status: "ASSIGNED" },
+    { name: "MacBook Pro 14\"", type: "LAPTOP", serial: "MBP14-002", condition: "GOOD", status: "ASSIGNED" },
+    { name: "Dell Monitor 27\"", type: "MONITOR", serial: "DEL27-001", condition: "GOOD", status: "ASSIGNED" },
+    { name: "LG Monitor 24\"", type: "MONITOR", serial: "LG24-002", condition: "FAIR", status: "AVAILABLE" },
+    { name: "iPhone 15 Pro", type: "PHONE", serial: "IP15P-001", condition: "NEW", status: "ASSIGNED" },
+    { name: "Samsung Galaxy S24", type: "PHONE", serial: "SGS24-001", condition: "GOOD", status: "AVAILABLE" },
+    { name: "Logitech MX Keys", type: "KEYBOARD", serial: "LGK-001", condition: "NEW", status: "AVAILABLE" },
+    { name: "Logitech MX Master 3", type: "MOUSE", serial: "LGM-001", condition: "GOOD", status: "AVAILABLE" },
+    { name: "Sony WH-1000XM5", type: "HEADSET", serial: "SONY-001", condition: "NEW", status: "ASSIGNED" },
+    { name: "Ergonomic Chair", type: "CHAIR", serial: "CHAIR-001", condition: "GOOD", status: "ASSIGNED" },
+    { name: "Standing Desk", type: "DESK", serial: "DESK-001", condition: "NEW", status: "AVAILABLE" },
+    { name: "Webcam Logitech C920", type: "CAMERA", serial: "CAM-001", condition: "FAIR", status: "DAMAGED" },
+  ];
+
+  for (let i = 0; i < assets.length; i++) {
+    const a = assets[i];
+    const assignedEmp =
+      a.status === "ASSIGNED" ? employees[i % employees.length] : null;
+    await db.activity.create({
+      data: {
+        type: "ASSET",
+        title: a.name,
+        employeeId: assignedEmp?.id ?? null,
+        description: JSON.stringify({
+          name: a.name,
+          type: a.type,
+          serialNumber: a.serial,
+          condition: a.condition,
+          status: a.status,
+          notes: "",
+          assignedToId: assignedEmp?.id ?? null,
+          assignedToName: assignedEmp?.fullName ?? null,
+          assignedDate: assignedEmp ? iso(Date.now() - (i + 1) * 21 * DAY) : null,
+          returnDate: null,
+          expectedReturnDate: null,
+        }),
+      },
+    });
+  }
+  created.assets = assets.length;
+}
+
 async function seedAssetMaintenance(
   created: Record<string, number>,
   skipped: Record<string, string>
@@ -549,10 +660,12 @@ export async function ensureDemoData(): Promise<DemoDataResult> {
   const created: Record<string, number> = {};
   const skipped: Record<string, string> = {};
 
+  await seedCandidates(created, skipped);
   await seedInterviews(created, skipped);
   await seedSurveys(created, skipped);
   await seedExpenses(created, skipped);
   await seedTimesheets(created, skipped);
+  await seedAssets(created, skipped);
   await seedAssetMaintenance(created, skipped);
 
   return { created, skipped };
